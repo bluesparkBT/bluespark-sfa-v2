@@ -24,7 +24,7 @@ class Address(SQLModel, table=True):  # defined in Employee in ASP
     sub_city: str = Field(index=True)
     woreda: str = Field(index=True)
     landmark: Optional[str] = Field(default=None, index=True)
-    locations: List["Location"] = Relationship(back_populates="address_rel")
+    locations: List["Location"] = Relationship(back_populates="address")
 
 
     @model_validator(mode="after")
@@ -51,10 +51,10 @@ class Location(SQLModel, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     name: Optional[str] = Field(default=None)
-    address: Optional[int] = Field(default=None, foreign_key="address.id", index=True)
+    address_id: Optional[int] = Field(default=None, foreign_key="address.id", index=True)
     latitude: float
     longitude: float
-    address_rel: Optional[Address] = Relationship(back_populates="locations")
+    address: Optional[Address] = Relationship(back_populates="locations")
 
     @model_validator(mode="after")
     def check(self) -> Self:

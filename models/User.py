@@ -57,7 +57,7 @@ class User(SQLModel, table=True):
         id_type (Optional[IdType]): The type of identification document.
         id_number (Optional[str]): The identification number.
         gender (Optional[Gender]): The gender of the user.
-        address (Optional[int]): Foreign key referencing the user's address ID (indexed).
+        address_id (Optional[int]): Foreign key referencing the user's address ID (indexed).
     """
     id: Optional[int] = Field(default=None, primary_key=True)
     fullname: str = Field(index=True)
@@ -73,7 +73,7 @@ class User(SQLModel, table=True):
     id_number: Optional[str] = Field
     gender: Optional[Gender]
     # manager: Optional[int] = Field(default=None, foreign_key="employee.id")
-    address: Optional[int] = Field(default=None, foreign_key="address.id", index=True)
+    address_id: Optional[int] = Field(default=None, foreign_key="address.id", index=True)
 
 
 

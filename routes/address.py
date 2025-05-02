@@ -106,8 +106,26 @@ async def get_locations(session: SessionDep) -> list[LocationRead]:
         list[Location]: A list of Location objects.
         If empty it returns an empty list. []
     """
-    statement = select(Location).options(selectinload(Location.address_rel))
+    statement = select(Location).options(selectinload(Location.address))
     locations = session.exec(statement).all()
+
+#    returns this
+#     [
+#     {
+#         "id": 4,
+#         "name": "Addis Ababa",
+#         "latitude": 9.234,
+#         "longitude": 32.678,
+#         "address": {
+#             "id": 3,
+#             "country": "Ethiopia",
+#             "city": "Addis Ababa",
+#             "sub_city": "Bole",
+#             "woreda": "05",
+#             "landmark": "Meg"
+#         }
+#     }
+#     ]
 
 
     return locations

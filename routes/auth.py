@@ -117,7 +117,7 @@ async def admin_create_user(
             id_type=id_type,
             id_number=id_number,
             gender=gender,
-            address=db_address.id,
+            address_id=db_address.id,
         )
         session.add(user)
         session.commit()

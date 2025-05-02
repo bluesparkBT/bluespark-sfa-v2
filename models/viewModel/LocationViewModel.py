@@ -19,7 +19,7 @@ class LocationRead(BaseModel):
     name: Optional[str]
     latitude: float
     longitude: float
-    address_rel: Optional[AddressRead]
+    address: Optional[AddressRead]
 
     class Config:
         orm_mode = True
