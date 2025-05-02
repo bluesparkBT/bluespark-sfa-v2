@@ -1,0 +1,8 @@
+fastapi[standard]
+python-dotenv
+PyJWT
+passlib[bcrypt]
+sqlmodel
+psycopg2
+alembic
+pandas
