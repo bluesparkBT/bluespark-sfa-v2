@@ -12,6 +12,8 @@ from models.User import User
 security = HTTPBearer()
 
 ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_DAYS = 2
+REFRESH_TOKEN_EXPIRE_DAYS = 30
 SessionDep = Annotated[Session, Depends(get_session)]
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 

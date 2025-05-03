@@ -1,7 +1,7 @@
 from datetime import  datetime
 from pydantic import model_validator, validate_email
 from sqlmodel import SQLModel, Field
-from typing import Optional, Self
+from typing import Optional, Self, List
 from enum import Enum
 
 
@@ -99,6 +99,23 @@ class User(SQLModel, table=True):
        
 
         return self
+    
+
+# class AccessPolicy(str, Enum):
+#     read_access = "ViewOnly"
+#     edit_access = "Edit"
+#     contribute_access = "Contribute"
+#     manage_access = "Manage"
+
+# class Scope(str, Enum):
+#     managerial_scope = "Managerial scope"
+#     personal_scope = "Personal scope"
+
+# class ScopeGroup(str, Enum):
+#     id: Optional[int] = Field(default=None, primary_key=True, unique=True)
+#     scope_name: str = Field(index=True, unique=True)
+#     organization_id: Optional[List[int]] = Field(default=None, foreign_key="organization.id", index=True)
+
     
 
 

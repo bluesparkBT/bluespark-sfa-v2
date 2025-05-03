@@ -1,5 +1,5 @@
 import base64
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 from typing import Annotated, Optional
 from fastapi import APIRouter, Body, HTTPException, Depends, status
@@ -10,6 +10,8 @@ from models.Location import Address
 from utils.address_util import check_address
 from utils.auth_util import (
     ALGORITHM,
+    ACCESS_TOKEN_EXPIRE_DAYS,
+    REFRESH_TOKEN_EXPIRE_DAYS,
     authenticate_user,
     create_access_token,
     get_current_user,
@@ -30,10 +32,52 @@ AuthenticationRouter = r = APIRouter()
 SessionDep = Annotated[Session, Depends(get_session)]
 # UserDep = Annotated[dict, Depends(get_current_user)]
 
+@r.post("/login")
+async def login(session: SessionDep, username: str=Body(...),password: str=Body(...)):
+    """Authenticate a user with their username and password.
+
+    Args:
+        session (SessionDep): Database session
+        username (str): username of the user
+        password (str): password of the user
+
+    Raises:
+        HTTPException: 401 if authentication fails
+        HTTPException: 400 if other error occurs
+
+    Returns:
+        JSON: access token and refresh token
+    """
+    try:
+        user: User = authenticate_user(session=session, username=username, password=password);
+        if not user:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect username or password")
+        access_token_expires = timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS)
+        access_token = create_access_token(
+            data={
+                "sub": user.username,
+                "username": user.id,
+            },
+            expires_delta=access_token_expires,
+        )
+
+        refresh_token_expires = timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+        refresh_token = create_access_token(
+            data={
+                "sub": user.username,
+                "type": "refresh token"
+            },
+            expires_delta=refresh_token_expires
+        )
+
+        return {"access_token": access_token, "refresh_token": refresh_token}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+          
+
 @r.post("/create-user")
-async def admin_create_user(
+async def create_user(
     session: SessionDep,
-    # current_user: UserDep,
     fullname: str = Body(...),
     username: str = Body(...),
     password: str = Body(...),
@@ -53,46 +97,43 @@ async def admin_create_user(
     landmark: Optional[str] = Body(None),
     # role: List[int] = Body(...) # Assuming role IDs
 ):
-    """
-    Create a new user account along with an associated address record.
+    """Create a user
 
-    Attributes:
-
-        id (Optional[int]): Unique identifier of the user (primary key).
-        fullname (str): The full name of the user (indexed).
-        username (str): The username of the user (indexed and unique).
-        email (Optional[str]): The email address of the user (indexed).
-        phone (str): The phone number of the user (indexed).
-        password (str): The password of the user.
-        date_of_birth (Optional[datetime]): The date of birth of the user.
-        date_of_joining (Optional[datetime]): The date the user joined the system.
-        salary (Optional[float]): The salary of the user.
-        position (Optional[str]): The job position of the user.
-        id_type (Optional[IdType]): The type of identification document.
-        id_number (Optional[str]): The identification number.
-        gender (Optional[Gender]): The gender of the user.
-        country (str): The country of the address.
-        city (str): The city of the address.
-        sub_city (str): The sub-city of the address.
-        woreda (str): The woreda of the address.
-        landmark (Optional[str]): A notable landmark near the address.
-        # role (List[int]): List of role IDs for the new user.
-
-    Returns:
-
-        User: The created user record.
+    Args:
+        session (SessionDep): _description_
+        fullname (str, optional): _description_. Defaults to Body(...).
+        username (str, optional): _description_. Defaults to Body(...).
+        password (str, optional): _description_. Defaults to Body(...).
+        email (Optional[str], optional): _description_. Defaults to Body(None).
+        phone_number (str, optional): _description_. Defaults to Body(...).
+        date_of_birth (Optional[datetime], optional): _description_. Defaults to Body(None).
+        date_of_joining (Optional[datetime], optional): _description_. Defaults to Body(None).
+        salary (Optional[float], optional): _description_. Defaults to Body(None).
+        position (Optional[str], optional): _description_. Defaults to Body(None).
+        id_type (Optional[IdType], optional): _description_. Defaults to Body(None).
+        id_number (Optional[str], optional): _description_. Defaults to Body(None).
+        gender (Optional[Gender], optional): _description_. Defaults to Body(None, description="The gender of the user").
+        country (str, optional): _description_. Defaults to Body("Ethiopia").
+        city (str, optional): _description_. Defaults to Body(...).
+        sub_city (str, optional): _description_. Defaults to Body(...).
+        woreda (str, optional): _description_. Defaults to Body(...).
+        landmark (Optional[str], optional): _description_. Defaults to Body(None).
 
     Raises:
+        HTTPException: 400 if the username already exists
+        HTTPException: 400 if other exception occurs
 
-        HTTPException: 400 if the user cannot be created due to insufficient privileges or other errors.
+    Returns:
+        User: the user created
     """
     try:
-        # if not check_policy(
-        #     session, PolicyType.create_access, "Admin", current_user.get("user")
-        # ):
-        #     raise HTTPException(
-        #         status_code=400, detail="You Do not have the required privilege"
-        #     )
+        # Check if user already exists
+        existing_user = session.exec(select(User).where(User.username == username)).first()
+        if existing_user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Username is already registered",
+            )
 
         address = Address(
             id=None,
@@ -121,17 +162,9 @@ async def admin_create_user(
         )
         session.add(user)
         session.commit()
-
-        # for r in role:
-        #     user_role: UserRole = UserRole(
-        #         user=user.id,
-        #         role=r,
-        #     )
-        #     session.add(user_role)
-
-        #session.commit()
-
         session.refresh(user)
+
         return user
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+    
