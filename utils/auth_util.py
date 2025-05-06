@@ -1,11 +1,12 @@
 import bcrypt, jwt
 from datetime import datetime, timedelta, timezone
 from sqlmodel import select
-from models.auth import User
+from models.user import User
 
 SECRET_KEY = "secret_here"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 90
+
 
 def get_password_hash(password: str) -> str:
     return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
