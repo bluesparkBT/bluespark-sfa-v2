@@ -7,11 +7,18 @@ Local install of Supabase to manage Postgres database and authentication
 ## First steps
 
 After cloning the repo create a `.gitignore` file and add the following<br>
-`.env`<br>
-`alembic.ini`<br>
-`.venv/`<br>
-`__pycache__/`<br>
-`alembic/versions/`<br>
+```sh
+    .env
+    .venv/
+    alembic.ini
+    alembic/
+
+    __pycache__/
+    models/__pycache__/
+    routes/__pycache__/
+    utils/__pycache__/
+
+```
 
 
 
@@ -58,6 +65,8 @@ Migrations are done using [alembic](https://alembic.sqlalchemy.org/en/latest/)
 To create a migration script:<br>
 
 `alembic revision --autogenerate -m "your message"`<br>
+Then Open alembic/versions/eeccaebd4e10_initial_migration.py and add this at the top:
+`import sqlmodel` <br>
 
 To run the script on the database server:<br>
 
