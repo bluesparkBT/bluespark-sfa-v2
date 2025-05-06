@@ -4,7 +4,7 @@ from models.multitenant import Company, Organization, OrganizationType
 from sqlmodel import select, Session
 from db import get_session
 from models.user import User,SuperAdminUser, ScopeGroup, Scope, ScopeGroupOrganizationLink
-from utils.jwt import verify_password, create_access_token, get_password_hash
+from utils.auth_util import verify_password, create_access_token, get_password_hash
 
 AuthenticationRouter =ar= APIRouter()
 
@@ -14,8 +14,9 @@ def login(
     username: str = Body(...),
     password: str = Body(...)
 ):
-    user = session.exec(select(User).where(User.username == username)).first()
-    if not user or not verify_password(password, user.passhash):
+    user = session.exec(select(SuperAdminUser).where(SuperAdminUser.username == username)).first()
+    print(user);
+    if not user or not verify_password(password+user.username, user.hashedPassword):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
     token = create_access_token(data={"sub": user.username})
