@@ -2,7 +2,6 @@ from sqlmodel import SQLModel, Field, Relationship
 from enum import Enum
 from datetime import  datetime
 from typing import List, Optional, Self
-from uuid import UUID, uuid4
 from pydantic import Base64Bytes, model_validator, validate_email
 
 
@@ -59,23 +58,23 @@ class ScopeGroup(SQLModel, table=True):
 class UserRole(SQLModel, table=True):
     __tablename__ = "user_role"
 
-    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    id: int = Field( primary_key=True)
     username: str
     email: str
     password_hash: str
-    tenant_id: UUID = Field(foreign_key="tenant.id")
-    role_id: UUID = Field(foreign_key="role.id")
+    tenant_id: int = Field(foreign_key="tenant.id")
+    role_id: int = Field(foreign_key="role.id")
 
 
 class Role(SQLModel, table=True):
     __tablename__ = "role"
 
-    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    id: int = Field( primary_key=True)
     name: str
-    tenant_id: UUID = Field(foreign_key="tenant.id")
+    tenant_id: int = Field(foreign_key="tenant.id")
 
 class Module(SQLModel, table=True):
-    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    id: int = Field(primary_key=True)
     name: str
 
 
@@ -88,14 +87,14 @@ class AccessPolicy(str, Enum):
 
 
 class RoleModulePermission(SQLModel, table=True):
-    id: UUID = Field(default_factory=uuid4, primary_key=True)
-    role_id: UUID = Field(foreign_key="role.id")
-    module_id: UUID = Field(foreign_key="module.id")
+    id: int = Field( primary_key=True)
+    role_id: int = Field(foreign_key="role.id")
+    module_id: int = Field(foreign_key="module.id")
     permission: AccessPolicy = Field(sa_column_kwargs={"nullable": False})
 
 class Tenant(SQLModel, table=True):
     __tablename__ = "tenant"
-    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    id: int = Field( primary_key=True)
     name: str
 
 class User(SQLModel, table=True):
@@ -116,7 +115,7 @@ class User(SQLModel, table=True):
     gender: Optional[Gender]
     manager_id: Optional[int] = Field(default=None, foreign_key="users.id", index=True)
     address_id: Optional[int] = Field(default=None, foreign_key="address.id", index=True)
-    role_id: Optional[UUID] = Field(default=None, foreign_key="role.id")
+    role_id: Optional[int] = Field(default=None, foreign_key="role.id")
     scope: Scope = Field(default=Scope.personal_scope)
     scope_group_id: Optional[int] = Field(default=None, foreign_key="scope_group.id")
 
@@ -141,7 +140,7 @@ class SuperAdminUser(SQLModel, table=True):
     username: str = Field(unique=True, index=True)
     email: Optional[str] = Field(index=True)
     hashedPassword: str
-    role_id: Optional[UUID] = Field(default=None, foreign_key="role.id")
+    role_id: Optional[int] = Field(default=None, foreign_key="role.id")
     scope_group_id: Optional[int] = Field(default=None, foreign_key="scope_group.id")
 
     @model_validator(mode="after")

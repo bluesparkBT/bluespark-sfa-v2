@@ -16,7 +16,7 @@ def login(
     password: str = Body(...)
 ):
     user = session.exec(select(SuperAdminUser).where(SuperAdminUser.username == username)).first()
-    print(user);
+    print(user)
     if not user or not verify_password(password+user.username, user.hashedPassword):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
