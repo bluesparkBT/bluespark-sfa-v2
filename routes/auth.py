@@ -33,6 +33,13 @@ async def create_superadmin_user(
     service_provider_company: str = Body(...)
 ):
     try:
+        existing_superadmin= session.exec(select(SuperAdminUser)).first()
+        if existing_superadmin is not None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Superadmin already registered",
+            )
+
         organization = Organization(
             organization_name=service_provider_company,
             organization_type = OrganizationType.company
