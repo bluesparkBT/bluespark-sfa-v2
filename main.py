@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
+from db import create_db_and_tables
 from routes.auth import AuthenticationRouter
 
 
@@ -31,12 +32,8 @@ app.add_middleware(
 )
 
 
-@app.exception_handler(Exception)
-async def global_exception_handler(request, exc):
-    return JSONResponse(
-        status_code=500,
-        content={"message": "An unexpected error occurred."},
-    )
-
+@app.on_event("startup")
+def on_startup():
+    create_db_and_tables()
 
 app.include_router(AuthenticationRouter, prefix="/auth", tags=["auth"])

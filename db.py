@@ -8,6 +8,7 @@ from sqlmodel import create_engine, Session
 
 # Virtual Environment
 from dotenv import load_dotenv
+from sqlmodel import SQLModel
 
 load_dotenv()
 SECRET_KEY = os.getenv("SECRET_KEY")
@@ -26,3 +27,6 @@ engine = create_engine(POSTGRES)
 def get_session():
     with Session(engine) as session:
         yield session
+        
+def create_db_and_tables():
+    SQLModel.metadata.create_all(engine)
