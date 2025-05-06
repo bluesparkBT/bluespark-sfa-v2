@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException, Body, status, Depends
 from models.multitenant import Company, Organization, OrganizationType
 from sqlmodel import select, Session
 from db import get_session
-from models.auth import User,SuperAdminUser, ScopeGroup, Scope, ScopeGroupOrganizationLink
+from models.user import User,SuperAdminUser, ScopeGroup, Scope, ScopeGroupOrganizationLink
 from utils.jwt import verify_password, create_access_token, get_password_hash
 
 AuthenticationRouter =ar= APIRouter()

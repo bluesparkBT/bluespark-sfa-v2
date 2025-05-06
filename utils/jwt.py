@@ -1,7 +1,7 @@
 import bcrypt, jwt
 from datetime import datetime, timedelta, timezone
 from sqlmodel import select
-from models.auth import User
+from models.user import User
 
 SECRET_KEY = "secret_here"
 ALGORITHM = "HS256"

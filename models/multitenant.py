@@ -2,7 +2,7 @@ from pydantic import model_validator
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, Self, List
 from enum import Enum
-from models.auth import ScopeGroup, ScopeGroupOrganizationLink
+from models.user import ScopeGroup, ScopeGroupOrganizationLink
 
 
 class Company(SQLModel, table=True): 
