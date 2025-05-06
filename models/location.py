@@ -1,0 +1,44 @@
+from pydantic import model_validator
+from sqlmodel import SQLModel, Field, Relationship
+from typing import Optional, Self, List
+
+
+class Address(SQLModel, table=True): 
+    __tablename__ = "address"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    country: str = Field(default="Ethiopia", index=True)
+    city: str = Field(index=True)
+    sub_city: str = Field(index=True)
+    woreda: str = Field(index=True)
+    landmark: Optional[str] = Field(default=None, index=True)
+    location: Optional["Location"] = Relationship(back_populates="address")
+
+
+    @model_validator(mode="after")
+    def check(self) -> Self:
+        if self.landmark == "null" or self.landmark == "":
+            self.landmark = None
+        return self
+
+
+class Location(SQLModel, table=True):
+    __tablename__ = "location"
+
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: Optional[str] = Field(default=None)
+    address_id: Optional[int] = Field(default=None, foreign_key="address.id", index=True)
+    latitude: float
+    longitude: float
+
+    address: Optional[Address] = Relationship(back_populates="location")
+   
+
+    @model_validator(mode="after")
+    def check(self) -> Self:
+        if self.name == "null" or self.name == "":
+            self.name = None
+        if self.address == "null" or self.address == "":
+            self.address = None
+        return self

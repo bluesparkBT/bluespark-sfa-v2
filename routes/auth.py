@@ -1,7 +1,9 @@
+from typing import Optional
 from fastapi import APIRouter, HTTPException, Body, status, Depends
+from models.multitenant import Company, Organization, OrganizationType
 from sqlmodel import select, Session
 from db import get_session
-from models.auth import User
+from models.auth import User,SuperAdminUser, ScopeGroup, Scope, ScopeGroupOrganizationLink
 from utils.jwt import verify_password, create_access_token, get_password_hash
 
 AuthenticationRouter =ar= APIRouter()
@@ -20,7 +22,59 @@ def login(
     return {"access_token": token}
 
 
+@ar.post("/register-superadmin/")
+async def create_superadmin_user(
+    session: Session = Depends(get_session),
+    username: str = Body(...),
+    password: str = Body(...),
+    email: Optional[str] = Body(None),
+    service_provider_company: str = Body(...)
+):
+    try:
+        organization = Organization(
+            organization_name=service_provider_company,
+            organization_type = OrganizationType.company
 
+        )
+        session.add(organization)
+        session.commit()
+        session.refresh(organization)
+
+        scope_group = ScopeGroup(
+           scope_name="Superadmin scope",
+        )
+
+        session.add(scope_group)
+        session.commit()
+        session.refresh(scope_group)
+
+        scope_organization_link = ScopeGroupOrganizationLink(
+            scope_group_id=scope_group.id,
+            organization_id=organization.id
+        )
+
+        session.add(scope_organization_link)
+        session.commit()
+        session.refresh(scope_organization_link)
+
+
+
+        user = SuperAdminUser(
+            id=None,
+            username=username,
+            email=email,
+            service_provider_company = organization.id,
+            hashedPassword=get_password_hash(password + username),
+            scope_group_id=scope_group.id
+        )
+
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+
+        return user
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @ar.post("/register/")
 def register(
