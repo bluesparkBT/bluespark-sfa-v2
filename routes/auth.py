@@ -1,117 +1,137 @@
-from typing import Optional
+from typing import Annotated
+from datetime import timedelta
 from fastapi import APIRouter, HTTPException, Body, status, Depends
-from models.multitenant import Company, Organization, OrganizationType
+from models.MultiTenant import Company
 from sqlmodel import select, Session
 from db import get_session
-from models.user import User,SuperAdminUser, ScopeGroup, Scope, ScopeGroupOrganizationLink
+from models.Users import User
+from models.MultiTenant import ScopeGroup, ScopeGroupOrganizationLink
+from models.viewModel.authViewModel import UserCreation, SuperAdminUserCreation
 
 from utils.auth_util import verify_password, create_access_token, get_password_hash
 
 AuthenticationRouter =ar= APIRouter()
+SessionDep = Annotated[Session, Depends(get_session)]
+
 
 @ar.post("/login/")
 def login(
-    session: Session = Depends(get_session),
+    session: SessionDep,
     username: str = Body(...),
     password: str = Body(...)
 ):
-    user = session.exec(select(SuperAdminUser).where(SuperAdminUser.username == username)).first()
-    print(user)
+    user = session.exec(select(User).where(User.username == username)).first()
+    
+    if not user.company or not user.organization:
+        raise HTTPException(status_code=400, detail="User missing company or organization info")
+
     if not user or not verify_password(password+user.username, user.hashedPassword):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+    access_token_expires = timedelta(minutes=90)
+    token = create_access_token(
+        data={
+            "sub": user.username,
+            "user_id": user.id,
+            "company": user.company.id,
+            "organization": user.organization.id,
 
-    token = create_access_token(data={"sub": user.username})
+            },
+        expires_delta = access_token_expires,
+    )
+    
     return {"access_token": token}
-
 
 @ar.post("/register-superadmin/")
 async def create_superadmin_user(
-    session: Session = Depends(get_session),
-    username: str = Body(...),
-    password: str = Body(...),
-    email: Optional[str] = Body(None),
-    service_provider_company: str = Body(...)
+    session: SessionDep,
+    super_admin: SuperAdminUserCreation = Body(...),
 ):
     try:
-        existing_superadmin= session.exec(select(SuperAdminUser)).first()
+        existing_superadmin = session.exec(select(User)).first()
         if existing_superadmin is not None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Superadmin already registered",
             )
 
-        organization = Organization(
-            organization_name=service_provider_company,
-            organization_type = OrganizationType.company
-
-        )
-        session.add(organization)
-        session.commit()
-        session.refresh(organization)
-
-        scope_group = ScopeGroup(
-           scope_name="Superadmin scope",
-        )
-
-        session.add(scope_group)
-        session.commit()
-        session.refresh(scope_group)
-
-        scope_organization_link = ScopeGroupOrganizationLink(
-            scope_group_id=scope_group.id,
-            organization_id=organization.id
-        )
-
-        session.add(scope_organization_link)
-        session.commit()
-        session.refresh(scope_organization_link)
-
-
-
-        user = SuperAdminUser(
+        user = User(
             id=None,
-            username=username,
-            email=email,
-            service_provider_company = organization.id,
-            hashedPassword=get_password_hash(password + username),
-            scope_group_id=scope_group.id
+            fullname=super_admin.fullname,
+            username=super_admin.username,
+            email=super_admin.email,
+            hashedPassword=get_password_hash(super_admin.password + super_admin.username),
         )
-
         session.add(user)
         session.commit()
         session.refresh(user)
 
-        return user
+        company = Company(
+            company_name=super_admin.service_provider_company,
+        )
+        session.add(company)
+        session.commit()
+        session.refresh(company)
+
+        scope_group = ScopeGroup(
+            scope_name="Superadmin scope",
+            company_id=company.id,
+        )
+        session.add(scope_group)
+        session.commit()
+        session.refresh(scope_group)
+
+        # Link the scope group to the company (or organization)
+        scope_organization_link = ScopeGroupOrganizationLink(
+            scope_group_id=scope_group.id,
+            organization_id=None,
+            company_id=company.id,
+        )
+        session.add(scope_organization_link)
+        session.commit()
+        session.refresh(scope_organization_link)
+
+        return {"message": "Superadmin created successfully"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
-
-@ar.post("/register/")
-def register(
-    session: Session = Depends(get_session),
-    username: str = Body(...),
-    email: str = Body(...),
-    password: str = Body(...)
+    
+    
+@ar.post("/create-user/")
+async def create_user(
+    session: SessionDep,
+    user_data: UserCreation = Body(...),
 ):
-    # Check if user already exists
-    existing_user = session.exec(select(User).where(User.username == username)).first()
-    if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username already registered",
+    try: 
+        existing_user = session.exec(select(User).where(User.username == user_data.username)).first()
+        if existing_user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Username already registered",
+            )
+
+        new_user = User(
+            fullname=user_data.fullname,
+            username=user_data.username,
+            email=user_data.email,
+            phone=user_data.phone_number,
+            hashedPassword=get_password_hash(user_data.password + user_data.username),
+            gender=user_data.gender,
+            salary=user_data.salary,
+            position=user_data.position,
+            date_of_birth=user_data.date_of_birth,
+            date_of_joining=user_data.date_of_joining,
+            id_type=user_data.id_type,
+            id_number=user_data.id_number,
+            scope=user_data.scope,
+            scope_group_id=None,
+            organization= user_data.organization,
+            company_id= user_data.company,
+
         )
+        session.add(new_user)
+        session.commit()
+        session.refresh(new_user)
 
-    # Hash the password
-    hashed_password = get_password_hash(password)
-
-    # Create user
-    new_user = User(username=username, email=email, passhash=hashed_password)
-    session.add(new_user)
-    session.commit()
-    session.refresh(new_user)
-
-    # Optionally return access token
-    token = create_access_token(data={"sub": new_user.username})
-    return {
-        "message": "User registered successfully",
-        "access_token": token
-    }
+        return {
+            "message": "User: {new_user} registered successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
