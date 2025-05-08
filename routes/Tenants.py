@@ -40,23 +40,26 @@ async def get_organization(
 @tr.post("/create-company/")
 async def create_company(
     session: SessionDep,
-    company: TenantCreation = Body(...),
+    current_user: User = Depends(get_current_user),
+    tenant: TenantCreation = Body(...),
 ) -> Company:
 
     try:
-        existing_tenant = session.exec(select(Company).where(Company.company_name == company.company_name)).first()
+        existing_tenant = session.exec(select(Company).where(Company.company_name == tenant.company_name)).first()
 
         if existing_tenant is not None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Company already registered",
             )
+      #since the service provider is the one to create a tenant, the parent company would be the company of the service provider
         company = Company(
             id = None,
-            company_name = company.company_name,
-            owner_name = company.owner_name,
-            description = company.description,
-            logo_image = company.logo_image,
+            company_name = tenant.company_name,
+            owner_name = tenant.owner_name,
+            description = tenant.description,
+            logo_image = tenant.logo_image,
+            parent_company_id = current_user['company']
         )
         session.add(company)
         session.commit()
@@ -86,8 +89,9 @@ async def get_my_company(
         HTTPException: 404 if the company is not found.
     """
     try:
+        print(current_user);
         # Query the company associated with the logged-in user
-        company = session.exec(select(Company).where(Company.id == current_user.company_id)).first()
+        company = session.exec(select(Company).where(Company.id == current_user['company'])).first()
 
         if not company:
             raise HTTPException(

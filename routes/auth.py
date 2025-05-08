@@ -22,7 +22,7 @@ def login(
 ):
     user = session.exec(select(User).where(User.username == username)).first()
     
-    if not user.company or not user.organization:
+    if not user.company_id and not user.organization_id:
         raise HTTPException(status_code=400, detail="User missing company or organization info")
 
     if not user or not verify_password(password+user.username, user.hashedPassword):
@@ -32,9 +32,8 @@ def login(
         data={
             "sub": user.username,
             "user_id": user.id,
-            "company": user.company.id,
-            "organization": user.organization.id,
-
+            "company": user.company_id,
+            "organization": user.organization_id,
             },
         expires_delta = access_token_expires,
     )
@@ -54,16 +53,7 @@ async def create_superadmin_user(
                 detail="Superadmin already registered",
             )
 
-        user = User(
-            id=None,
-            fullname=super_admin.fullname,
-            username=super_admin.username,
-            email=super_admin.email,
-            hashedPassword=get_password_hash(super_admin.password + super_admin.username),
-        )
-        session.add(user)
-        session.commit()
-        session.refresh(user)
+    
 
         company = Company(
             company_name=super_admin.service_provider_company,
@@ -79,6 +69,18 @@ async def create_superadmin_user(
         session.add(scope_group)
         session.commit()
         session.refresh(scope_group)
+
+        user = User(
+            id=None,
+            fullname=super_admin.fullname,
+            username=super_admin.username,
+            email=super_admin.email,
+            hashedPassword=get_password_hash(super_admin.password + super_admin.username),
+            company_id = company.id
+        )
+        session.add(user)
+        session.commit()
+        session.refresh(user)
 
         # Link the scope group to the company (or organization)
         scope_organization_link = ScopeGroupOrganizationLink(
@@ -107,6 +109,7 @@ async def create_user(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Username already registered",
             )
+        
 
         new_user = User(
             fullname=user_data.fullname,
@@ -123,10 +126,11 @@ async def create_user(
             id_number=user_data.id_number,
             scope=user_data.scope,
             scope_group_id=None,
-            organization= user_data.organization,
+            organization_id= user_data.organization,
             company_id= user_data.company,
 
         )
+
         session.add(new_user)
         session.commit()
         session.refresh(new_user)

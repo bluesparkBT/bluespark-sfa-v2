@@ -16,8 +16,6 @@ class Organization(BaseModel):
 
     
 class TenantCreation(BaseModel): 
-
-    id: int
     company_name: str
     owner_name: str
     description: str
@@ -27,7 +25,7 @@ class TenantCreation(BaseModel):
     def check(self) -> Self:
         if self.description == "null" or self.description == "":
             self.description = None
+        if self.logo_image == "null" or self.logo_image == "":
+            self.logo_image = None
 
-        if self.parent_organization == "null" or self.parent_organization == "":
-            self.parent_organization = None
         return self

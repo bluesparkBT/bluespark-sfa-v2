@@ -10,7 +10,7 @@ from utils.util_functions import capitalize_name, validate_name
 
 
 class UserCreation(BaseModel):
-    company: str | list[int] | dict[int, str] | None
+    company: int | list[int] | dict[int, str] | None
     organization: list[int] | dict[int, str]
     fullname: str
     username: str

@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from db import create_db_and_tables
+from routes.Tenants import TenantRouter
 from routes.auth import AuthenticationRouter
 
 
@@ -37,3 +38,4 @@ def on_startup():
     create_db_and_tables()
 
 app.include_router(AuthenticationRouter, prefix="/auth", tags=["auth"])
+app.include_router(TenantRouter, prefix="/tenant", tags=["tenant"])
