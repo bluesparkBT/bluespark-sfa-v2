@@ -43,15 +43,16 @@ class ScopeGroupOrganizationLink(SQLModel, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     scope_group_id: int =Field(foreign_key="scope_group.id", index=True)
-    organization_id: int = Field(foreign_key="organization.id", index=True)
+    organization_id: Optional[int] = Field(foreign_key="organization.id", index=True)
+    company_id: Optional[int] = Field(foreign_key="company.id", index=True)
 
 class ScopeGroup(SQLModel, table=True):
     __tablename__ = "scope_group"
 
     id: Optional[int] = Field(default=None, primary_key=True)
     scope_name: str = Field(index=True, unique=True)
-    organizations: List["Organization"] = Relationship(back_populates="scope_groups",link_model=ScopeGroupOrganizationLink)
-
+    organizations: Optional[List["Organization"]] = Relationship(back_populates="scope_groups",link_model=ScopeGroupOrganizationLink)
+    companies: Optional[List["Company"]] = Relationship(back_populates="scope_groups",link_model=ScopeGroupOrganizationLink)
 
     users: Optional[List["User"]] = Relationship(back_populates="scope_group")
 
@@ -113,13 +114,19 @@ class User(SQLModel, table=True):
     id_type: Optional[IdType] = Field(default=None)
     id_number: Optional[str] = Field(default=None)
     gender: Optional[Gender]
+    house_number: Optional[str] = Field(default=None)
+    image: Optional[Base64Bytes] = Field(default=None)
     manager_id: Optional[int] = Field(default=None, foreign_key="users.id", index=True)
     address_id: Optional[int] = Field(default=None, foreign_key="address.id", index=True)
     role_id: Optional[int] = Field(default=None, foreign_key="role.id")
+    company_id: Optional[int] = Field(default=None, foreign_key="company.id", index=True)
+    organization_id: Optional[int] = Field(default=None, foreign_key="organization.id", index=True)
     scope: Scope = Field(default=Scope.personal_scope)
     scope_group_id: Optional[int] = Field(default=None, foreign_key="scope_group.id")
 
     scope_group: Optional[ScopeGroup] = Relationship(back_populates="users")
+    company: Optional["Company"] = Relationship(back_populates="users")
+    organization: Optional["Organization"] = Relationship(back_populates="users")
 
     @model_validator(mode="after")
     def check(self) -> Self:

@@ -3,8 +3,8 @@ from typing import Annotated
 from sqlmodel import Session, select
 
 
-from models.user import User, Role, Module, AccessPolicy, RoleModulePermission
-from models.auth import get_current_user
+from models.Users import User, Role, Module, AccessPolicy, RoleModulePermission
+from models.viewModel.authViewModel import get_current_user
 from db import get_session
 
 # SessionDep = Annotated[Session, Depends(get_session)]
