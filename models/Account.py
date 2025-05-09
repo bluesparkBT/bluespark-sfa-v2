@@ -71,18 +71,6 @@ class Scope(str, Enum):
     personal_scope = "Personal scope"
 
 
-
-class UserRole(SQLModel, table=True):
-    __tablename__ = "user_role"
-
-    id: int = Field( primary_key=True)
-    username: str
-    email: str
-    password_hash: str
-    organization_id: int = Field(foreign_key="organization.id")
-    role_id: int = Field(foreign_key="role.id")
-
-
 class Role(SQLModel, table=True):
     __tablename__ = "role"
 
@@ -90,6 +78,28 @@ class Role(SQLModel, table=True):
     name: str
     organization_id: int = Field(foreign_key="organization.id")
     permissions: List["RoleModulePermission"] = Relationship(back_populates="role")
+
+class ModuleName(str, Enum):
+
+    category = "Category"
+    product = "Product"
+    dashboard = "Dashboard"
+    finance = "Finance"
+    sales = "Sales"
+    presales = "Presales"
+    trade_marketing = "Trade Marketing"
+    visit = "Visit"
+    order = "Order"
+    route = "Route"
+    territory = "Territory"
+    point_of_sale = "Point Of Sale"
+    address = "Address"
+    users = "Users"
+    organization = "Organization"
+    inventory_management = "Inventory Management"
+    route_schedule = "Route Schedule"
+    penetration = "Penetration"
+ 
 
 class Module(SQLModel, table=True):
     __tablename__ = "module"
@@ -141,7 +151,7 @@ class User(SQLModel, table=True):
     manager_id: Optional[int] = Field(default=None, foreign_key="users.id", index=True)
     id_type: Optional[IdType] = Field(default=None)
     id_number: Optional[str] = Field(default=None)    
-    address_id: Optional[int] = Field(default=None, foreign_key="address.id", index=True)
+    # address_id: Optional[int] = Field(default=None, foreign_key="address.id")
 
     @model_validator(mode="after")
     def check(self) -> Self:

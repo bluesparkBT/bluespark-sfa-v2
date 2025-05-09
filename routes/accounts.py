@@ -18,8 +18,8 @@ def login(
 ):
     user = session.exec(select(User).where(User.username == username)).first()
     
-    if not user.organization or not user.organization:
-        raise HTTPException(status_code=400, detail="User missing company or organization info")
+    if not user.organization :
+        raise HTTPException(status_code=400, detail="User missing organization info")
 
     if not user or not verify_password(password+user.username, user.hashedPassword):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
@@ -28,9 +28,7 @@ def login(
         data={
             "sub": user.username,
             "user_id": user.id,
-            "company": user.company.id,
-            "organization": user.organization.id,
-
+            "organization": user.organization,
             },
         expires_delta = access_token_expires,
     )
@@ -54,19 +52,6 @@ async def create_superadmin_user(
                 detail="Superadmin already registered",
             )
         
-
-        new_user =User(
-            fullname=fullname,
-            username=username,
-            email=email,
-            hashedPassword=get_password_hash(password + username),
-        )
-        
-        
-        session.add(new_user)
-        session.commit()
-        session.refresh(new_user)
-
         organization = Organization(
             organization_name=service_provider_company,
         )
@@ -74,6 +59,21 @@ async def create_superadmin_user(
         session.add(organization)
         session.commit()
         session.refresh(organization)
+        
+
+        new_user =User(
+            fullname=fullname,
+            username=username,
+            email=email,
+            hashedPassword=get_password_hash(password + username),
+            organization=organization.id
+        )
+        
+        
+        session.add(new_user)
+        session.commit()
+        session.refresh(new_user)
+
 
         scope_group = ScopeGroup(
             scope_name="Superadmin scope",

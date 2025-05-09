@@ -1,4 +1,4 @@
-from typing import Annotated, List
+from typing import Annotated, List, Dict, Any
 from fastapi import APIRouter, HTTPException, Body, status, Depends
 from sqlmodel import select, Session
 from db import get_session
@@ -94,7 +94,7 @@ async def get_my_organization(
     """
     try:
         # Query the organization associated with the logged-in user
-        organization = session.exec(select(Organization).where(Organization.id == current_user.organization_id)).first()
+        organization = session.exec(select(Organization).where(Organization.id == current_user.get("organization"))).first()
 
         if not organization:
             raise HTTPException(
