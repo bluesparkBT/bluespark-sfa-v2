@@ -6,9 +6,11 @@ from db import get_session
 from models.Account import User, ScopeGroup, ScopeGroupLink, Organization, Gender, Scope
 from utils.auth_util import verify_password, create_access_token, get_password_hash
 from utils.util_functions import validate_name, validate_email, validate_phone_number
+from utils.auth_util import get_current_user, check_accessPolicy
 
 AuthenticationRouter =ar= APIRouter()
 SessionDep = Annotated[Session, Depends(get_session)]
+UserDep = Annotated[dict, Depends(get_current_user)]
 
 
 @ar.post("/login/")
@@ -44,9 +46,16 @@ def login(
 @ar.get("/get-my-user/")
 async def get_my_user(
     session: SessionDep,
-    user_id: int = Body(...),
+    current_user: UserDep,
+    user_id: int,
 ):
     try:
+        if not check_accessPolicy(
+            session, "edit", "Users", current_user["user_id"]
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
         user = session.exec(select(User).where(User.id == user_id)).first()
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
@@ -68,6 +77,7 @@ async def get_my_user(
 @ar.post("/create-superadmin/")
 async def create_superadmin_user(
     session: SessionDep,
+    current_user: UserDep,
       fullname: str = Body(...),
       username: str = Body(...),
       email: str = Body(...),
@@ -75,6 +85,12 @@ async def create_superadmin_user(
       service_provider_company: str = Body(...),
 ):
     try:
+        if not check_accessPolicy(
+            session, "edit", "Users", current_user["user_id"]
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
         existing_superadmin = session.exec(select(User).where(User.username== username)).first()
         if existing_superadmin is not None:
             raise HTTPException(
@@ -130,9 +146,16 @@ async def create_superadmin_user(
 @ar.delete("/delete-superadmin/")
 async def delete_superadmin_user(
     session: SessionDep,
+    current_user: UserDep,
     super_admin_id: int = Body(...),
 ):
     try:
+        if not check_accessPolicy(
+            session, "edit", "Users", current_user["user_id"]
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
         superadmin = session.exec(select(User).where(User.id == super_admin_id)).first()
         if not superadmin:
             raise HTTPException(status_code=404, detail="Superadmin not found")
@@ -147,8 +170,15 @@ async def delete_superadmin_user(
 @ar.get("/get-users/")
 async def get_users(
     session: SessionDep,
+    current_user: UserDep,
 ):
     try:
+        if not check_accessPolicy(
+            session, "edit", "Users", current_user["user_id"]
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
         users = session.exec(select(User)).all()
         if not users:
             raise HTTPException(status_code=404, detail="No users found")
@@ -178,25 +208,32 @@ async def get_users(
 @ar.post("/create-user/")
 async def create_user(
     session: SessionDep,
-            fullname: str = Body(...),
-            username: str = Body(...),
-            password: str = Body(...), 
-            email: str = Body(...),
-            role_id: int = Body(...),
-            scope: Scope = Body(...),
-            scope_group_id: int = Body(...),
-            organization: int = Body(...),
-            phone_number: str = Body(...),
-            gender: Gender = Body(...),
-            salary: float = Body(...),
-            position: str = Body(...),
-            date_of_birth: datetime = Body(...),
-            date_of_joining: datetime = Body(...),
-            id_type: str = Body(...),
-            id_number: str = Body(...),
+    current_user: UserDep,
+    fullname: str = Body(...),
+    username: str = Body(...),
+    password: str = Body(...), 
+    email: str = Body(...),
+    role_id: int = Body(...),
+    scope: Scope = Body(...),
+    scope_group_id: int = Body(...),
+    organization: int = Body(...),
+    phone_number: str = Body(...),
+    gender: Gender = Body(...),
+    salary: float = Body(...),
+    position: str = Body(...),
+    date_of_birth: datetime = Body(...),
+    date_of_joining: datetime = Body(...),
+    id_type: str = Body(...),
+    id_number: str = Body(...),
             
 ):
     try: 
+        if not check_accessPolicy(
+            session, "edit", "Users", current_user["user_id"]
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
         existing_user = session.exec(select(User).where(User.username == username)).first()
         if existing_user:
             raise HTTPException(
@@ -251,25 +288,32 @@ async def create_user(
 @ar.put("/update-user/")
 async def update_uer(
     session: SessionDep,
-            fullname: str = Body(...),
-            username: str = Body(...),
-            password: str = Body(...), 
-            email: str = Body(...),
-            role_id: int = Body(...),
-            scope: Scope = Body(...),
-            scope_group_id: str = Body(...),
-            organization: int = Body(...),
-            phone_number: str = Body(...),
-            gender: Gender = Body(...),
-            salary: float = Body(...),
-            position: str = Body(...),
-            date_of_birth: datetime = Body(...),
-            date_of_joining: datetime = Body(...),
-            id_type: str = Body(...),
-            id_number: str = Body(...),
+    current_user: UserDep,
+    fullname: str = Body(...),
+    username: str = Body(...),
+    password: str = Body(...), 
+    email: str = Body(...),
+    role_id: int = Body(...),
+    scope: Scope = Body(...),
+    scope_group_id: str = Body(...),
+    organization: int = Body(...),
+    phone_number: str = Body(...),
+    gender: Gender = Body(...),
+    salary: float = Body(...),
+    position: str = Body(...),
+    date_of_birth: datetime = Body(...),
+    date_of_joining: datetime = Body(...),
+    id_type: str = Body(...),
+    id_number: str = Body(...),
             
 ):
     try: 
+        if not check_accessPolicy(
+            session, "edit", "Users", current_user["user_id"]
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
         existing_user = session.exec(select(User).where(User.username == username)).first()
         if existing_user:
             raise HTTPException(
@@ -323,9 +367,16 @@ async def update_uer(
 @ar.delete("/delete-user/")
 async def delete_user(
     session: SessionDep,
+    current_user: UserDep,
     user_id: int = Body(...),
 ):
     try:
+        if not check_accessPolicy(
+            session, "edit", "Users", current_user["user_id"]
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
         user = session.exec(select(User).where(User.id == user_id)).first()
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
@@ -341,10 +392,17 @@ async def delete_user(
 @ar.post("/create-scope-group/")
 async def create_scope_group(
     session: SessionDep,
+    current_user: UserDep,
     scope_name: str = Body(...),
     organization_ids: List[int] = Body(...),
 ):
     try:
+        if not check_accessPolicy(
+            session, "edit", "Administration", current_user["user_id"]
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
         existing_scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.scope_name == scope_name)).first()
         if existing_scope_group:
             raise HTTPException(
@@ -377,8 +435,15 @@ async def create_scope_group(
 @ar.get("/get-scope-groups/")
 async def get_scope_groups(
     session: SessionDep,
+    current_user: UserDep,
 ):
     try:
+        if not check_accessPolicy(
+            session, "edit", "Administration", current_user["user_id"]
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
         scope_groups = session.exec(select(ScopeGroup)).all()
         if not scope_groups:
             raise HTTPException(status_code=404, detail="No scope groups found")
@@ -401,9 +466,16 @@ async def get_scope_groups(
 @ar.delete("/delete-scope-group/")
 async def delete_scope_group(
     session: SessionDep,
+    current_user: UserDep,
     scope_group_id: int = Body(...),
 ):
     try:
+        if not check_accessPolicy(
+            session, "edit", "Administration", current_user["user_id"]
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
         scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == scope_group_id)).first()
         if not scope_group:
             raise HTTPException(status_code=404, detail="Scope group not found")
