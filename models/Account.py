@@ -73,26 +73,14 @@ class Scope(str, Enum):
 
 
 
-class UserRole(SQLModel, table=True):
-    __tablename__ = "user_role"
-
-    id: int = Field( primary_key=True)
-    username: str
-    email: str
-    password_hash: str
-    organization_id: int = Field(foreign_key="organization.id")
-    role_id: int = Field(foreign_key="role.id")
-
 
 class Role(SQLModel, table=True):
     __tablename__ = "role"
 
-    id: Optional[int] = Field(default=None, primary_key=True, unique=True)
+    id: int = Field(primary_key=True)
     name: str
     organization_id: int = Field(foreign_key="organization.id")
     permissions: List["RoleModulePermission"] = Relationship(back_populates="role")
-
-
 
 class AccessPolicy(str, Enum):
     deny = "deny"
@@ -122,17 +110,24 @@ class ModuleName(str, Enum):
     route_schedule = "Route Schedule"
     penetration = "Penetration"
 
+class Module(SQLModel, table=True):
+    __tablename__ = "module"
+
+    id: int = Field(primary_key=True)
+    name: str
+    permissions: List["RoleModulePermission"] = Relationship(back_populates="module")
+
+
 class RoleModulePermission(SQLModel, table=True):
     __tablename__ = "role_module_permission"
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int = Field(primary_key=True)
     role_id: int = Field(foreign_key="role.id")
     module_id: int = Field(foreign_key="module.id")
     access_policy: AccessPolicy
 
     role: Optional[Role] = Relationship(back_populates="permissions")
-    module: Optional[ModuleName] = Relationship(back_populates="permissions")
-
+    module: Optional[Module] = Relationship(back_populates="permissions")
 
 class User(SQLModel, table=True):
     __tablename__ = "users"

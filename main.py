@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from db import create_db_and_tables
 from routes.accounts import AuthenticationRouter
 from routes.organizations import TenantRouter
+from routes.role import RoleRouter
 
 
 load_dotenv()
@@ -48,7 +49,10 @@ async def validation_exception_handler(request, exc):
         content={"error": "Invalid input", "details": exc.errors()},
     )
 
-
-
-app.include_router(AuthenticationRouter, prefix="/auth", tags=["auth"])
-app.include_router(TenantRouter, prefix="/company", tags=["company"])
+@app.on_event("startup")
+def on_startup():
+    create_db_and_tables()
+    
+app.include_router(AuthenticationRouter, prefix="/account", tags=["account"])
+app.include_router(TenantRouter, prefix="/organization", tags=["organization"])
+app.include_router(RoleRouter, prefix="/role", tags=["role"])
