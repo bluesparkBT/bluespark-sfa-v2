@@ -1,19 +1,22 @@
 from typing import Annotated, List
 from fastapi import APIRouter, HTTPException, Body, status, Depends
 from sqlmodel import select, Session
+from sqlalchemy.orm import selectinload
 from db import get_session
-from models.Account import User, Organization, OrganizationType
+from models.Account import User, Organization, OrganizationType, ScopeGroup
 
 from utils.auth_util import get_current_user
 from utils.util_functions import validate_name, validate_image
 
 TenantRouter =tr= APIRouter()
 SessionDep = Annotated[Session, Depends(get_session)]
+UserDep = Annotated[dict, Depends(get_current_user)]
 
 
 @tr.post("/create-organization/")
 async def create_organization(
     session: SessionDep,
+    current_user: UserDep,
     organization_name: str = Body(...),
     owner_name: str = Body(...),
     description: str = Body(...),
@@ -31,20 +34,10 @@ async def create_organization(
         )
         #Check Validity
         
-        if validate_name(organization_name) == False:
+        if validate_name(owner_name) == False:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Company name is not valid",
-        )
-        elif validate_name(owner_name) == False:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Owner name is not valid",
-        )
-        elif validate_name(description) == False:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Description is not valid",
+                detail="Company owner name is not valid",
         )
         elif validate_image(logo_image) == False and logo_image is None:
             raise HTTPException(
@@ -94,7 +87,7 @@ async def get_my_organization(
     """
     try:
         # Query the organization associated with the logged-in user
-        organization = session.exec(select(Organization).where(Organization.id == current_user.organization_id)).first()
+        organization = session.exec(select(Organization).where(Organization.id == current_user.get(organization))).first()
 
         if not organization:
             raise HTTPException(
@@ -104,6 +97,7 @@ async def get_my_organization(
 
         # Return the organization information
         return {
+            "id": organization.id,
             "organization": organization.organization_name,
             "owner": organization.owner_name,
             "logo": organization.logo_image,
@@ -111,42 +105,76 @@ async def get_my_organization(
         
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
-
-
 @tr.get("/get-organizations/")
 async def get_organizations(
     session: SessionDep,
-) -> List[Organization]:
+):
     """
-    Retrieve all companies from the database.
+    Retrieve all organizations with their associated scope groups.
+    """
+    try:
+        # Use selectinload to eagerly load the relationship
+        sgo = select(Organization).options(selectinload(Organization.scope_groups))
+        organizations = session.exec(sgo).all()
+
+        if not organizations:
+            raise HTTPException(status_code=404, detail="No organizations found")
+
+        organization_list = []
+
+        for org in organizations:
+            organization_list.append({
+                "id": org.id,
+                "organization": org.organization_name,
+                "owner": org.owner_name,
+                "logo": org.logo_image,
+                "description": org.description,
+                "organization_type": org.organization_type,
+                "parent_organization": org.parent_id,
+                "scope_groups": [
+                    {"id": sg.id, "scope_name": sg.scope_name}
+                    for sg in org.scope_groups
+                ]
+            })
+
+        return organization_list
+
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@tr.delete("/delete-organization/{id}")
+async def delete_organization(
+    session: SessionDep,
+    id: int,
+):
+    """
+    Delete an organization by ID.
 
     Args:
         session (SessionDep): Database session.
+        id (int): ID of the organization to delete.
 
     Returns:
-        List[Organizations]: A list of Organizations objects.
-        If empty, it returns an empty list. []
+        dict: Confirmation message.
 
     Raises:
-        HTTPException: 400 if there is an error during retrieval.
+        HTTPException: 404 if the organization is not found.
     """
     try:
-        # Query all companies directly
-        organizations = session.exec(select(Organization)).all()
-        
-        organization_list = []
-        
-        for organization in organizations:
-            organization_list.append({
-                "organization": organization.organization_name,
-                "owner": organization.owner_name,
-                "logo": organization.logo_image,
-            })
-            
-        return organization_list
+        # Query the organization by ID
+        organization = session.get(Organization, id)
+
+        if not organization:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Organization not found",
+            )
+
+        # Delete the organization
+        session.delete(organization)
+        session.commit()
+
+        return {"message": "Organization deleted successfully"}
     
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
-    
-
-    

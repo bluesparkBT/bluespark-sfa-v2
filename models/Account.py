@@ -2,14 +2,7 @@ from sqlmodel import SQLModel, Field, Relationship
 from enum import Enum
 from datetime import  datetime
 from typing import List, Optional, Self
-from pydantic import Base64Bytes, model_validator, validate_email
-
-
-class OrganizationType(str, Enum):
-    distributor = "Distributor"
-    subagent = "SubAgent"
-    retailer = "Retailer"
-    company = "Company"
+from models.Location import Address, Location
 
 
 class ScopeGroupLink(SQLModel, table=True):
@@ -18,7 +11,21 @@ class ScopeGroupLink(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     scope_group_id: int = Field(foreign_key="scope_group.id", index=True)
     organization_id: int = Field(foreign_key="organization.id", index=True)
-    
+
+
+class ScopeGroup(SQLModel, table=True):
+    __tablename__ = "scope_group"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    scope_name: str = Field(index=True, unique=True)
+    organizations: List["Organization"] = Relationship(back_populates="scope_groups", link_model=ScopeGroupLink)
+
+class OrganizationType(str, Enum):
+    distributor = "Distributor"
+    subagent = "SubAgent"
+    retailer = "Retailer"
+    company = "Company"
+
 class Organization(SQLModel, table=True): 
     __tablename__ = "organization"
 
@@ -28,17 +35,11 @@ class Organization(SQLModel, table=True):
     logo_image: Optional[str] = Field(default=None)
     description: Optional[str] = Field(default=None, index=True)
     organization_type: OrganizationType = Field(default=OrganizationType.company)
-    parent_id: Optional[int] = Field(default=None)
-    scope_groups: Optional["ScopeGroup"] = Relationship(back_populates="organizations", link_model=ScopeGroupLink) 
-
-
-class ScopeGroup(SQLModel, table=True):
-    __tablename__ = "scope_group"
-
-    id: Optional[int] = Field(default=None, primary_key=True)
-    scope_name: str = Field(index=True, unique=True)
-    organizations: List["Organization"] = Relationship(back_populates="scope_groups", link_model=ScopeGroupLink)
-    
+    parent_id: Optional[int] = Field(default=None,  foreign_key="organization.id")
+    scope_groups: List["ScopeGroup"] = Relationship(
+        back_populates="organizations",
+        link_model=ScopeGroupLink
+    )
 class Gender(str, Enum):
     """
     Enum Class representing gender options.
@@ -67,8 +68,8 @@ class IdType(str, Enum):
     school_id = "School ID"
 
 class Scope(str, Enum):
-    managerial_scope = "Managerial scope"
-    personal_scope = "Personal scope"
+    managerial_scope = "managerial_scope"
+    personal_scope = "personal_scope"
 
 
 
@@ -86,37 +87,51 @@ class UserRole(SQLModel, table=True):
 class Role(SQLModel, table=True):
     __tablename__ = "role"
 
-    id: int = Field(primary_key=True)
+    id: Optional[int] = Field(default=None, primary_key=True, unique=True)
     name: str
     organization_id: int = Field(foreign_key="organization.id")
     permissions: List["RoleModulePermission"] = Relationship(back_populates="role")
 
-class Module(SQLModel, table=True):
-    __tablename__ = "module"
-
-    id: int = Field(primary_key=True)
-    name: str
-    permissions: List["RoleModulePermission"] = Relationship(back_populates="module")
 
 
 class AccessPolicy(str, Enum):
-    
+    deny = "deny"
     view = "view"
     edit = "edit"
     contribute = "contribute"
     manage = "manage"
+    
+class ModuleName(str, Enum):
 
+    category = "Category"
+    product = "Product"
+    dashboard = "Dashboard"
+    finance = "Finance"
+    sales = "Sales"
+    presales = "Presales"
+    trade_marketing = "Trade Marketing"
+    visit = "Visit"
+    order = "Order"
+    route = "Route"
+    territory = "Territory"
+    point_of_sale = "Point Of Sale"
+    address = "Address"
+    users = "Users"
+    organization = "Organization"
+    inventory_management = "Inventory Management"
+    route_schedule = "Route Schedule"
+    penetration = "Penetration"
 
 class RoleModulePermission(SQLModel, table=True):
     __tablename__ = "role_module_permission"
 
-    id: int = Field(primary_key=True)
+    id: Optional[int] = Field(default=None, primary_key=True)
     role_id: int = Field(foreign_key="role.id")
     module_id: int = Field(foreign_key="module.id")
     access_policy: AccessPolicy
 
     role: Optional[Role] = Relationship(back_populates="permissions")
-    module: Optional[Module] = Relationship(back_populates="permissions")
+    module: Optional[ModuleName] = Relationship(back_populates="permissions")
 
 
 class User(SQLModel, table=True):
@@ -125,9 +140,10 @@ class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     fullname: str = Field(index=True)
     username: str = Field(unique=True, index=True)
+    hashedPassword: str
+    
     email: Optional[str] = Field(index=True)
     phone_number: Optional[str] = Field(default=None,index=True)
-    hashedPassword: str
     organization: Optional[int] = Field(default=None, foreign_key="organization.id", index=True)
     role_id: Optional[int] = Field(default=None, foreign_key="role.id")
     scope: Scope = Field(default=Scope.personal_scope)
@@ -143,12 +159,5 @@ class User(SQLModel, table=True):
     id_number: Optional[str] = Field(default=None)    
     address_id: Optional[int] = Field(default=None, foreign_key="address.id", index=True)
 
-    @model_validator(mode="after")
-    def check(self) -> Self:
-
-        if validate_email(self.email) is False:
-            raise ValueError("Invalid email")
-
-        return self
 
     
