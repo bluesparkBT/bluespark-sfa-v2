@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi import FastAPI
+from routes.role import RoleRouter
 from starlette.status import HTTP_400_BAD_REQUEST
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -52,3 +53,4 @@ async def validation_exception_handler(request, exc):
 
 app.include_router(AuthenticationRouter, prefix="/auth", tags=["auth"])
 app.include_router(TenantRouter, prefix="/company", tags=["company"])
+app.include_router(RoleRouter, prefix="/role", tags=["role"])
