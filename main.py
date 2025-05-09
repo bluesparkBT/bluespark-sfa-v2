@@ -1,11 +1,14 @@
 import os
 from dotenv import load_dotenv
-from fastapi import FastAPI
 from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from fastapi import FastAPI
+from starlette.status import HTTP_400_BAD_REQUEST
 from fastapi.middleware.cors import CORSMiddleware
 
 from db import create_db_and_tables
-from routes.auth import AuthenticationRouter
+from routes.accounts import AuthenticationRouter
+from routes.organizations import TenantRouter
 
 
 load_dotenv()
@@ -31,9 +34,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    return JSONResponse(
+        status_code=500,
+        content={"message": "An unexpected error occurred."},
+    )
+    
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request, exc):
+    return JSONResponse(
+        status_code=HTTP_400_BAD_REQUEST,
+        content={"error": "Invalid input", "details": exc.errors()},
+    )
 
-@app.on_event("startup")
-def on_startup():
-    create_db_and_tables()
+
 
 app.include_router(AuthenticationRouter, prefix="/auth", tags=["auth"])
+app.include_router(TenantRouter, prefix="/company", tags=["company"])
