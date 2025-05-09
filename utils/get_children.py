@@ -1,7 +1,7 @@
 from sqlmodel import select, Session
 from fastapi import Depends
 from typing import Annotated, List
-from models import Users
+from models import Account
 from db import SECRET_KEY, get_session
 
 from models.MultiTenant import Organization
@@ -43,7 +43,7 @@ def get_child_employee(session: SessionDep, employee_id: int):
         emp = queue.pop(0)
         employee.append(emp)
         db_emp = session.exec(
-            select(Users.id).where(Users.manager == employee_id)
+            select(Account.id).where(Account.manager == employee_id)
         ).all()
         queue.extend(db_emp)
 

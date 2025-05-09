@@ -4,7 +4,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jwt.exceptions import InvalidTokenError
 from sqlmodel import select
-from models.Users import User
+from models.Account import User
 
 security = HTTPBearer()
 SECRET_KEY = "secret_here"
