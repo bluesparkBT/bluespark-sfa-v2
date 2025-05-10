@@ -92,7 +92,7 @@ async def form_roles(
     
 
 @rr.get("/form-modules")
-async def form_roles(
+async def form_modules(
     session: SessionDep,
     current_user: User = Depends(get_current_user),
 ):
@@ -113,7 +113,7 @@ async def form_roles(
 
 
 @rr.post("/update-role-module")
-async def create_role(
+async def update_role(
     session: SessionDep,
     role_id: int = Body(...),
     module: str = Body(...),

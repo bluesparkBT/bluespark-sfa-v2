@@ -3,10 +3,12 @@ from datetime import timedelta, date, datetime
 from fastapi import APIRouter, HTTPException, Body, status, Depends
 from sqlmodel import select, Session
 from db import get_session
-from models.Account import User, ScopeGroup, ScopeGroupLink, Organization, Gender, Scope
+from models.Account import User, ScopeGroup, ScopeGroupLink, Organization, Gender, Scope, Role, RoleModulePermission
 from utils.auth_util import verify_password, create_access_token, get_password_hash
 from utils.util_functions import validate_name, validate_email, validate_phone_number
 from utils.auth_util import get_current_user, check_accessPolicy
+from utils.model_converter_util import get_html_types
+
 
 AuthenticationRouter =ar= APIRouter()
 SessionDep = Annotated[Session, Depends(get_session)]
@@ -170,12 +172,12 @@ async def get_users(
     current_user: UserDep,
 ):
     try:
-        if not check_accessPolicy(
-            session, "edit", "Users", current_user["user_id"]
-            ):
-            raise HTTPException(
-                status_code=403, detail="You Do not have the required privilege"
-            )
+        # if not check_accessPolicy(
+        #     session, "edit", "Users", current_user["user_id"]
+        #     ):
+        #     raise HTTPException(
+        #         status_code=403, detail="You Do not have the required privilege"
+        #     )
         users = session.exec(select(User)).all()
         if not users:
             raise HTTPException(status_code=404, detail="No users found")
@@ -201,7 +203,52 @@ async def get_users(
         
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@ar.get("/form-user/")
+async def form_user(
+    session: SessionDep,
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        organizations = session.exec(select(Organization)).all()
+
+        organization_list = [
+            org.organization_name
+            for org in organizations
+        ]
         
+        roles = session.exec(select(Role)).all()
+        role_list = [
+            role.name
+            for role in roles
+        ]
+        scope = session.exec(select(Scope)).all()
+        scope_list = [
+            scope.scope_name
+            for scope in scope
+        ]
+        
+        data = {"id":"", 
+                "full_name": "", 
+                "username": "",
+                "email": "",
+                "phone_number": "",
+                "organization": organization_list,
+                "role_id": role_list,
+                "scope": scope_list,
+                "scope_group_id": "",
+                "date_of_birth": "",
+                "date_of_joining": "",
+                "position": "",
+                "salary": "",
+                "gender": "",
+                
+                }
+        
+        return {"data": data, "html_types": get_html_types("user")}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+      
 @ar.post("/create-user/")
 async def create_user(
     session: SessionDep,
@@ -225,12 +272,12 @@ async def create_user(
             
 ):
     try: 
-        if not check_accessPolicy(
-            session, "edit", "Users", current_user["user_id"]
-            ):
-            raise HTTPException(
-                status_code=403, detail="You Do not have the required privilege"
-            )
+        # if not check_accessPolicy(
+        #     session, "edit", "Users", current_user["user_id"]
+        #     ):
+        #     raise HTTPException(
+        #         status_code=403, detail="You Do not have the required privilege"
+        #     )
         existing_user = session.exec(select(User).where(User.username == username)).first()
         if existing_user:
             raise HTTPException(
@@ -385,21 +432,41 @@ async def delete_user(
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@ar.get("/form-scope-group/")
+async def form_scope(
+    session: SessionDep,
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        organizations = session.exec(select(Organization)).all()
 
+        organization_list = [
+            org.organization_name
+            for org in organizations
+        ]
+        
+        data = {"id":"", 
+                "name": "", 
+                "organization": organization_list}
+        
+        return {"data": data, "html_types": get_html_types("scope_group")}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    
 @ar.post("/create-scope-group/")
 async def create_scope_group(
     session: SessionDep,
     current_user: UserDep,
     scope_name: str = Body(...),
-    organization_ids: List[int] = Body(...),
+    organization_list: List[int] = Body(...),
 ):
     try:
-        if not check_accessPolicy(
-            session, "edit", "Administration", current_user["user_id"]
-            ):
-            raise HTTPException(
-                status_code=403, detail="You Do not have the required privilege"
-            )
+        # if not check_accessPolicy(
+        #     session, "edit", "Administration", current_user["user_id"]
+        #     ):
+        #     raise HTTPException(
+        #         status_code=403, detail="You Do not have the required privilege"
+        #     )
         existing_scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.scope_name == scope_name)).first()
         if existing_scope_group:
             raise HTTPException(
@@ -408,7 +475,7 @@ async def create_scope_group(
             )
 
         # Add related organizations
-        organizations = session.exec(select(Organization).where(Organization.id.in_(organization_ids))).all()
+        organizations = session.exec(select(Organization).where(Organization.id.in_(organization_list))).all()
         if not organizations:
             raise HTTPException(status_code=400, detail="Invalid organization IDs")
                 
@@ -435,12 +502,12 @@ async def get_scope_groups(
     current_user: UserDep,
 ):
     try:
-        if not check_accessPolicy(
-            session, "edit", "Administration", current_user["user_id"]
-            ):
-            raise HTTPException(
-                status_code=403, detail="You Do not have the required privilege"
-            )
+        # if not check_accessPolicy(
+        #     session, "edit", "Administration", current_user["user_id"]
+        #     ):
+        #     raise HTTPException(
+        #         status_code=403, detail="You Do not have the required privilege"
+        #     )
         scope_groups = session.exec(select(ScopeGroup)).all()
         if not scope_groups:
             raise HTTPException(status_code=404, detail="No scope groups found")
