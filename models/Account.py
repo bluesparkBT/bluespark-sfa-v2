@@ -110,12 +110,12 @@ class ModuleName(str, Enum):
     route_schedule = "Route Schedule"
     penetration = "Penetration"
 
-class Module(SQLModel, table=True):
-    __tablename__ = "module"
+# class Module(SQLModel, table=True):
+#     __tablename__ = "module"
 
-    id: int = Field(primary_key=True)
-    name: str
-    permissions: List["RoleModulePermission"] = Relationship(back_populates="module")
+#     id: int = Field(primary_key=True)
+#     name: str
+#     permissions: List["RoleModulePermission"] = Relationship(back_populates="module")
 
 
 class RoleModulePermission(SQLModel, table=True):
@@ -123,17 +123,16 @@ class RoleModulePermission(SQLModel, table=True):
 
     id: int = Field(primary_key=True)
     role_id: int = Field(foreign_key="role.id")
-    module_id: int = Field(foreign_key="module.id")
+    module: str 
     access_policy: AccessPolicy
 
     role: Optional[Role] = Relationship(back_populates="permissions")
-    module: Optional[Module] = Relationship(back_populates="permissions")
-
+    
 class User(SQLModel, table=True):
     __tablename__ = "users"
     
     id: Optional[int] = Field(default=None, primary_key=True)
-    fullname: str = Field(index=True)
+    fullname: Optional[str] = Field(default=None, index=True)
     username: str = Field(unique=True, index=True)
     hashedPassword: str
     
@@ -152,7 +151,7 @@ class User(SQLModel, table=True):
     manager_id: Optional[int] = Field(default=None, foreign_key="users.id", index=True)
     id_type: Optional[IdType] = Field(default=None)
     id_number: Optional[str] = Field(default=None)    
-    address_id: Optional[int] = Field(default=None, foreign_key="address.id", index=True)
+    #address_id: Optional[int] = Field(default=None, foreign_key="address.id", index=True)
 
 
     

@@ -77,20 +77,18 @@ async def get_my_user(
 @ar.post("/create-superadmin/")
 async def create_superadmin_user(
     session: SessionDep,
-    current_user: UserDep,
-      fullname: str = Body(...),
       username: str = Body(...),
       email: str = Body(...),
       password: str = Body(...),
       service_provider_company: str = Body(...),
 ):
     try:
-        if not check_accessPolicy(
-            session, "edit", "Users", current_user["user_id"]
-            ):
-            raise HTTPException(
-                status_code=403, detail="You Do not have the required privilege"
-            )
+        # if not check_accessPolicy(
+        #     session, "edit", "Users", current_user["user_id"]
+        #     ):
+        #     raise HTTPException(
+        #         status_code=403, detail="You Do not have the required privilege"
+        #     )
         existing_superadmin = session.exec(select(User).where(User.username== username)).first()
         if existing_superadmin is not None:
             raise HTTPException(
@@ -106,7 +104,6 @@ async def create_superadmin_user(
         session.refresh(organization)
         
         new_user =User(
-            fullname=fullname,
             username=username,
             email=email,
             hashedPassword=get_password_hash(password + username),
