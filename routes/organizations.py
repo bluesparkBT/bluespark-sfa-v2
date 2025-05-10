@@ -6,6 +6,7 @@ from db import get_session
 from models.Account import User, Organization, OrganizationType, ScopeGroup
 
 from utils.auth_util import get_current_user
+from utils.model_converter_util import get_html_types
 from utils.util_functions import validate_name, validate_image
 
 TenantRouter =tr= APIRouter()
@@ -13,10 +14,31 @@ SessionDep = Annotated[Session, Depends(get_session)]
 UserDep = Annotated[dict, Depends(get_current_user)]
 
 
+
+@tr.get("/form")
+async def get_form_fields_organization(
+    session: SessionDep, 
+    current_user: User = Depends(get_current_user)):
+    try:
+       
+        organization = Organization(
+            id="",
+            organization_name = "",
+            owner_name = "",
+            description = "",
+            logo_image = "",
+            organization_type = {i.value: i.value for i in OrganizationType}
+        )
+
+        return {"data": organization, "html_types": get_html_types(Organization)}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @tr.post("/create-organization/")
 async def create_organization(
     session: SessionDep,
-    current_user: UserDep,
+    current_user: User = Depends(get_current_user),
     organization_name: str = Body(...),
     owner_name: str = Body(...),
     description: str = Body(...),
@@ -87,7 +109,7 @@ async def get_my_organization(
     """
     try:
         # Query the organization associated with the logged-in user
-        organization = session.exec(select(Organization).where(Organization.id == current_user.get(organization))).first()
+        organization = session.exec(select(Organization).where(Organization.id == current_user.get("organization"))).first()
 
         if not organization:
             raise HTTPException(
@@ -105,6 +127,7 @@ async def get_my_organization(
         
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+    
 @tr.get("/get-organizations/")
 async def get_organizations(
     session: SessionDep,
@@ -141,6 +164,78 @@ async def get_organizations(
 
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+    
+@tr.get("/get-organization/{id}")
+async def get_organization(
+    session: SessionDep,
+    id: int,
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        organization = session.exec(select(Organization).where(Organization.id == id)).first()
+        if not organization:
+            raise HTTPException(status_code=404, detail="Role not found")
+  
+        return {
+            "id": organization.id,
+            "organization_name": organization.organization_name,
+            "description": organization.description,
+            "owner_name": organization.owner_name,
+            "logo_image": organization.logo_image,
+            "organization_type": organization.organization_type
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    
+    
+@tr.put("/update-organization/")
+async def create_organization(
+    session: SessionDep,
+    current_user: UserDep,
+    id: int = Body(...),
+    organization_name: str = Body(...),
+    owner_name: str = Body(...),
+    description: str = Body(...),
+    logo_image: str = Body(...),
+    organization_type: str = Body(...),    
+):
+
+    try:
+        existing_tenant = session.exec(select(Organization).where(Organization.id == id)).first()
+
+        if existing_tenant is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Organization not found",
+        )
+        #Check Validity
+        
+        if validate_name(owner_name) == False:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Company owner name is not valid",
+        )
+        elif validate_image(logo_image) == False and logo_image is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Logo image is not valid",
+        )
+
+        existing_tenant.organization_name = organization_name
+        existing_tenant.owner_name = owner_name
+        existing_tenant.description = description
+        existing_tenant.logo_image = logo_image
+        existing_tenant.organization_type = organization_type
+            
+        session.add(existing_tenant)
+        session.commit()
+        session.refresh(existing_tenant)
+        
+        return {"message": "Organization updated successfully", "organization": organization_name}
+    
+    except Exception as e:
+        
+        raise HTTPException(status_code=400, detail=str(e)) 
 
 @tr.delete("/delete-organization/{id}")
 async def delete_organization(
