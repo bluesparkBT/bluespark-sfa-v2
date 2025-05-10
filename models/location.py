@@ -1,6 +1,6 @@
 from pydantic import model_validator
 from sqlmodel import SQLModel, Field, Relationship
-from typing import Optional, Self, List
+from typing import Optional, Self
 
 
 class Address(SQLModel, table=True): 
