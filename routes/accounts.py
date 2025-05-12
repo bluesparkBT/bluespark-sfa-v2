@@ -1,4 +1,4 @@
-from typing import Annotated, List
+from typing import Annotated, Any, Dict, List
 from datetime import timedelta, date, datetime
 from fastapi import APIRouter, HTTPException, Body, status, Depends
 from sqlmodel import select, Session
@@ -8,6 +8,7 @@ from utils.auth_util import verify_password, create_access_token, get_password_h
 from utils.util_functions import validate_name, validate_email, validate_phone_number
 from utils.auth_util import get_current_user, check_accessPolicy
 from utils.model_converter_util import get_html_types
+from utils.form_db_fetch import fetch_organization_id_and_name
 
 
 AuthenticationRouter =ar= APIRouter()
@@ -441,27 +442,21 @@ async def form_scope(
     current_user: User = Depends(get_current_user),
 ):
     try:
-        organizations = session.exec(select(Organization)).all()
-
-        organization_list = [
-            org.organization_name
-            for org in organizations
-        ]
-        
+       
         data = {"id":"", 
-                "name": "", 
-                "organization": organization_list}
+                "name": ""
+                }
         
         return {"data": data, "html_types": get_html_types("scope_group")}
     except Exception as e:
+        print(str(e))
         raise HTTPException(status_code=400, detail=str(e))
     
 @ar.post("/create-scope-group/")
 async def create_scope_group(
     session: SessionDep,
     current_user: UserDep,
-    scope_name: str = Body(...),
-    organization_list: List[int] = Body(...),
+    scope_data: Dict[str, Any] = Body(...),
 ):
     try:
         # if not check_accessPolicy(
@@ -470,34 +465,110 @@ async def create_scope_group(
         #     raise HTTPException(
         #         status_code=403, detail="You Do not have the required privilege"
         #     )
+        scope_name = scope_data.get("name")
+
+        if validate_name(scope_name) == False:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Scope name is not valid",
+        )
+
         existing_scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.scope_name == scope_name)).first()
         if existing_scope_group:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Scope group already exists",
             )
-
-        # Add related organizations
-        organizations = session.exec(select(Organization).where(Organization.id.in_(organization_list))).all()
-        if not organizations:
-            raise HTTPException(status_code=400, detail="Invalid organization IDs")
-                
+      
         scope_group = ScopeGroup(
             scope_name=scope_name,
         )
-        
-        scope_group.organizations = organizations
         
         session.add(scope_group)
         session.commit()
         session.refresh(scope_group)
 
-        return {
-            "message": "Scope group", scope_group.scope_name: "created successfully",
-            "organizations": [org.organization_name for org in scope_group.organizations]
-        }
+        return scope_group.id
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+    
+@ar.get("/form-scope-organization/")
+async def form_scope_organization(
+    session: SessionDep,
+    current_user: UserDep,
+
+):
+    try:
+        # if not check_accessPolicy(
+        #     session, "edit", "Administration", current_user["user_id"]
+        #     ):
+        #     raise HTTPException(
+        #         status_code=403, detail="You Do not have the required privilege"
+        #     )
+        
+        org = {"scope_id":"", 
+                "organizations": fetch_organization_id_and_name(session)
+                }
+        print(org)
+        
+        return {"data": org, "html_types": get_html_types("scope_organization")}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    
+    
+@ar.post("/add-scope-organization/")
+async def add_organization_to_scope(
+    session: SessionDep,
+    current_user: UserDep,
+    scope_id:int = Body(...),
+    organizations: List[int] = Body(...)
+):
+    try:
+        # if not check_accessPolicy(
+        #     session, "edit", "Administration", current_user["user_id"]
+        #     ):
+        #     raise HTTPException(
+        #         status_code=403, detail="You Do not have the required privilege"
+        #     )
+      
+
+        scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == scope_id)).first()
+        if not scope_group:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Scope group not found",
+            )
+        
+        existing_orgs = [organization.id for organization in scope_group.organizations ]
+        print(existing_orgs)
+    
+        existing_org_ids = set(existing_orgs)
+        new_org_ids_set = set(organizations)
+
+        # Add new entries
+        to_add = new_org_ids_set - existing_org_ids
+        for org_id in to_add:
+            scope_group_link_add = ScopeGroupLink(scope_group_id=scope_id, organization_id=org_id)
+            session.add(scope_group_link_add)
+            session.commit()
+            session.refresh(scope_group_link_add)
+
+
+      # Remove obsolete entries
+        to_remove = existing_org_ids - new_org_ids_set
+        if to_remove:
+            scope_group_link_remove = session.exec(select(ScopeGroupLink)
+                .where(ScopeGroupLink.scope_group_id == scope_id)
+                .where(ScopeGroupLink.organization_id.in_(to_remove))).first()
+            session.delete(scope_group_link_remove)
+            session.commit()
+            
+
+        return "Organization in Scope Group updated successfully"
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    
+
 
 @ar.get("/get-scope-groups/")
 async def get_scope_groups(
@@ -529,21 +600,93 @@ async def get_scope_groups(
         
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
-
-@ar.delete("/delete-scope-group/")
-async def delete_scope_group(
+    
+@ar.get("/get-scope-group/{id}")
+async def get_scope_group(
     session: SessionDep,
     current_user: UserDep,
-    scope_group_id: int = Body(...),
+    id: int
 ):
     try:
-        if not check_accessPolicy(
-            session, "edit", "Administration", current_user["user_id"]
-            ):
+        # if not check_accessPolicy(
+        #     session, "edit", "Administration", current_user["user_id"]
+        #     ):
+        #     raise HTTPException(
+        #         status_code=403, detail="You Do not have the required privilege"
+        #     )
+        scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == id)).first()
+        if not scope_group:
+            raise HTTPException(status_code=404, detail="Scope Group not found")
+   
+       
+            
+        return {
+                "id": scope_group.id,
+                "name": scope_group.scope_name,
+                "organizations": [org.id for org in scope_group.organizations],
+            }
+
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    
+
+
+@ar.put("/update-scope-group/")
+async def update_scope_group(
+    session: SessionDep,
+    current_user: UserDep,
+    name: str = Body(...) ,
+    id: int = Body(...),
+):
+    try:
+        # if not check_accessPolicy(
+        #     session, "edit", "Administration", current_user["user_id"]
+        #     ):
+        #     raise HTTPException(
+        #         status_code=403, detail="You Do not have the required privilege"
+        #     )
+        scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == id)).first()
+        if not scope_group:
+            raise HTTPException(status_code=404, detail="Role not found")
+      
+        if validate_name(name) == False:
             raise HTTPException(
-                status_code=403, detail="You Do not have the required privilege"
-            )
-        scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == scope_group_id)).first()
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Role name is not valid",
+        )
+
+        scope_group.scope_name = name
+        session.add(scope_group)
+        session.commit()
+        session.refresh(scope_group)
+
+
+        return scope_group.id
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    
+
+@ar.delete("/delete-scope-group/{id}")
+async def delete_scope_group(
+    session: SessionDep,
+    id: int,
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        # if not check_accessPolicy(
+        #     session, "edit", "Administration", current_user["user_id"]
+        #     ):
+        #     raise HTTPException(
+        #         status_code=403, detail="You Do not have the required privilege"
+        #     )
+        scope_group_links = session.exec(select(ScopeGroupLink).where(ScopeGroupLink.scope_group_id == id)).all()
+        if scope_group_links:
+            for scope_group_link in scope_group_links:
+                session.delete(scope_group_link)
+                session.commit()
+
+        scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == id)).first()
         if not scope_group:
             raise HTTPException(status_code=404, detail="Scope group not found")
 
