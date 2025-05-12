@@ -15,9 +15,9 @@ RoleRouter = rr = APIRouter()
 SessionDep = Annotated[Session, Depends(get_session)]
 UserDep = Annotated[dict, Depends(get_current_user)]
 
-modules: List = ["dashboard", "finance", "sales", "presales", "trade marketing", "visit", "order", "report", "route", "address", "users", "organization", "inventory management", "category", "product", "route schedule", "territory", "point of sale", "role"]
+modules: List = ["Dashboard", "Finance", "Sales", "Presales", "Trade Marketing", "Visit", "Order", "Report", "Route", "Address", "Users", "Organization", "Inventory Management", "Category", "Product", "Route Schedule", "Territory", "Point Of Sale", "Role"]
 modules_dict = {
-    module: module.title()
+    module: module
     for module in modules
 }
 
@@ -35,20 +35,16 @@ async def get_roles(
         if not roles:
             raise HTTPException(status_code=404, detail="Role not found")
         for role in roles:
-            permissions = [
-            perm for perm in role.permissions if perm.module is not None
-            ]
-        
-            if permissions:  
-                roles_data.append({
-                    "id": role.id,
-                    "role_name": role.name,  #
-                    **{  
-                        perm.module: perm.access_policy
-                        for perm in permissions
-                    }
-                })
-
+            permissions = ""
+            for perm in role.permissions:
+                if(perm.access_policy != "deny"):
+                    permissions += perm.module+"("+perm.access_policy+"),"
+            roles_data.append({
+                "id": role.id,
+                "role_name": role.name,
+                "roles": permissions
+            })
+     
         return roles_data
  
     except Exception as e:
