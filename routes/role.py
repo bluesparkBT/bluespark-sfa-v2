@@ -133,7 +133,7 @@ async def update_role(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@rr.get("/my-roles")
+@rr.get("/my-role")
 async def get_my_role(
     session: SessionDep,
     current_user: User = Depends(get_current_user),
