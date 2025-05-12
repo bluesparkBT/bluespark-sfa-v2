@@ -80,28 +80,6 @@ class Role(SQLModel, table=True):
     permissions: List["RoleModulePermission"] = Relationship(back_populates="role")
 
 
-class ModuleName(str, Enum):
-
-    category = "Category"
-    product = "Product"
-    dashboard = "Dashboard"
-    finance = "Finance"
-    sales = "Sales"
-    presales = "Presales"
-    trade_marketing = "Trade Marketing"
-    visit = "Visit"
-    order = "Order"
-    route = "Route"
-    territory = "Territory"
-    point_of_sale = "Point Of Sale"
-    address = "Address"
-    users = "Users"
-    organization = "Organization"
-    inventory_management = "Inventory Management"
-    route_schedule = "Route Schedule"
-    penetration = "Penetration"
- 
-
 class AccessPolicy(str, Enum):
     deny = "deny"
     view = "view"
@@ -125,10 +103,12 @@ class ModuleName(str, Enum):
     point_of_sale = "Point Of Sale"
     address = "Address"
     users = "Users"
+    role = "Role"
     organization = "Organization"
     inventory_management = "Inventory Management"
     route_schedule = "Route Schedule"
     penetration = "Penetration"
+    administration = "Administration"
 
 # class Module(SQLModel, table=True):
 #     __tablename__ = "module"
@@ -144,7 +124,7 @@ class RoleModulePermission(SQLModel, table=True):
     id: int = Field(primary_key=True)
     role_id: int = Field(foreign_key="role.id")
     module: str 
-    access_policy: AccessPolicy
+    access_policy: AccessPolicy = Field(default=AccessPolicy.deny)
 
     role: Optional[Role] = Relationship(back_populates="permissions")
     
@@ -158,7 +138,7 @@ class User(SQLModel, table=True):
     
     email: Optional[str] = Field(index=True)
     phone_number: Optional[str] = Field(default=None,index=True)
-    organization: Optional[int] = Field(default=None, foreign_key="organization.id", index=True)
+    organization_id: Optional[int] = Field(default=None, foreign_key="organization.id", index=True)
     role_id: Optional[int] = Field(default=None, foreign_key="role.id")
     scope: Scope = Field(default=Scope.personal_scope)
     scope_group_id: Optional[int] = Field(default=None, foreign_key="scope_group.id")

@@ -1,6 +1,6 @@
 import bcrypt, jwt
 from datetime import datetime, timedelta, timezone
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Path
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jwt.exceptions import InvalidTokenError
 from sqlmodel import select
@@ -23,6 +23,10 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 90
 
 SessionDep = Annotated[Session, Depends(get_session)]
 
+def get_tenant(tenant: str = Path(...)):
+    # Validate tenant (optional)
+    # e.g., check if tenant exists in DB
+    return tenant
 
 def get_password_hash(password: str) -> str:
     return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
