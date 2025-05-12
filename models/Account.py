@@ -2,7 +2,7 @@ from sqlmodel import SQLModel, Field, Relationship
 from enum import Enum
 from datetime import  datetime
 from typing import List, Optional, Self
-from models.Location import Address, Location
+from models.location import Address, Location
 
 
 class ScopeGroupLink(SQLModel, table=True):

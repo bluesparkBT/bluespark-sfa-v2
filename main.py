@@ -11,10 +11,12 @@ from db import create_db_and_tables
 from routes.accounts import AuthenticationRouter
 from routes.organizations import TenantRouter
 from routes.role import RoleRouter
+from routes.product import ProductRouter
 
 
 load_dotenv()
 ENV = os.getenv("ENV")
+
 
 app = FastAPI(
     title="Bluespark SFA API",
@@ -23,6 +25,10 @@ app = FastAPI(
     middleware=[],
     swagger_ui_parameters={"docExpansion": "none", "tryItOutEnabled": True},
 )
+@app.on_event("startup")
+def on_startup():
+    create_db_and_tables()
+
 
 origins = [
     "*",
@@ -35,6 +41,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
@@ -58,3 +67,5 @@ app.include_router(AuthenticationRouter, prefix="/account", tags=["account"])
 app.include_router(TenantRouter, prefix="/organization", tags=["organization"])
 app.include_router(RoleRouter, prefix="/role", tags=["role"])
 app.include_router(UtilRouter, prefix="/utility", tags=["Utility"])
+app.include_router(ProductRouter, prefix="/product", tags=["product"])
+
