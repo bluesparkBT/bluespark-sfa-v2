@@ -7,12 +7,14 @@ from sqlmodel import select
 from models.Account import User
 from db import get_session
 
-from typing import Annotated
+from typing import Annotated, Dict
 from sqlmodel import Session
-from models.Account import AccessPolicy, RoleModulePermission, Role, User
+from models.Account import AccessPolicy, RoleModulePermission, Role, User, ModuleName
 from sqlmodel import select
 from typing import Literal
-
+import traceback
+import string
+import random
 
 security = HTTPBearer()
 SECRET_KEY = "secret_here"
@@ -74,66 +76,96 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
     
 
 
+def generate_random_password(length: int = 12) -> str:
+    """Generate a secure random password with uppercase, lowercase, digits, and punctuation."""
+    characters = string.ascii_letters + string.digits + string.punctuation
+    return ''.join(random.SystemRandom().choice(characters) for _ in range(length))
 
-PolicyType = Literal["deny", "view", "edit", "contribute", "manage"]
-
-def check_accessPolicy(
-    session: SessionDep, 
-    policy_type: PolicyType, 
-    endpoint_group: str, 
-    user_id: int
+def check_permission(
+    session: Session,
+    policy_type: str,
+    endpoint_group: str,
+    user_id: int,
 ) -> bool:
     """
-    Checks if the user has the required privilege level to access a certain endpoint.
+    Checks if the user has the required access policy for a specific module.
 
     Args:
-        session (SessionDep): Database session.
-        policy_type (PolicyType): The required access policy (e.g., "view", "edit").
-        endpoint_group (str): The module or endpoint group (e.g., "Product", "Sales").
-        user_id (int): The ID of the user.
+        session (Session): DB session.
+        policy_type (str): Required access policy level (e.g., 'view', 'edit').
+        endpoint_group (str): The system module (e.g., 'Users', 'Sales').
+        user_id (int): ID of the user making the request.
 
     Returns:
-        bool: True if the user has the required privilege, False otherwise.
+        bool: True if access is allowed, False otherwise.
     """
     try:
-        # Fetch the user and their role
-        user = session.exec(select(User).where(User.id == user_id)).first()
+        # Debug step-by-step checks
+        print(f"Checking permission for user_id={user_id}, module={endpoint_group}, policy={policy_type}")
+        
+        user = session.exec(select(User).where(User.id == user_id['user_id'])).first()
         if not user or not user.role_id:
-            return False  # User does not exist or has no assigned role
+            print("User not found or has no role")
+            return False
 
-        # Fetch the role and its permissions
         role = session.exec(select(Role).where(Role.id == user.role_id)).first()
         if not role:
-            return False  # Role does not exist
+            print("Role not found")
+            return False
 
-        # Fetch the module permission for the specified endpoint group
+        if endpoint_group in ModuleName:
+            module = endpoint_group
+        else:
+            print(f"Module '{endpoint_group}' not found")
+            return False
+        
+        print(module)
+
         permission = session.exec(
             select(RoleModulePermission)
-            .join(Module, RoleModulePermission.module_id == Module.id)
             .where(
                 RoleModulePermission.role_id == role.id,
-                Module.name == endpoint_group
+                RoleModulePermission.module == module,
             )
         ).first()
 
         if not permission:
-            return False  # No permission found for the specified module
+            print("No permission record found")
+            return False
 
-        # Check if the user's access policy meets or exceeds the required policy
+        # Access level comparison
         access_levels = {
-            AccessPolicy.deny: 0,
-            AccessPolicy.view: 1,
-            AccessPolicy.edit: 2,
-            AccessPolicy.contribute: 3,
-            AccessPolicy.manage: 4,
+            "deny": 0,
+            "view": 2,
+            "edit": 6,
+            "contribute": 7,
+            "manage": 15,
+        }
+        
+        
+        crud_digit = {
+            "Create": 0,
+            "Read": 1,
+            "Update": 2,
+            "Delete": 3
         }
 
-        user_access_level = access_levels[permission.access_policy]
-        required_access_level = access_levels[AccessPolicy(policy_type)]
+        user_access_level = bin(access_levels[permission.access_policy])[2:].zfill(4)
+        
+        print("Access Level User",access_levels[permission.access_policy], user_access_level)
 
-        return user_access_level >= required_access_level
+        
+        required_access_level = bin(access_levels[policy_type])[2:].zfill(4)
+        
+        print("Access Level Required",access_levels[policy_type], required_access_level)
+
+               
+        if required_access_level[crud_digit[policy_type]] == '1' and  user_access_level[crud_digit[policy_type]] == '1':
+            return True
+        else:
+            return False
 
     except Exception as e:
-        # Log the error or handle it as needed
-        print(f"Error checking access policy: {e}")
+        print(f"Error in check_permission: {e}")
+        # traceback.print_exc()
         return False
