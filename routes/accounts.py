@@ -1,12 +1,12 @@
-from typing import Annotated, List
+from typing import Annotated, List, Dict, Any
 from datetime import timedelta, date, datetime
 from fastapi import APIRouter, HTTPException, Body, status, Depends
 from sqlmodel import select, Session
 from db import get_session
-from models.Account import User, ScopeGroup, ScopeGroupLink, Organization, Gender, Scope, Role, RoleModulePermission
+from models.Account import User, ScopeGroup, ScopeGroupLink, Organization, Gender, Scope, Role, AccessPolicy
 from utils.auth_util import verify_password, create_access_token, get_password_hash
 from utils.util_functions import validate_name, validate_email, validate_phone_number
-from utils.auth_util import get_current_user, check_accessPolicy
+from utils.auth_util import get_current_user, check_permission, generate_random_password
 from utils.model_converter_util import get_html_types
 
 
@@ -52,7 +52,7 @@ async def get_my_user(
     user_id: int,
 ):
     try:
-        if not check_accessPolicy(
+        if not check_permission(
             session, "edit", "Users", current_user["user_id"]
             ):
             raise HTTPException(
@@ -85,8 +85,8 @@ async def create_superadmin_user(
       service_provider_company: str = Body(...),
 ):
     try:
-        # if not check_accessPolicy(
-        #     session, "edit", "Users", current_user["user_id"]
+        # if not check_permission(
+        #     session, "edit", "Users", current_user
         #     ):
         #     raise HTTPException(
         #         status_code=403, detail="You Do not have the required privilege"
@@ -149,8 +149,8 @@ async def delete_superadmin_user(
     super_admin_id: int = Body(...),
 ):
     try:
-        if not check_accessPolicy(
-            session, "edit", "Users", current_user["user_id"]
+        if not check_permission(
+            session, "edit", "Users", current_user["super_admin_id"]
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
@@ -171,9 +171,9 @@ async def get_users(
     session: SessionDep,
     current_user: UserDep,
 ):
-    try:
-        # if not check_accessPolicy(
-        #     session, "edit", "Users", current_user["user_id"]
+    try:  
+        # if not check_permission(
+        #     session, "Read", "Users", current_user
         #     ):
         #     raise HTTPException(
         #         status_code=403, detail="You Do not have the required privilege"
@@ -183,7 +183,6 @@ async def get_users(
             raise HTTPException(status_code=404, detail="No users found")
         
         user_list = []
-        
         for user in users:
             user_list.append({
                 "id": user.id,
@@ -191,7 +190,7 @@ async def get_users(
                 "username": user.username,
                 "email": user.email,
                 "phone_number": user.phone_number,
-                "organization": user.organization,
+                "organization": user.organization_id,
                 "role_id": user.role_id,
                 "manager_id": user.manager_id,
                 "scope": user.scope,
@@ -204,76 +203,63 @@ async def get_users(
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@ar.get("/form-user/")
-async def form_user(
+@ar.get("/user-form/")
+async def create_user_form(
     session: SessionDep,
     current_user: User = Depends(get_current_user),
 ):
     try:
         organizations = session.exec(select(Organization)).all()
+        organization_list = [org.organization_name for org in organizations]
 
-        organization_list = [
-            org.organization_name
-            for org in organizations
-        ]
-        
         roles = session.exec(select(Role)).all()
-        role_list = [
-            role.name
-            for role in roles
-        ]
-        scope = session.exec(select(Scope)).all()
-        scope_list = [
-            scope.scope_name
-            for scope in scope
-        ]
+        role_list = [role.name for role in roles]
         
-        data = {"id":"", 
-                "full_name": "", 
-                "username": "",
-                "email": "",
-                "phone_number": "",
-                "organization": organization_list,
-                "role_id": role_list,
-                "scope": scope_list,
-                "scope_group_id": "",
-                "date_of_birth": "",
-                "date_of_joining": "",
-                "position": "",
-                "salary": "",
-                "gender": "",
-                
-                }
+        scope_group = session.exec(select(ScopeGroup)).all()
+        scope_group_list = [sg.scope_name for sg in scope_group]
         
-        return {"data": data, "html_types": get_html_types("user")}
+
+        scope = [s.value for s in Scope]
+
+        user_data = {
+            "id": "", 
+            "full_name": "", 
+            "username": "",
+            "email": "",
+            "phone_number": "",
+            "organization": organization_list,
+            "role_id": role_list,
+            "scope": scope,
+            "scope_group": scope_group_list,
+            "gender": {gender.value for gender in Gender},
+        }
+
+        return {"data": user_data, "html_types": get_html_types("users")}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
       
 @ar.post("/create-user/")
 async def create_user(
     session: SessionDep,
     current_user: UserDep,
+    
     fullname: str = Body(...),
     username: str = Body(...),
-    password: str = Body(...), 
+    raw_password: str = Body(...), 
     email: str = Body(...),
     role_id: int = Body(...),
     scope: Scope = Body(...),
-    scope_group_id: int = Body(...),
-    organization: int = Body(...),
+    scope_group: int = Body(...),
+    organization_id: int = Body(...),
     phone_number: str = Body(...),
     gender: Gender = Body(...),
-    salary: float = Body(...),
-    position: str = Body(...),
-    date_of_birth: datetime = Body(...),
-    date_of_joining: datetime = Body(...),
-    id_type: str = Body(...),
-    id_number: str = Body(...),
+
             
 ):
     try: 
-        # if not check_accessPolicy(
-        #     session, "edit", "Users", current_user["user_id"]
+        # if not check_permission(
+        #     session, "Create", "Users", current_user
         #     ):
         #     raise HTTPException(
         #         status_code=403, detail="You Do not have the required privilege"
@@ -290,7 +276,6 @@ async def create_user(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Fullname is not valid",
         )
-
         elif validate_email(email) == False:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -301,23 +286,23 @@ async def create_user(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Phone number is not valid",
         )
+            
+        # Generate and hash password
+        raw_password = generate_random_password()
+        hashed_password = get_password_hash(raw_password + username)
+        
         new_user = User(
+            id= None,
             fullname=fullname,
             username=username,
             email=email,
             phone_number=phone_number,
-            hashedPassword=get_password_hash(password + username),
-            organization= organization,
+            hashedPassword = hashed_password,
+            organization_id= organization_id,
             role_id=role_id,           
             gender=gender,
-            salary=salary,
-            position=position,
-            date_of_birth=date_of_birth,
-            date_of_joining=date_of_joining,
-            id_type=id_type,
-            id_number=id_number,
             scope=scope,
-            scope_group_id=scope_group_id,
+            scope_group_id=scope_group,
 
         )
         session.add(new_user)
@@ -325,10 +310,56 @@ async def create_user(
         session.refresh(new_user)
 
         return {
-            "message": "User: {new_user} registered successfully"}
+            "message": "User registered successfully",
+            "temporary_password": raw_password }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@ar.get("/update-user-form/")
+async def update_user_form(
+    session: SessionDep,
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        organizations = session.exec(select(Organization)).all()
+        organization_list = [org.organization_name for org in organizations]
+
+        roles = session.exec(select(Role)).all()
+        role_list = [role.name for role in roles]
+        
+        scope_group = session.exec(select(ScopeGroup)).all()
+        scope_group_list = [sg.scope_name for sg in scope_group]
+        
+
+        scope = [s.value for s in Scope]
+        gender = [g.value for g in Gender]
+
+        user_data = {
+            "id": "", 
+            "full_name": "", 
+            "username": "",
+            "password": "",
+            "email": "",
+            "phone_number": "",
+            "organization": organization_list,
+            "role_id": role_list,
+            "scope": scope,
+            "scope_group": scope_group_list,
+            "gender": gender,
+            "position": "",
+            "salary": "",
+            "date_of_birth": "",
+            "date_of_joining": "",
+            "image": "file",
+            "id_type": "",
+            "id_number": "",
+        }
+
+        return {"data": user_data, "html_types": get_html_types("users")}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    
+    
 @ar.put("/update-user/")
 async def update_uer(
     session: SessionDep,
@@ -352,8 +383,8 @@ async def update_uer(
             
 ):
     try: 
-        if not check_accessPolicy(
-            session, "edit", "Users", current_user["user_id"]
+        if not check_permission(
+            session, "edit", "Users", current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
@@ -415,8 +446,8 @@ async def delete_user(
     user_id: int = Body(...),
 ):
     try:
-        if not check_accessPolicy(
-            session, "edit", "Users", current_user["user_id"]
+        if not check_permission(
+            session, "edit", "Users", current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
@@ -461,12 +492,13 @@ async def create_scope_group(
     organization_list: List[int] = Body(...),
 ):
     try:
-        # if not check_accessPolicy(
-        #     session, "edit", "Administration", current_user["user_id"]
+        # if not check_permission(
+        #     session, "edit", "Administration", current_user
         #     ):
         #     raise HTTPException(
         #         status_code=403, detail="You Do not have the required privilege"
         #     )
+        
         existing_scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.scope_name == scope_name)).first()
         if existing_scope_group:
             raise HTTPException(
@@ -502,8 +534,8 @@ async def get_scope_groups(
     current_user: UserDep,
 ):
     try:
-        # if not check_accessPolicy(
-        #     session, "edit", "Administration", current_user["user_id"]
+        # if not check_permission(
+        #     session, "edit", "Administration", current_user
         #     ):
         #     raise HTTPException(
         #         status_code=403, detail="You Do not have the required privilege"
@@ -534,8 +566,8 @@ async def delete_scope_group(
     scope_group_id: int = Body(...),
 ):
     try:
-        if not check_accessPolicy(
-            session, "edit", "Administration", current_user["user_id"]
+        if not check_permission(
+            session, "edit", "Administration", current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
