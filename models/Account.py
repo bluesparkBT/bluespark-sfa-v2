@@ -78,28 +78,6 @@ class Role(SQLModel, table=True):
     name: str
     organization_id: int = Field(foreign_key="organization.id")
     permissions: List["RoleModulePermission"] = Relationship(back_populates="role")
-
-
-class ModuleName(str, Enum):
-
-    category = "Category"
-    product = "Product"
-    dashboard = "Dashboard"
-    finance = "Finance"
-    sales = "Sales"
-    presales = "Presales"
-    trade_marketing = "Trade Marketing"
-    visit = "Visit"
-    order = "Order"
-    route = "Route"
-    territory = "Territory"
-    point_of_sale = "Point Of Sale"
-    address = "Address"
-    users = "Users"
-    organization = "Organization"
-    inventory_management = "Inventory Management"
-    route_schedule = "Route Schedule"
-    penetration = "Penetration"
  
 
 class AccessPolicy(str, Enum):
@@ -144,7 +122,7 @@ class RoleModulePermission(SQLModel, table=True):
     id: int = Field(primary_key=True)
     role_id: int = Field(foreign_key="role.id")
     module: str 
-    access_policy: AccessPolicy
+    access_policy: Optional[AccessPolicy] = Field(default=AccessPolicy.deny)
 
     role: Optional[Role] = Relationship(back_populates="permissions")
     
