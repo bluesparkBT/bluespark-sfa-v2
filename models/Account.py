@@ -71,9 +71,6 @@ class Scope(str, Enum):
     managerial_scope = "managerial_scope"
     personal_scope = "personal_scope"
 
-
-
-
 class Role(SQLModel, table=True):
     __tablename__ = "role"
 
@@ -81,6 +78,7 @@ class Role(SQLModel, table=True):
     name: str
     organization_id: int = Field(foreign_key="organization.id")
     permissions: List["RoleModulePermission"] = Relationship(back_populates="role")
+ 
 
 class AccessPolicy(str, Enum):
     deny = "deny"
@@ -124,7 +122,7 @@ class RoleModulePermission(SQLModel, table=True):
     id: int = Field(primary_key=True)
     role_id: int = Field(foreign_key="role.id")
     module: str 
-    access_policy: AccessPolicy
+    access_policy: Optional[AccessPolicy] = Field(default=AccessPolicy.deny)
 
     role: Optional[Role] = Relationship(back_populates="permissions")
     
@@ -152,6 +150,7 @@ class User(SQLModel, table=True):
     id_type: Optional[IdType] = Field(default=None)
     id_number: Optional[str] = Field(default=None)    
     #address_id: Optional[int] = Field(default=None, foreign_key="address.id", index=True)
+
 
 
     

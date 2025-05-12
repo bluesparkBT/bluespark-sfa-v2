@@ -3,7 +3,7 @@ from typing import Annotated
 from sqlmodel import Session, select
 
 
-from models.Account import User, Role, Module, AccessPolicy, RoleModulePermission
+from models.Account import User, Role, ModuleName, AccessPolicy, RoleModulePermission
 from utils.auth_util import get_current_user
 from db import get_session
 
@@ -12,7 +12,7 @@ from db import get_session
 def check_permission(module: str, required: AccessPolicy):
     def dependency(user: User = Depends(get_current_user), session: Session = Depends(get_session)):
         role = session.get(Role, user.role_id)
-        module_obj = session.exec(select(Module).where(Module.name == module)).first()
+        module_obj = session.exec(select(ModuleName).where(ModuleName.name == module)).first()
         perm = session.exec(
             select(RoleModulePermission)
             .where(RoleModulePermission.role_id == role.id)

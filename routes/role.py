@@ -5,6 +5,7 @@ from sqlmodel import Session, select
 
 from db import SECRET_KEY, get_session
 from models.Account import AccessPolicy, Role, RoleModulePermission, User
+from models.Account import ModuleName as modules
 from utils.auth_util import get_current_user
 from utils.form_db_fetch import fetch_user_id_and_name
 from utils.model_converter_util import get_html_types
@@ -14,13 +15,6 @@ from utils.util_functions import validate_name
 RoleRouter = rr = APIRouter()
 SessionDep = Annotated[Session, Depends(get_session)]
 UserDep = Annotated[dict, Depends(get_current_user)]
-
-modules: List = ["dashboard", "finance", "sales", "presales", "trade marketing", "visit", "order", "report", "route", "address", "users", "organization", "inventory management", "category", "product", "route schedule", "territory", "point of sale", "role"]
-modules_dict = {
-    module: module.title()
-    for module in modules
-}
-
 
 
 @rr.get("/roles")
@@ -35,20 +29,16 @@ async def get_roles(
         if not roles:
             raise HTTPException(status_code=404, detail="Role not found")
         for role in roles:
-            permissions = [
-            perm for perm in role.permissions if perm.module is not None
-            ]
-        
-            if permissions:  
-                roles_data.append({
-                    "id": role.id,
-                    "role_name": role.name,  #
-                    **{  
-                        perm.module: perm.access_policy
-                        for perm in permissions
-                    }
-                })
-
+            permissions = ""
+            for perm in role.permissions:
+                if(perm.access_policy != "deny"):
+                    permissions += perm.module+"("+perm.access_policy+"),"
+            roles_data.append({
+                "id": role.id,
+                "role_name": role.name,
+                "roles": permissions
+            })
+     
         return roles_data
  
     except Exception as e:
@@ -92,13 +82,14 @@ async def form_roles(
     
 
 @rr.get("/form-modules")
-async def form_roles(
+async def form_modules(
     session: SessionDep,
     current_user: User = Depends(get_current_user),
 ):
     try:
      
         policy_type =  {i.value: i.value for i in AccessPolicy}
+        modules_dict =  {i.value: i.value for i in modules}
         print(policy_type)
         role = {
             "role_id":"",
@@ -113,7 +104,7 @@ async def form_roles(
 
 
 @rr.post("/update-role-module")
-async def create_role(
+async def update_role(
     session: SessionDep,
     role_id: int = Body(...),
     module: str = Body(...),
@@ -137,7 +128,7 @@ async def create_role(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@rr.get("/my-roles")
+@rr.get("/my-role")
 async def get_my_role(
     session: SessionDep,
     current_user: User = Depends(get_current_user),
@@ -199,7 +190,7 @@ async def create_role(
         for module in modules:
             role_module_permission= RoleModulePermission(
                 role_id=role.id,
-                module=module,
+                module=module.value,
                 access_policy=AccessPolicy.deny
             )
 
