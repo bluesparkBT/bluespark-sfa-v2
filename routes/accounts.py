@@ -22,6 +22,7 @@ def login(
     password: str = Body(...)
 ):
     
+
     try:
         user = session.exec(select(User).where(User.username == username)).first()
         
@@ -44,6 +45,7 @@ def login(
     
     except Exception as e:
         return {"error": str(e)}
+
     
 @ar.get("/get-my-user/")
 async def get_my_user(
@@ -101,10 +103,12 @@ async def create_superadmin_user(
         organization = Organization(
             organization_name=service_provider_company,
         )
+
         session.add(organization)
         session.commit()
         session.refresh(organization)
         
+
         new_user =User(
             username=username,
             email=email,
@@ -116,7 +120,6 @@ async def create_superadmin_user(
         session.add(new_user)
         session.commit()
         session.refresh(new_user)
-
 
 
         scope_group = ScopeGroup(

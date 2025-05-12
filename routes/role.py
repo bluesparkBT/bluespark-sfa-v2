@@ -1,3 +1,4 @@
+
 from typing import Annotated, Any, Dict, List
 from fastapi import APIRouter, HTTPException, Depends, Body, status
 from sqlmodel import Session, select
@@ -20,7 +21,6 @@ modules_dict = {
     module: module
     for module in modules
 }
-
 
 
 @rr.get("/roles")
@@ -133,6 +133,7 @@ async def update_role(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+
 @rr.get("/my-role")
 async def get_my_role(
     session: SessionDep,
@@ -148,17 +149,30 @@ async def get_my_role(
         if not role:
             raise HTTPException(status_code=404, detail="Role not found")
 
+
         permissions = [
             perm for perm in role.permissions if perm.module is not None
         ]
+=======
+
+        session.exec(select(RoleModulePermission).where(RoleModulePermission.role_id == role.id))
+
+        permissions = {
+            perm.module.name: perm.access_policy
+            for perm in role.permissions if perm.module is not None
+        }
 
         return {
             "id": role.id,
             "role_name": role.name,
+
             **{  
                 perm.module: perm.access_policy
                 for perm in permissions
             }     
+=======
+            "permissions": permissions
+
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -174,12 +188,14 @@ async def create_role(
        
         role_name = role_data.get("name")
 
+
         if validate_name(role_name) == False:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Role name is not valid",
         )
         
+
         #create role
         role = Role(
             name=role_name,
@@ -202,8 +218,10 @@ async def create_role(
             session.add(role_module_permission)
             session.commit()
             session.refresh(role_module_permission)
+
  
         return role.id
+
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
         
@@ -222,16 +240,19 @@ async def update_role(
             raise HTTPException(status_code=404, detail="Role not found")
       
         if validate_name(name) == False:
+
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Role name is not valid",
         )
+
 
         role.name = name
         session.add(role)
         session.commit()
         session.refresh(role)
         return role.id
+
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -244,6 +265,7 @@ async def delete_role(
 ):
 
     try:   
+
         role = session.exec(select(Role).where(Role.id == id)).first()
         if not role:
             raise HTTPException(status_code=404, detail="Role not found")
@@ -260,6 +282,7 @@ async def delete_role(
         for role_module in assigned_role_module:
             session.delete(role_module) 
             session.commit()   
+
         
         session.delete(role)
         session.commit()
