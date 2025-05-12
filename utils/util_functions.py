@@ -35,13 +35,16 @@ def validate_email(email: str) -> bool:
     return False
 
 
-def is_valid_phone_number(phone_number: str) -> str:
-    """Validates phone number and returns it in the correct format starting with +251."""
-    phone_number = phone_number.replace(" ", "")
-    phone_regex = r"^\+\d{1,3}\d{10}$"
-    zero_regex = r"^0\d{9}$"
+def validate_phone_number(phone_number) -> bool:
+    """Validates Ethiopian phone numbers starting with +2517/9 or 07/09."""
+    if not phone_number:
+        return False
 
-    if re.match(phone_regex, phone_number) or re.match(zero_regex, phone_number):
-        return True
-    return False
+    phone_number = str(phone_number).replace(" ", "")
+    # Matches +251 followed by 7xx or 9xx and 7 more digits
+    phone_regex = r"^\+251[79]\d{8}$"
+    # Matches local format like 07xxxxxxxx or 09xxxxxxxx
+    local_regex = r"^0[79]\d{8}$"
+
+    return bool(re.match(phone_regex, phone_number) or re.match(local_regex, phone_number))
 

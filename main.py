@@ -3,13 +3,14 @@ from dotenv import load_dotenv
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi import FastAPI
-from routes.role import RoleRouter
+from routes.util import UtilRouter
 from starlette.status import HTTP_400_BAD_REQUEST
 from fastapi.middleware.cors import CORSMiddleware
 
 from db import create_db_and_tables
 from routes.accounts import AuthenticationRouter
 from routes.organizations import TenantRouter
+from routes.role import RoleRouter
 
 
 load_dotenv()
@@ -49,8 +50,11 @@ async def validation_exception_handler(request, exc):
         content={"error": "Invalid input", "details": exc.errors()},
     )
 
-
-
-app.include_router(AuthenticationRouter, prefix="/auth", tags=["auth"])
-app.include_router(TenantRouter, prefix="/company", tags=["company"])
+@app.on_event("startup")
+def on_startup():
+    create_db_and_tables()
+    
+app.include_router(AuthenticationRouter, prefix="/account", tags=["account"])
+app.include_router(TenantRouter, prefix="/organization", tags=["organization"])
 app.include_router(RoleRouter, prefix="/role", tags=["role"])
+app.include_router(UtilRouter, prefix="/utility", tags=["Utility"])
