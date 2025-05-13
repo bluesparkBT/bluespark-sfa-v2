@@ -1,6 +1,6 @@
 import bcrypt, jwt
 from datetime import datetime, timedelta, timezone
-from fastapi import Depends, HTTPException, status, Path
+from fastapi import Depends, HTTPException, status, Path, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jwt.exceptions import InvalidTokenError
 from sqlmodel import select
@@ -23,9 +23,15 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 90
 
 SessionDep = Annotated[Session, Depends(get_session)]
 
-def get_tenant(tenant: str = Path(...)):
-    # Validate tenant (optional)
-    # e.g., check if tenant exists in DB
+# This assumes you've saved tenant in request.state via middleware
+def get_tenant(
+    request: Request,
+    session: SessionDep,
+) -> str:
+    tenant = getattr(request.state, "tenant", None)
+    if not tenant:
+        raise HTTPException(status_code=400, detail="Tenant not found.")
+     
     return tenant
 
 def get_password_hash(password: str) -> str:
