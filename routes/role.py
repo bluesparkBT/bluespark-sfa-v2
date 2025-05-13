@@ -107,7 +107,7 @@ async def form_modules(
 ):
     try:
         if not check_permission(
-            session, "Read", "Administation", current_user
+            session, "Read", "Administration", current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"

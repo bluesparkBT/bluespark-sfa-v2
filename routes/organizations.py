@@ -55,7 +55,7 @@ async def create_tenant(
     organization_type: str = Body(...),
 ):
     try:
-        if not check_permission(session, "Create", "Tenant", current_user):
+        if not check_permission(session, "Create", "Organization", current_user):
             raise HTTPException(status_code=403, detail="You do not have the required privilege")
 
         existing_tenant = session.exec(
