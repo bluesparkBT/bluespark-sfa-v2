@@ -1,27 +1,35 @@
 from typing import Annotated, List, Dict, Any, Optional
 
-from fastapi import APIRouter, HTTPException, Body, status, Depends
+from fastapi import APIRouter, HTTPException, Body, status, Depends, Path
 from sqlmodel import select, Session
 from sqlalchemy.orm import selectinload
 from db import get_session
-from models.Account import User, Organization, OrganizationType, ScopeGroup
+from models.Account import User, Organization, OrganizationType, ScopeGroup, Scope, Role, ScopeGroupLink
 
-from utils.auth_util import get_current_user
+from utils.auth_util import get_tenant, get_current_user, check_permission, generate_random_password, get_password_hash
 from utils.model_converter_util import get_html_types
 from utils.util_functions import validate_name, validate_image
+from utils.get_hierarchy import get_parent_organizations
 
 TenantRouter =tr= APIRouter()
 SessionDep = Annotated[Session, Depends(get_session)]
 UserDep = Annotated[dict, Depends(get_current_user)]
 
 
-
-@tr.get("/form")
+@tr.get("/organization-form/")
 async def get_form_fields_organization(
-    session: SessionDep, 
-    current_user: User = Depends(get_current_user)):
+    session: SessionDep,
+    tenant: str = Depends(get_tenant), 
+    current_user: User = Depends(get_current_user)
+):
     try:
-       
+        if not check_permission(
+            session, "Read", "Organization", current_user
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
+
         organization = Organization(
             id="",
             organization_name = "",
@@ -35,11 +43,97 @@ async def get_form_fields_organization(
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@tr.post("/create-tenant")
+async def create_tenant(
+    session: SessionDep,
+    current_user: UserDep,
+    tenant: str = Depends(get_tenant),
 
+    tenant_name: str = Body(...),
+    description: str = Body(...),
+    logo_image: str = Body(...),
+    organization_type: str = Body(...),
+):
+    try:
+        if not check_permission(session, "Create", "Tenant", current_user):
+            raise HTTPException(status_code=403, detail="You do not have the required privilege")
+
+        existing_tenant = session.exec(
+            select(Organization).where(Organization.organization_name == tenant_name)
+        ).first()
+        if existing_tenant:
+            raise HTTPException(status_code=400, detail="Tenant already exists")
+
+        if not logo_image or not validate_image(logo_image):
+            raise HTTPException(status_code=400, detail="Logo image is not valid")
+
+        new_tenant = Organization(
+            organization_name=tenant_name,
+            description=description,
+            logo_image=logo_image,
+            organization_type=organization_type,
+        )
+        session.add(new_tenant)
+        session.commit()
+        session.refresh(new_tenant)
+
+        scope_group = ScopeGroup(
+            scope_name="System Admin Scope",
+        )
+        session.add(scope_group)
+        session.commit()
+        session.refresh(scope_group)
+
+        scope_group_link = ScopeGroupLink(
+            scope_group_id=scope_group.id,
+            organization_id=new_tenant.id,
+        )
+        session.add(scope_group_link)
+        session.commit()
+
+        role_name = "Tenant System Admin"
+        role = Role(
+            name=role_name,
+            organization_id=new_tenant.id,
+        )
+        session.add(role)
+        session.commit()
+        session.refresh(role)
+
+        raw_password = generate_random_password()
+        hashed_password = get_password_hash(raw_password + tenant_name)
+
+        tenant_admin = User(
+            username=f"{tenant_name.lower()}_admin",
+            fullname=f"{tenant_name} Admin",
+            email=f"{tenant_name.lower()}_admin@{tenant_name}.com",
+            hashedPassword=hashed_password,
+            organization=new_tenant.id,
+            role_id=role.id,
+            scope=Scope.managerial_scope,
+            scope_group_id=scope_group.id,
+        )
+        session.add(tenant_admin)
+        session.commit()
+        session.refresh(tenant_admin)
+
+        return {
+            "message": "Tenant and system admin created successfully",
+            "tenant": tenant_name,
+            "admin_username": tenant_admin.username,
+            "admin_password": raw_password 
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    
 @tr.post("/create-organization/")
 async def create_organization(
     session: SessionDep,
+    tenant: str = Depends(get_tenant),
     current_user: User = Depends(get_current_user),
+    
     organization_name: str = Body(...),
     owner_name: str = Body(...),
     description: str = Body(...),
@@ -48,6 +142,12 @@ async def create_organization(
 ):
 
     try:
+        if not check_permission(
+            session, "Create", "Organization", current_user
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
         existing_tenant = session.exec(select(Organization).where(Organization.organization_name == organization_name)).first()
 
         if existing_tenant is not None:
@@ -93,7 +193,8 @@ async def create_organization(
 @tr.get("/get-my-organization/")
 async def get_my_organization(
     session: SessionDep,
-    current_user: User = Depends(get_current_user),  # Extract the logged-in user
+    tenant: str = Depends(get_tenant),
+    current_user: User = Depends(get_current_user),
 ) -> dict:
     """
     Retrieve the organization information for the logged-in user.
@@ -109,6 +210,12 @@ async def get_my_organization(
         HTTPException: 404 if the organization is not found.
     """
     try:
+        if not check_permission(
+            session, "Read", "Organization", current_user
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
         # Query the organization associated with the logged-in user
         organization = session.exec(select(Organization).where(Organization.id == current_user.get("organization"))).first()
 
@@ -132,11 +239,20 @@ async def get_my_organization(
 @tr.get("/get-organizations/")
 async def get_organizations(
     session: SessionDep,
+    current_user: UserDep,    
+    tenant: str = Depends(get_tenant),
+
 ):
     """
     Retrieve all organizations with their associated scope groups.
     """
     try:
+        if not check_permission(
+            session, "Read", "Organization", current_user
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
         # Use selectinload to eagerly load the relationship
         sgo = select(Organization).options(selectinload(Organization.scope_groups))
         organizations = session.exec(sgo).all()
@@ -171,8 +287,15 @@ async def get_organization(
     session: SessionDep,
     id: int,
     current_user: User = Depends(get_current_user),
+    tenant: str = Depends(get_tenant),
 ):
     try:
+        if not check_permission(
+            session, "Read", "Organization", current_user
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
         organization = session.exec(select(Organization).where(Organization.id == id)).first()
         if not organization:
             raise HTTPException(status_code=404, detail="Role not found")
@@ -187,12 +310,15 @@ async def get_organization(
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
-    
+
     
 @tr.put("/update-organization/")
 async def create_organization(
     session: SessionDep,
-    current_user: UserDep,
+    current_user: UserDep,    
+    tenant: str = Depends(get_tenant),
+
+    
     id: int = Body(...),
     organization_name: str = Body(...),
     owner_name: str = Body(...),
@@ -202,6 +328,12 @@ async def create_organization(
 ):
 
     try:
+        if not check_permission(
+            session, "Update", "Organization", current_user
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
         existing_tenant = session.exec(select(Organization).where(Organization.id == id)).first()
 
         if existing_tenant is None:
@@ -241,7 +373,9 @@ async def create_organization(
 @tr.delete("/delete-organization/{id}")
 async def delete_organization(
     session: SessionDep,
-    id: int,
+    current_user: UserDep,
+    id: int,    
+    tenant: str = Depends(get_tenant),
 ):
     """
     Delete an organization by ID.
@@ -257,6 +391,12 @@ async def delete_organization(
         HTTPException: 404 if the organization is not found.
     """
     try:
+        if not check_permission(
+            session, "Delete", "Organization", current_user
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
         # Query the organization by ID
         organization = session.get(Organization, id)
 
@@ -274,3 +414,31 @@ async def delete_organization(
     
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+# @ar.get("/get-organization-hierarchy/")
+# async def get_organization_hierarchy(
+#     session: SessionDep,
+# tenant: str = Depends(get_tenant),
+#     current_user: UserDep,
+#     scope_group_id: int = Body(...),
+# ):
+#     try:
+#         if not check_permission(
+#             session, "Read", "Organization", current_user
+#             ):
+#             raise HTTPException(
+#                 status_code=403, detail="You Do not have the required privilege"
+#             )
+#         scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == scope_group_id)).first()
+#         if not scope_group:
+#             raise HTTPException(status_code=404, detail="Scope group not found")
+
+#         hierarchy = get_hierarchy(scope_group, session)
+        
+#         return {
+#             "scope_group": scope_group.scope_name,
+#             "hierarchy": hierarchy
+#         }
+#     except Exception as e:
+#         raise HTTPException(status_code=400, detail=str(e))
+    

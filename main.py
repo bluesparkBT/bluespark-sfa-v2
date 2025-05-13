@@ -54,7 +54,7 @@ async def validation_exception_handler(request, exc):
 def on_startup():
     create_db_and_tables()
     
-app.include_router(AuthenticationRouter, prefix="/account", tags=["account"])
-app.include_router(TenantRouter, prefix="/organization", tags=["organization"])
-app.include_router(RoleRouter, prefix="/role", tags=["role"])
-app.include_router(UtilRouter, prefix="/utility", tags=["Utility"])
+app.include_router(AuthenticationRouter, prefix="/{tenant}/account", tags=["account"])
+app.include_router(TenantRouter, prefix="/{tenant}/organization", tags=["organization"])
+app.include_router(RoleRouter, prefix="/{tenant}/role", tags=["role"])
+app.include_router(UtilRouter, prefix="/{tenant}/utility", tags=["utility"])
