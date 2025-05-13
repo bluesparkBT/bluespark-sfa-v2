@@ -79,7 +79,6 @@ class Role(SQLModel, table=True):
     organization_id: int = Field(foreign_key="organization.id")
     permissions: List["RoleModulePermission"] = Relationship(back_populates="role")
 
-
 class AccessPolicy(str, Enum):
     deny = "deny"
     view = "view"
@@ -124,7 +123,7 @@ class RoleModulePermission(SQLModel, table=True):
     id: int = Field(primary_key=True)
     role_id: int = Field(foreign_key="role.id")
     module: str 
-    access_policy: AccessPolicy = Field(default=AccessPolicy.deny)
+    access_policy: Optional[AccessPolicy] = Field(default=AccessPolicy.deny)
 
     role: Optional[Role] = Relationship(back_populates="permissions")
     

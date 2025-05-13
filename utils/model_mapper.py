@@ -20,7 +20,6 @@ MODEL_HTML_TYPES = {
     "scope_group":{
         "id":"hidden",
         "name":"text",
-        "organization":"select",
     },
     "user": {
         "id": "hidden",
@@ -41,5 +40,9 @@ MODEL_HTML_TYPES = {
         "id_number": "text",
         "gender": "select",
         "house_number": "text",
-    }
+    },
+    "scope_organization":{
+        "scope_id":"hidden",
+        "organizations":"checkbox",
+    },
 }

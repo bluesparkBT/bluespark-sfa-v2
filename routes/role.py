@@ -16,7 +16,6 @@ SessionDep = Annotated[Session, Depends(get_session)]
 UserDep = Annotated[dict, Depends(get_current_user)]
 
 
-
 @rr.get("/roles-form")
 async def form_roles(
     session: SessionDep,
