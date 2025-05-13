@@ -4,7 +4,8 @@ from typing import Annotated
 from db import  get_session
 from models.Account import (
     Organization,
-    User
+    User,
+    Role
 )
 
 from sqlmodel import Session, select
@@ -21,5 +22,11 @@ def fetch_organization_id_and_name(session: SessionDep):
     organization_row = session.exec(select(Organization.id, Organization.organization_name)).all()
     organizations = {row[0]: row[1] for row in organization_row}
     return organizations
+
+def fetch_role_id_and_name(session: SessionDep):
+    
+    role_row = session.exec(select(Role.id, Role.name)).all()
+    roles = {row[0]: row[1] for row in role_row}
+    return roles
 
 
