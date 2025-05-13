@@ -19,115 +19,36 @@ UserDep = Annotated[dict, Depends(get_current_user)]
 @tr.get("/organization-form/")
 async def get_form_fields_organization(
     session: SessionDep,
-    tenant: str = Depends(get_tenant), 
+    tenant: str, 
     current_user: User = Depends(get_current_user)
 ):
     try:
-        if not check_permission(
-            session, "Read", "Organization", current_user
-            ):
-            raise HTTPException(
-                status_code=403, detail="You Do not have the required privilege"
-            )
+        # if not check_permission(
+        #     session, "Read", "Organization", current_user
+        #     ):
+        #     raise HTTPException(
+        #         status_code=403, detail="You Do not have the required privilege"
+        #     )
+        organizations = session.exec(select(Organization)).all()
+        organization_list = [org.organization_name for org in organizations]
+        
+        organization_data = {
+            "id": "",
+            "organization_name": "",
+            "owner_name": "",
+            "description": "",
+            "logo_image": "",
+            "parent_organization": organization_list,
+            "organization_type" : {i.value: i.value for i in OrganizationType}
+            }
+        
 
-        organization = Organization(
-            id="",
-            organization_name = "",
-            owner_name = "",
-            description = "",
-            logo_image = "",
-            organization_type = {i.value: i.value for i in OrganizationType}
-        )
-
-        return {"data": organization, "html_types": get_html_types(Organization)}
+        return {"data": organization_data, "html_types": get_html_types(Organization)}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@tr.post("/create-tenant")
-async def create_tenant(
-    session: SessionDep,
-    current_user: UserDep,
-    tenant: str = Depends(get_tenant),
 
-    tenant_name: str = Body(...),
-    description: str = Body(...),
-    logo_image: str = Body(...),
-    organization_type: str = Body(...),
-):
-    try:
-        if not check_permission(session, "Create", "Organization", current_user):
-            raise HTTPException(status_code=403, detail="You do not have the required privilege")
 
-        existing_tenant = session.exec(
-            select(Organization).where(Organization.organization_name == tenant_name)
-        ).first()
-        if existing_tenant:
-            raise HTTPException(status_code=400, detail="Tenant already exists")
-
-        if not logo_image or not validate_image(logo_image):
-            raise HTTPException(status_code=400, detail="Logo image is not valid")
-
-        new_tenant = Organization(
-            organization_name=tenant_name,
-            description=description,
-            logo_image=logo_image,
-            organization_type=organization_type,
-        )
-        session.add(new_tenant)
-        session.commit()
-        session.refresh(new_tenant)
-
-        scope_group = ScopeGroup(
-            scope_name="System Admin Scope",
-        )
-        session.add(scope_group)
-        session.commit()
-        session.refresh(scope_group)
-
-        scope_group_link = ScopeGroupLink(
-            scope_group_id=scope_group.id,
-            organization_id=new_tenant.id,
-        )
-        session.add(scope_group_link)
-        session.commit()
-
-        role_name = "Tenant System Admin"
-        role = Role(
-            name=role_name,
-            organization_id=new_tenant.id,
-        )
-        session.add(role)
-        session.commit()
-        session.refresh(role)
-
-        raw_password = generate_random_password()
-        hashed_password = get_password_hash(raw_password + tenant_name)
-
-        tenant_admin = User(
-            username=f"{tenant_name.lower()}_admin",
-            fullname=f"{tenant_name} Admin",
-            email=f"{tenant_name.lower()}_admin@{tenant_name}.com",
-            hashedPassword=hashed_password,
-            organization=new_tenant.id,
-            role_id=role.id,
-            scope=Scope.managerial_scope,
-            scope_group_id=scope_group.id,
-        )
-        session.add(tenant_admin)
-        session.commit()
-        session.refresh(tenant_admin)
-
-        return {
-            "message": "Tenant and system admin created successfully",
-            "tenant": tenant_name,
-            "admin_username": tenant_admin.username,
-            "admin_password": raw_password 
-        }
-
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-    
 @tr.post("/create-organization/")
 async def create_organization(
     session: SessionDep,
@@ -138,16 +59,17 @@ async def create_organization(
     owner_name: str = Body(...),
     description: str = Body(...),
     logo_image: str = Body(...),
+    parent_organization : int = Body(...),
     organization_type: str = Body(...),    
 ):
 
     try:
-        if not check_permission(
-            session, "Create", "Organization", current_user
-            ):
-            raise HTTPException(
-                status_code=403, detail="You Do not have the required privilege"
-            )
+        # if not check_permission(
+        #     session, "Create", "Organization", current_user
+        #     ):
+        #     raise HTTPException(
+        #         status_code=403, detail="You Do not have the required privilege"
+        #     )
         existing_tenant = session.exec(select(Organization).where(Organization.organization_name == organization_name)).first()
 
         if existing_tenant is not None:
@@ -168,13 +90,16 @@ async def create_organization(
                 detail="Logo image is not valid",
         )
             
-        
+        organizations = session.exec(select(Organization)).all()
+        organization_list = [org.organization_name for org in organizations]
         
         organization = Organization(
+            id = None,
             organization_name = organization_name,
             owner_name = owner_name,
             description = description,
             logo_image = logo_image,
+            parent_id = organization_list,
             organization_type = organization_type
         )
         

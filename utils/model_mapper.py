@@ -6,6 +6,7 @@ MODEL_HTML_TYPES = {
         "owner_name": "text",
         "description": "textarea",
         "logo_image": "file",
+        "parent_organization": "select",
         "organization_type": "select",
     },
     "Role":{
@@ -36,7 +37,7 @@ MODEL_HTML_TYPES = {
         "salary": "number",
         "position": "text",
         "image": "file",
-        "id_type": "text",
+        "id_type": "select",
         "id_number": "text",
         "gender": "select",
         "house_number": "text",
