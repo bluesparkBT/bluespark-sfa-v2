@@ -48,6 +48,7 @@ async def get_form_fields_organization(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+
 @tr.post("/create-organization/")
 async def create_organization(
     session: SessionDep,

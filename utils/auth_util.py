@@ -117,7 +117,7 @@ def check_permission(
             print("Role not found")
             return False
 
-        if endpoint_group in ModuleName:
+        if endpoint_group in [moduleName.value for moduleName in ModuleName]:
             module = endpoint_group
         else:
             print(f"Module '{endpoint_group}' not found")
@@ -154,22 +154,18 @@ def check_permission(
             "Delete": 3
         }
 
-        user_access_level = bin(access_levels[permission.access_policy])[2:].zfill(4)
-        
+        user_access_level = access_levels[permission.access_policy]
         print("Access Level User",access_levels[permission.access_policy], user_access_level)
-
-        
-        required_access_level = bin(access_levels[policy_type])[2:].zfill(4)
-        
-        print("Access Level Required",access_levels[policy_type], required_access_level)
-
-               
-        if required_access_level[crud_digit[policy_type]] == '1' and  user_access_level[crud_digit[policy_type]] == '1':
+      
+        required_access_level = 1 << crud_digit[policy_type] 
+        print("Access Level Required",crud_digit[policy_type], required_access_level)
+      
+        if user_access_level & required_access_level:
             return True
         else:
             return False
 
     except Exception as e:
         print(f"Error in check_permission: {e}")
-        # traceback.print_exc()
+        traceback.print_exc()
         return False
