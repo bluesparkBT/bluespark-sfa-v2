@@ -28,8 +28,9 @@ def login(
 
     try:
         user = session.exec(select(User).where(User.username == username)).first()
+        print(user)
         
-        if not user.organization or not user.organization:
+        if not user and not user.organization_id:
             raise HTTPException(status_code=400, detail="User missing company or organization info")
 
         if not user or not verify_password(password+user.username, user.hashedPassword):
@@ -39,7 +40,7 @@ def login(
             data={
                 "sub": user.username,
                 "user_id": user.id,
-                "organization": user.organization,
+                "organization": user.organization_id,
                 },
             expires_delta = access_token_expires,
         )
@@ -85,21 +86,14 @@ async def get_my_user(
 @ar.post("/create-superadmin/")
 async def create_superadmin_user(
     session: SessionDep,
-    current_user: UserDep,
-    tenant: str = Depends(get_tenant), 
-       
+    tenant: str = Depends(get_tenant),  
     username: str = Body(...),
     email: str = Body(...),
     password: str = Body(...),
     service_provider_company: str = Body(...),
 ):
     try:
-        if not check_permission(
-            session, "Create", "Users", current_user
-            ):
-            raise HTTPException(
-                status_code=403, detail="You Do not have the required privilege"
-            )
+  
         existing_superadmin = session.exec(select(User).where(User.username== username)).first()
         if existing_superadmin is not None:
             raise HTTPException(
@@ -120,7 +114,7 @@ async def create_superadmin_user(
             username=username,
             email=email,
             hashedPassword=get_password_hash(password + username),
-            organization= organization.id,
+            organization_id= organization.id,
         )
         
         
@@ -532,8 +526,7 @@ async def create_scope_group(
     current_user: UserDep,    
     tenant: str = Depends(get_tenant),
 
-    scope_name: str = Body(...),
-    organization_list: List[int] = Body(...),
+   scope_data: Dict[str, Any] = Body(...),
 ):
     try:
         if not check_permission(
@@ -542,6 +535,14 @@ async def create_scope_group(
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
+        scope_name = scope_data.get("name")
+
+        if validate_name(scope_name) == False:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Scope name is not valid",
+        )
+
         
 
         existing_scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.scope_name == scope_name)).first()
@@ -563,7 +564,7 @@ async def create_scope_group(
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
     
-@ar.get("/form-scope-organization/")
+@ar.get("/scope-organization-form/")
 async def form_scope_organization(
     session: SessionDep,
     current_user: UserDep,
