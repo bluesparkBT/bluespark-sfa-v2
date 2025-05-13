@@ -16,6 +16,39 @@ ServiceProvider =sp= APIRouter()
 SessionDep = Annotated[Session, Depends(get_session)]
 UserDep = Annotated[dict, Depends(get_current_user)]
 
+@sp.post("/login/")
+def login(
+    session: SessionDep,
+    
+    username: str = Body(...),
+    password: str = Body(...)
+):
+    
+
+    try:
+        user = session.exec(select(User).where(User.username == username)).first()
+        print(user)
+        
+        if not user and not user.organization_id:
+            raise HTTPException(status_code=400, detail="User missing company or organization info")
+
+        if not user or not verify_password(password+user.username, user.hashedPassword):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+        access_token_expires = timedelta(minutes=90)
+        token = create_access_token(
+            data={
+                "sub": user.username,
+                "user_id": user.id,
+                "organization": user.organization_id,
+                },
+            expires_delta = access_token_expires,
+        )
+        
+        return {"access_token": token}
+    
+    except Exception as e:
+        return {"error": str(e)}
+
 @sp.post("/create-superadmin/")
 async def create_superadmin_user(
     session: SessionDep,

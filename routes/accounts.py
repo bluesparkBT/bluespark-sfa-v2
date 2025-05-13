@@ -235,7 +235,6 @@ async def create_user_form(
         scope_group_list = [sg.scope_name for sg in scope_group]
         
 
-        scope = [s.value for s in Scope]
 
         user_data = {
             "id": "", 
@@ -243,11 +242,11 @@ async def create_user_form(
             "username": "",
             "email": "",
             "phone_number": "",
-            "organization": organization_list,
+            "organization": fetch_organization_id_and_name(session),
             "role_id": role_list,
-            "scope": scope,
+            "scope": {scope.value: scope.value for scope in Scope},
             "scope_group": scope_group_list,
-            "gender": {gender.value for gender in Gender},
+            "gender": {gender.value: gender.value for gender in Gender},
         }
 
         return {"data": user_data, "html_types": get_html_types("users")}
@@ -712,12 +711,23 @@ async def update_scope_group(
     current_user: UserDep,    
     tenant: str = Depends(get_tenant),
 
-    scope_group_id: int = Body(...),
+    name: str = Body(...) ,
+    id: int = Body(...),
 ):
     try:
         if not check_permission(
             session, "Delete", "Administration", current_user
             ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Role name is not valid",
+        )
+
+        scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == id)).first()
+        if not scope_group:
+            raise HTTPException(status_code=404, detail="Role not found")
+      
+        if validate_name(name) == False:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Role name is not valid",
