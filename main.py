@@ -68,5 +68,5 @@ app.include_router(AuthenticationRouter, prefix="/{tenant}/account", tags=["acco
 app.include_router(TenantRouter, prefix="/{tenant}/organization", tags=["organization"])
 app.include_router(RoleRouter, prefix="/{tenant}/role", tags=["role"])
 app.include_router(UtilRouter, prefix="/{tenant}/utility", tags=["utility"])
-app.include_router(ProductRouter, prefic="/{tenant}/product", tags="[product]")
+app.include_router(ProductRouter, prefix="/{tenant}/product", tags=["product"])
 app.include_router(ServiceProvider, tags=["Service Provider"])

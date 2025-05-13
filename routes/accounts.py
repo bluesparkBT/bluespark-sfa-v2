@@ -25,7 +25,6 @@ def login(
     password: str = Body(...)
 ):
     
-
     try:
         user = session.exec(select(User).where(User.username == username)).first()
         print(user)
@@ -186,7 +185,31 @@ async def get_users(
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-        users = session.exec(select(User)).all()
+        # users = session.exec(select(User)).all()
+        # if not users:
+        #     raise HTTPException(status_code=404, detail="No users found")
+        # Fetch the ScopeGroup assigned to the current user
+        user_scope_group = session.exec(
+            select(ScopeGroup).where(ScopeGroup.id == current_user["scope_group_id"])
+        ).first()
+        if not user_scope_group:
+            raise HTTPException(
+                status_code=404, detail="ScopeGroup not found for the current user"
+            )
+
+        # Fetch the list of organizations associated with the ScopeGroup
+        organization_ids = [
+            org.id for org in user_scope_group.organizations
+        ]
+        if not organization_ids:
+            raise HTTPException(
+                status_code=404, detail="No organizations found for the user's ScopeGroup"
+            )
+
+        # Fetch users belonging to the organizations in the ScopeGroup
+        users = session.exec(
+            select(User).where(User.organization_id.in_(organization_ids))
+        ).all()
         if not users:
             raise HTTPException(status_code=404, detail="No users found")
         
