@@ -1,14 +1,15 @@
-from typing import Annotated, List, Dict, Any
+import traceback
+from typing import Annotated, List, Dict, Any, Optional
 from datetime import timedelta, date, datetime
 from fastapi import APIRouter, HTTPException, Body, status, Depends, Path
 from sqlmodel import select, Session
 from db import get_session
-from models.Account import User, ScopeGroup, ScopeGroupLink, Organization, Gender, Scope, Role, AccessPolicy
+from models.Account import User, ScopeGroup, ScopeGroupLink, Organization, Gender, Scope, Role, AccessPolicy, IdType
 from utils.auth_util import verify_password, create_access_token, get_password_hash
-from utils.util_functions import validate_name, validate_email, validate_phone_number
+from utils.util_functions import validate_name, validate_email, validate_phone_number, parse_datetime_field, format_date_for_input, parse_enum
 from utils.auth_util import get_tenant, get_current_user, check_permission, generate_random_password
 from utils.model_converter_util import get_html_types
-from utils.form_db_fetch import fetch_organization_id_and_name
+from utils.form_db_fetch import fetch_organization_id_and_name, fetch_role_id_and_name, fetch_scope_group_id_and_name
 
 
 AuthenticationRouter =ar= APIRouter()
@@ -83,94 +84,6 @@ async def get_my_user(
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@ar.post("/create-superadmin/")
-async def create_superadmin_user(
-    session: SessionDep,
-    tenant: str = Depends(get_tenant),  
-    username: str = Body(...),
-    email: str = Body(...),
-    password: str = Body(...),
-    service_provider_company: str = Body(...),
-):
-    try:
-  
-        existing_superadmin = session.exec(select(User).where(User.username== username)).first()
-        if existing_superadmin is not None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Superadmin already registered",
-            )
-        
-        organization = Organization(
-            organization_name=service_provider_company,
-        )
-
-        session.add(organization)
-        session.commit()
-        session.refresh(organization)
-        
-
-        new_user =User(
-            username=username,
-            email=email,
-            hashedPassword=get_password_hash(password + username),
-            organization_id= organization.id,
-        )
-        
-        
-        session.add(new_user)
-        session.commit()
-        session.refresh(new_user)
-
-
-        scope_group = ScopeGroup(
-            scope_name="Superadmin scope",
-        )
-        
-        session.add(scope_group)
-        session.commit()
-        session.refresh(scope_group)
-        
-        scope_group_link = ScopeGroupLink(
-            scope_group_id=scope_group.id,
-            organization_id=organization.id,
-        )
-        
-        session.add(scope_group_link)
-        session.commit()
-        session.refresh(scope_group_link)
-
-        # Link the scope group to the company (or organization)
-
-        return {"message": "Superadmin created successfully"}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-@ar.delete("/delete-superadmin/")
-async def delete_superadmin_user(
-    session: SessionDep,
-    current_user: UserDep,    
-    tenant: str = Depends(get_tenant),
-
-    super_admin_id: int = Body(...),
-):
-    try:
-        if not check_permission(
-            session, "Delete", "Users", current_user
-            ):
-            raise HTTPException(
-                status_code=403, detail="You Do not have the required privilege"
-            )
-        superadmin = session.exec(select(User).where(User.id == super_admin_id)).first()
-        if not superadmin:
-            raise HTTPException(status_code=404, detail="Superadmin not found")
-
-        session.delete(superadmin)
-        session.commit()
-
-        return {"message": "Superadmin deleted successfully"}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
     
 @ar.get("/get-users/")
 async def get_users(
@@ -210,6 +123,50 @@ async def get_users(
         
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+    
+@ar.get("/get-user/{id}")
+async def get_user(
+    session: SessionDep,
+    id: int,
+    tenant: str = Depends(get_tenant),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        if not check_permission(
+            session, "Read", "Users", current_user
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
+       
+        user = session.exec(select(User).where(User.id == id)).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        user_data = {
+            "id": user.id, 
+            "full_name": user.fullname, 
+            "username": user.username,
+            "email": user.email,
+            "phone_number": user.phone_number,
+            "organization": user.organization_id,
+            "role": user.role_id,
+            "scope": user.scope,
+            "scope_group": user.scope_group_id,
+            "gender": user.gender,
+            "date_of_birth": format_date_for_input(user.date_of_birth),
+            "date_of_joining": format_date_for_input(user.date_of_joining),
+            "salary": 0 if user.salary is None else user.salary,
+            "position":user.position,
+            "image": user.image,
+            "id_type": user.id_type,
+            "id_number": user.id_number,
+            "password": "",
+        }
+       
+        return user_data
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 
 @ar.get("/user-form/")
 async def create_user_form(
@@ -225,17 +182,6 @@ async def create_user_form(
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-        organizations = session.exec(select(Organization)).all()
-        organization_list = [org.organization_name for org in organizations]
-
-        roles = session.exec(select(Role)).all()
-        role_list = [role.name for role in roles]
-        
-        scope_group = session.exec(select(ScopeGroup)).all()
-        scope_group_list = [sg.scope_name for sg in scope_group]
-        
-
-
         user_data = {
             "id": "", 
             "full_name": "", 
@@ -243,13 +189,13 @@ async def create_user_form(
             "email": "",
             "phone_number": "",
             "organization": fetch_organization_id_and_name(session),
-            "role_id": role_list,
+            "role": fetch_role_id_and_name(session),
             "scope": {scope.value: scope.value for scope in Scope},
-            "scope_group": scope_group_list,
+            "scope_group": fetch_scope_group_id_and_name(session),
             "gender": {gender.value: gender.value for gender in Gender},
         }
 
-        return {"data": user_data, "html_types": get_html_types("users")}
+        return {"data": user_data, "html_types": get_html_types("user")}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -260,16 +206,15 @@ async def create_user(
     current_user: UserDep,    
     tenant: str = Depends(get_tenant),
 
-    fullname: str = Body(...),
+    full_name: str = Body(...),
     username: str = Body(...),
-    raw_password: str = Body(...), 
     email: str = Body(...),
-    role_id: int = Body(...),
-    scope: Scope = Body(...),
+    role: int = Body(...),
+    scope: str = Body(...),
     scope_group: int = Body(...),
-    organization_id: int = Body(...),
+    organization: int = Body(...),
     phone_number: str = Body(...),
-    gender: Gender = Body(...),
+    gender: str = Body(...),
             
 ):
     try: 
@@ -286,7 +231,7 @@ async def create_user(
                 detail="Username already registered",
             )
         #check input validity
-        if validate_name(fullname) == False:
+        if validate_name(full_name) == False:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Fullname is not valid",
@@ -304,19 +249,19 @@ async def create_user(
             
         # Generate and hash password
         raw_password = generate_random_password()
-        hashed_password = get_password_hash(raw_password + username)
+        hashed_password = get_password_hash(raw_password+ username)
         
         new_user = User(
             id= None,
-            fullname=fullname,
+            fullname=full_name,
             username=username,
             email=email,
             phone_number=phone_number,
             hashedPassword = hashed_password,
-            organization_id= organization_id,
-            role_id=role_id,           
-            gender=gender,
-            scope=scope,
+            organization_id= organization,
+            role_id=role,           
+            gender=parse_enum(Gender,gender, "Gender"),
+            scope=parse_enum(Scope,scope, "Scope"),
             scope_group_id=scope_group,
 
         )
@@ -344,41 +289,31 @@ async def update_user_form(
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-        organizations = session.exec(select(Organization)).all()
-        organization_list = [org.organization_name for org in organizations]
-
-        roles = session.exec(select(Role)).all()
-        role_list = [role.name for role in roles]
-        
-        scope_group = session.exec(select(ScopeGroup)).all()
-        scope_group_list = [sg.scope_name for sg in scope_group]
-        
-
-        scope = [s.value for s in Scope]
-        gender = [g.value for g in Gender]
+     
 
         user_data = {
             "id": "", 
             "full_name": "", 
             "username": "",
-            "password": "",
             "email": "",
             "phone_number": "",
-            "organization": organization_list,
-            "role_id": role_list,
-            "scope": scope,
-            "scope_group": scope_group_list,
-            "gender": gender,
-            "position": "",
-            "salary": "",
+            "organization": fetch_organization_id_and_name(session),
+            "role": fetch_role_id_and_name(session),
+            "scope": {scope.value: scope.value for scope in Scope},
+            "scope_group": fetch_scope_group_id_and_name(session),
+            "gender": {gender.value: gender.value for gender in Gender},
             "date_of_birth": "",
             "date_of_joining": "",
-            "image": "file",
-            "id_type": "",
+            "salary": 0,
+            "position": "",
+            "image": "",
+            "id_type": {i.value: i.value for i in IdType},
             "id_number": "",
+            "password": "",
+
         }
 
-        return {"data": user_data, "html_types": get_html_types("users")}
+        return {"data": user_data, "html_types": get_html_types("user")}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
     
@@ -387,23 +322,24 @@ async def update_uer(
     session: SessionDep,
     current_user: UserDep,    
     tenant: str = Depends(get_tenant),
-
-    fullname: str = Body(...),
+    id: int = Body(...),
+    full_name: str = Body(...),
     username: str = Body(...),
     password: str = Body(...), 
     email: str = Body(...),
-    role_id: int = Body(...),
-    scope: Scope = Body(...),
-    scope_group_id: str = Body(...),
+    role: int = Body(...),
+    scope: str = Body(...),
+    scope_group: int = Body(...),
     organization: int = Body(...),
     phone_number: str = Body(...),
-    gender: Gender = Body(...),
+    gender: str = Body(...),
     salary: float = Body(...),
     position: str = Body(...),
-    date_of_birth: datetime = Body(...),
-    date_of_joining: datetime = Body(...),
+    date_of_birth:  Optional[str]  = Body(...),
+    date_of_joining:  Optional[str]  = Body(...),
     id_type: str = Body(...),
     id_number: str = Body(...),
+    image: str = Body(...)           
             
 ):
     try: 
@@ -413,14 +349,14 @@ async def update_uer(
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-        existing_user = session.exec(select(User).where(User.username == username)).first()
-        if existing_user:
+        existing_user = session.exec(select(User).where(User.id == id)).first()
+        if not existing_user:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Username already registered",
+                detail="User does not exist",
             )
         #check input validity
-        if validate_name(fullname) == False:
+        if validate_name(full_name) == False:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Fullname is not valid",
@@ -435,41 +371,43 @@ async def update_uer(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Phone number is not valid",
         )
-        new_user = User(
-            fullname=fullname,
-            username=username,
-            email=email,
-            phone_number=phone_number,
-            hashedPassword=get_password_hash(password + username),
-            organization= organization,
-            role_id=role_id,           
-            gender=gender,
-            salary=salary,
-            position=position,
-            date_of_birth=date_of_birth,
-            date_of_joining=date_of_joining,
-            id_type=id_type,
-            id_number=id_number,
-            scope=scope,
-            scope_group_id=scope_group_id,
+       
+        existing_user.fullname = full_name
+        existing_user.username = username
+        existing_user.email = email
+        existing_user.phone_number = phone_number
+        existing_user.hashedPassword = get_password_hash(password + username) if password != "" else existing_user.hashedPassword
+        existing_user.organization_id = organization
+        existing_user.role_id = role
+        existing_user.gender = parse_enum(Gender,gender, "Gender")
+        existing_user.salary = float(salary)
+        existing_user.position = position
+        existing_user.date_of_birth = parse_datetime_field(date_of_birth)
+        existing_user.date_of_joining = parse_datetime_field(date_of_joining)
+        existing_user.id_type = parse_enum(IdType,id_type, "Id Type")
+        existing_user.id_number = id_number
+        existing_user.scope = parse_enum(Scope,scope, "Scope")
+        existing_user.scope_group_id = scope_group
+        existing_user.image = image
 
-        )
-        session.add(new_user)
+        session.add(existing_user)
         session.commit()
-        session.refresh(new_user)
+        session.refresh(existing_user)
 
         return {
-            "message": "User: {new_user} registered successfully"}
+            "message": "User: {existing_user} updated successfully"}
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
+    
+    
 
-@ar.delete("/delete-user/")
+@ar.delete("/delete-user/{id}/")
 async def delete_user(
     session: SessionDep,
-    current_user: UserDep,    
-    tenant: str = Depends(get_tenant),
-
-    user_id: int = Body(...),
+    current_user: UserDep,  
+    id: int, 
+    tenant: str = Depends(get_tenant)
 ):
     try:
         if not check_permission(
@@ -478,7 +416,7 @@ async def delete_user(
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-        user = session.exec(select(User).where(User.id == user_id)).first()
+        user = session.exec(select(User).where(User.id == id)).first()
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
 
@@ -762,6 +700,14 @@ async def delete_scope_group(
             for scope_group_link in scope_group_links:
                 session.delete(scope_group_link)
                 session.commit()
+        assigned_users = session.exec(select(User).where(User.scope_group_id == id)).all()
+
+        for user in assigned_users:
+            user.scope_group_id = None
+            session.add(user)  # mark for update
+
+        session.commit()
+
 
         scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == id)).first()
         if not scope_group:

@@ -10,6 +10,7 @@ from utils.auth_util import get_tenant, get_current_user, check_permission, gene
 from utils.model_converter_util import get_html_types
 from utils.util_functions import validate_name, validate_image
 from utils.get_hierarchy import get_parent_organizations
+from utils.form_db_fetch import fetch_organization_id_and_name
 
 TenantRouter =tr= APIRouter()
 SessionDep = Annotated[Session, Depends(get_session)]
@@ -29,8 +30,7 @@ async def get_form_fields_organization(
         #     raise HTTPException(
         #         status_code=403, detail="You Do not have the required privilege"
         #     )
-        organizations = session.exec(select(Organization)).all()
-        organization_list = [org.organization_name for org in organizations]
+       
         
         organization_data = {
             "id": "",
@@ -38,7 +38,7 @@ async def get_form_fields_organization(
             "owner_name": "",
             "description": "",
             "logo_image": "",
-            "parent_organization": organization_list,
+            "parent_organization": fetch_organization_id_and_name(session),
             "organization_type" : {i.value: i.value for i in OrganizationType}
             }
         
@@ -90,8 +90,7 @@ async def create_organization(
                 detail="Logo image is not valid",
         )
             
-        organizations = session.exec(select(Organization)).all()
-        organization_list = [org.organization_name for org in organizations]
+        
         
         organization = Organization(
             id = None,
@@ -99,7 +98,7 @@ async def create_organization(
             owner_name = owner_name,
             description = description,
             logo_image = logo_image,
-            parent_id = organization_list,
+            parent_id = parent_organization,
             organization_type = organization_type
         )
         
@@ -231,7 +230,8 @@ async def get_organization(
             "description": organization.description,
             "owner_name": organization.owner_name,
             "logo_image": organization.logo_image,
-            "organization_type": organization.organization_type
+            "organization_type": organization.organization_type,
+            "parent_organization": organization.parent_id
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -250,6 +250,7 @@ async def create_organization(
     description: str = Body(...),
     logo_image: str = Body(...),
     organization_type: str = Body(...),    
+    parent_organization: int = Body(...)
 ):
 
     try:
@@ -284,6 +285,7 @@ async def create_organization(
         existing_tenant.description = description
         existing_tenant.logo_image = logo_image
         existing_tenant.organization_type = organization_type
+        existing_tenant.parent_id = parent_organization
             
         session.add(existing_tenant)
         session.commit()
