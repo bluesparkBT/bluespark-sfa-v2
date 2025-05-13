@@ -1,4 +1,9 @@
+from datetime import datetime
+from http.client import HTTPException
 import re
+from typing import Optional
+
+from models.Account import Scope
 
 
 def capitalize_name(name: str) -> str:
@@ -47,4 +52,31 @@ def validate_phone_number(phone_number) -> bool:
     local_regex = r"^0[79]\d{8}$"
 
     return bool(re.match(phone_regex, phone_number) or re.match(local_regex, phone_number))
+
+def parse_datetime_field(value: Optional[str]) -> Optional[datetime]:
+        if not value:
+            return None
+        try:
+            return datetime.fromisoformat(value)
+        except ValueError:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Invalid date format. Use ISO format like 'YYYY-MM-DD'."
+            )
+        
+def format_date_for_input(dt: Optional[datetime]) -> str:
+    return dt.strftime('%Y-%m-%d') if dt else ""
+
+def parse_enum(enum_class, value: Optional[str], field_name: str):
+    if not value:
+        if enum_class == Scope:
+            return Scope.personal_scope
+        return None
+    try:
+        return enum_class(value)
+    except ValueError:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid value for {field_name}: '{value}'"
+        )
 
