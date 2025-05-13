@@ -6,7 +6,7 @@ class Product(SQLModel, table=True):
     __tablename__ = "product"
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    suk: str = Field(default=None)
+    sku: str = Field(default=None)
     name: str = Field(default=None, index=True)
     description: Optional[str] = Field(default=None)
     image: Optional[str] = Field(default=None)
@@ -16,7 +16,7 @@ class Product(SQLModel, table=True):
     price: Optional[float] = Field(default=None)
     unit: Optional[str] = Field(default=None)
     category_id: Optional[int] = Field(default=None, foreign_key="category.id", index=True)
-    category: "Category" = Relationship(back_populates="products")
+    category: Optional["Category"] = Relationship(back_populates="products")
 
 
 class Category(SQLModel, table=True):

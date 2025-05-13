@@ -1,6 +1,5 @@
 import os
 from sqlmodel import create_engine, Session
-from models import InheritanceGroup, ProductInheritanceGroup
 
 # Docker get the environment variables
 # SECRET_KEY = os.environ["SECRET_KEY"]
@@ -14,7 +13,7 @@ load_dotenv()
 # SECRET_KEY = os.getenv("SECRET_KEY")
 # POSTGRES = os.getenv("POSTGRES")
 
-POSTGRES ='postgresql://postgres:madmin@localhost:5432/new_db'
+POSTGRES ='postgresql://postgres:madmin@localhost:5432/sfa'
 SECRET_KEY ='your-secret-key'
 
 if not SECRET_KEY:

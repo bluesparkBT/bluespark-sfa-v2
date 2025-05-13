@@ -1,44 +1,50 @@
 from sqlmodel import SQLModel, Field, Relationship
 from enum import Enum   
 from typing import Optional, List
-from models.Product import Product, Category
 
+class ProductLink(SQLModel, table=True):
+    __tablename__ = "product_link"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    inheritance_group_id: int = Field(foreign_key="inheritance_group.id", index=True)
+    product_inheritance_id: int = Field(foreign_key="product_inheritance.id", index=True)
+
+class CategoryLink(SQLModel, table=True):
+    __tablename__ = "category_link"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    inheritance_group_id: int = Field(foreign_key="inheritance_group.id", index=True)
+    category_inheritance_id: int = Field(foreign_key="category_inheritance.id", index=True)
 
 class ProductInheritanceGroup(SQLModel, table=True):
-    __tablename__ = "productinheritance"
+    __tablename__ = "product_inheritance"
 
     id: int = Field(default=None, primary_key=True)
-    
+
     #  Reference Inheritance Group
-    inheritance_group: int = Field(default=None, foreign_key="inheritancegroup.id", index=True)
-    
-    #  Reference Product (for parent-child relationships)
+    inheritance_groups: List["InheritanceGroup"] = Relationship(back_populates="products", link_model=ProductLink)
+
+    #Product
     product_id: int = Field(default=None, foreign_key="product.id", index=True)
-
-    product: "Product" = Relationship(back_populates="products")
-
-
-
-
+    
 class CategoryInheritanceGroup(SQLModel, table=True):
-    __tablename__ = "categoryinheritance"
+    __tablename__ = "category_inheritance"
 
     id: int = Field(default=None, primary_key=True)
     
     #  Reference Inheritance Group
-    inheritance_group: int = Field(default=None, foreign_key="inheritancegroup.id", index=True)
+    inheritance_groups: List["InheritanceGroup"] = Relationship(back_populates="categories", link_model=CategoryLink)
     
     #  Reference Category (for parent-child relationships)
     category_id: int = Field(default=None, foreign_key="category.id", index=True)
-   
-    category: "Category" = Relationship(back_populates="categories")
 
+   
 class InheritanceGroup(SQLModel, table=True):
-    __tablename__ = "inheritancegroup"
+    __tablename__ = "inheritance_group"
     id: int = Field(default=None, primary_key=True)
     name: str = Field(index=True)
 
-    products: List["ProductInheritanceGroup"] = Relationship(back_populates="inheritance_group")
+    products: List["ProductInheritanceGroup"] = Relationship(back_populates="inheritance_groups", link_model=ProductLink)
 
-    categories: List["CategoryInheritanceGroup"] = Relationship(back_populates="inheritance_group")
+    categories: List["CategoryInheritanceGroup"] = Relationship(back_populates="inheritance_groups", link_model=CategoryLink)
 
