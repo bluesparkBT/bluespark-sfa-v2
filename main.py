@@ -1,4 +1,5 @@
 import os
+from fastapi import Request
 from dotenv import load_dotenv
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
@@ -8,6 +9,7 @@ from starlette.status import HTTP_400_BAD_REQUEST
 from fastapi.middleware.cors import CORSMiddleware
 
 from db import create_db_and_tables
+from routes.serviceProvider import ServiceProvider
 from routes.accounts import AuthenticationRouter
 from routes.organizations import TenantRouter
 from routes.role import RoleRouter
@@ -35,6 +37,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+@app.middleware("http")
+async def extract_tenant(request: Request, call_next):
+    parts = request.url.path.strip("/").split("/")
+    if parts:
+        request.state.tenant = parts[0]
+    response = await call_next(request)
+    return response
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
@@ -58,3 +67,4 @@ app.include_router(AuthenticationRouter, prefix="/{tenant}/account", tags=["acco
 app.include_router(TenantRouter, prefix="/{tenant}/organization", tags=["organization"])
 app.include_router(RoleRouter, prefix="/{tenant}/role", tags=["role"])
 app.include_router(UtilRouter, prefix="/{tenant}/utility", tags=["utility"])
+app.include_router(ServiceProvider, tags=["Service Provider"])
