@@ -9,7 +9,9 @@ from utils.auth_util import verify_password, create_access_token, get_password_h
 from utils.util_functions import validate_name, validate_email, validate_phone_number, parse_datetime_field, format_date_for_input, parse_enum
 from utils.auth_util import get_tenant, get_current_user, check_permission, generate_random_password
 from utils.model_converter_util import get_html_types
+from utils.get_hierarchy import get_child_organization
 from utils.form_db_fetch import fetch_organization_id_and_name, fetch_role_id_and_name, fetch_scope_group_id_and_name
+
 
 
 AuthenticationRouter =ar= APIRouter()
@@ -26,7 +28,6 @@ def login(
     password: str = Body(...)
 ):
     
-
     try:
         user = session.exec(select(User).where(User.username == username)).first()
         print(user)
@@ -36,6 +37,7 @@ def login(
 
         if not user or not verify_password(password+user.username, user.hashedPassword):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+        
         access_token_expires = timedelta(minutes=90)
         token = create_access_token(
             data={
@@ -99,7 +101,31 @@ async def get_users(
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-        users = session.exec(select(User)).all()
+        # users = session.exec(select(User)).all()
+        # if not users:
+        #     raise HTTPException(status_code=404, detail="No users found")
+        # Fetch the ScopeGroup assigned to the current user
+        user_scope_group = session.exec(
+            select(ScopeGroup).where(ScopeGroup.id == current_user["scope_group_id"])
+        ).first()
+        if not user_scope_group:
+            raise HTTPException(
+                status_code=404, detail="ScopeGroup not found for the current user"
+            )
+
+        # Fetch the list of organizations associated with the ScopeGroup
+        organization_ids = [
+            org.id for org in user_scope_group.organizations
+        ]
+        if not organization_ids:
+            raise HTTPException(
+                status_code=404, detail="No organizations found for the user's ScopeGroup"
+            )
+
+        # Fetch users belonging to the organizations in the ScopeGroup
+        users = session.exec(
+            select(User).where(User.organization_id.in_(organization_ids))
+        ).all()
         if not users:
             raise HTTPException(status_code=404, detail="No users found")
         
@@ -248,8 +274,10 @@ async def create_user(
         )
             
         # Generate and hash password
-        raw_password = generate_random_password()
-        hashed_password = get_password_hash(raw_password+ username)
+
+        password = generate_random_password()
+        # hashed_password = get_password_hash(raw_password + username)
+
         
         new_user = User(
             id= None,
@@ -257,7 +285,11 @@ async def create_user(
             username=username,
             email=email,
             phone_number=phone_number,
-            hashedPassword = hashed_password,
+            hashedPassword = password,
+            organization_id= organization_id,
+            role_id=role_id,           
+            gender=gender,
+            scope=scope,
             organization_id= organization,
             role_id=role,           
             gender=parse_enum(Gender,gender, "Gender"),
@@ -271,7 +303,7 @@ async def create_user(
 
         return {
             "message": "User registered successfully",
-            "temporary_password": raw_password }
+            "temporary_password": password }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -441,15 +473,11 @@ async def form_scope(
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-        organizations = session.exec(select(Organization)).all()
-
-        organization_list = [
-            org.organization_name
-            for org in organizations
-        ]
+        organizations_tree = get_child_organization(session, current_user["organization"])
         
         data = {"id":"", 
-                "name": ""
+                "name": "",
+                "organization": organizations_tree,
                 }
         
         return {"data": data, "html_types": get_html_types("scope_group")}
