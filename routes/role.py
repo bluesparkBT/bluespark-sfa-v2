@@ -178,7 +178,7 @@ async def get_my_role(
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-        user = session.exec(select(User).where(User.id ==current_user.get("user_id"))).first()
+        user = session.exec(select(User).where(User.id ==current_user.id)).first()
 
         if not user or not user.role_id:
             raise HTTPException(status_code=404, detail="User or assigned role not found")

@@ -454,7 +454,7 @@ async def form_scope(
         
         return {"data": data, "html_types": get_html_types("scope_group")}
     except Exception as e:
-        print(str(e))
+        traceback(str(e))
         raise HTTPException(status_code=400, detail=str(e))
     
 @ar.post("/create-scope-group/")
@@ -507,12 +507,12 @@ async def form_scope_organization(
 
 ):
     try:
-        if not check_permission(
-            session, "Read", "Administration", current_user
-            ):
-            raise HTTPException(
-                status_code=403, detail="You Do not have the required privilege"
-            )
+        # if not check_permission(
+        #     session, "Read", "Administration", current_user
+        #     ):
+        #     raise HTTPException(
+        #         status_code=403, detail="You Do not have the required privilege"
+        #     )
 
         org = {"scope_id":"", 
                 "organizations": get_child_organization(session, current_user["organization"])

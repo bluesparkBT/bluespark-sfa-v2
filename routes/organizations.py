@@ -16,7 +16,55 @@ TenantRouter =tr= APIRouter()
 SessionDep = Annotated[Session, Depends(get_session)]
 UserDep = Annotated[dict, Depends(get_current_user)]
 
+@tr.get("/get-organizations/")
+async def get_organizations(
+    session: SessionDep,
+    current_user: UserDep,    
+    tenant: str = Depends(get_tenant),
 
+):
+    """
+    Retrieve all organizations with their associated scope groups.
+    """
+    try:
+        # if not check_permission(
+        #     session, "Read", "Organization", current_user
+        #     ):
+        #     raise HTTPException(
+        #         status_code=403, detail="You Do not have the required privilege"
+        #     )
+        
+        # organization_ids = get_organization_ids_by_scope_group(session, current_user)
+
+        sgo = select(Organization).options(selectinload(Organization.scope_groups))
+        organizations = session.exec(sgo).all()
+
+        if not organizations:
+            raise HTTPException(status_code=404, detail="No organizations found")
+
+        organization_list = []
+
+        for org in organizations:
+            organization_list.append({
+                "id": org.id,
+                "organization": org.organization_name,
+                "owner": org.owner_name,
+                "logo": org.logo_image,
+                "description": org.description,
+                "organization_type": org.organization_type,
+                "parent_organization": org.parent_id,
+                "scope_groups": [
+                    {"id": sg.id, "scope_name": sg.scope_name}
+                    for sg in org.scope_groups
+                ]
+            })
+
+        return organization_list
+
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    
+    
 @tr.get("/organization-form/")
 async def get_form_fields_organization(
     session: SessionDep,
@@ -48,7 +96,6 @@ async def get_form_fields_organization(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-
 @tr.post("/create-organization/")
 async def create_organization(
     session: SessionDep,
@@ -63,12 +110,12 @@ async def create_organization(
 ):
 
     try:
-        if not check_permission(
-            session, "Create", "Organization", current_user
-            ):
-            raise HTTPException(
-                status_code=403, detail="You Do not have the required privilege"
-            )
+        # if not check_permission(
+        #     session, "Create", "Organization", current_user
+        #     ):
+        #     raise HTTPException(
+        #         status_code=403, detail="You Do not have the required privilege"
+        #     )
         existing_tenant = session.exec(select(Organization).where(Organization.organization_name == organization_name)).first()
 
         if existing_tenant is not None:
@@ -141,7 +188,7 @@ async def get_my_organization(
                 status_code=403, detail="You Do not have the required privilege"
             )
         # Query the organization associated with the logged-in user
-        organization = session.exec(select(Organization).where(Organization.id == current_user.get("organization"))).first()
+        organization = session.exec(select(Organization).where(Organization.id == current_user.organization_id)).first()
 
         if not organization:
             raise HTTPException(
@@ -160,54 +207,7 @@ async def get_my_organization(
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
     
-@tr.get("/get-organizations/")
-async def get_organizations(
-    session: SessionDep,
-    current_user: UserDep,    
-    tenant: str = Depends(get_tenant),
 
-):
-    """
-    Retrieve all organizations with their associated scope groups.
-    """
-    try:
-        if not check_permission(
-            session, "Read", "Organization", current_user
-            ):
-            raise HTTPException(
-                status_code=403, detail="You Do not have the required privilege"
-            )
-        
-        # organization_ids = get_organization_ids_by_scope_group(session, current_user)
-
-        sgo = select(Organization).options(selectinload(Organization.scope_groups))
-        organizations = session.exec(sgo).all()
-
-        if not organizations:
-            raise HTTPException(status_code=404, detail="No organizations found")
-
-        organization_list = []
-
-        for org in organizations:
-            organization_list.append({
-                "id": org.id,
-                "organization": org.organization_name,
-                "owner": org.owner_name,
-                "logo": org.logo_image,
-                "description": org.description,
-                "organization_type": org.organization_type,
-                "parent_organization": org.parent_id,
-                "scope_groups": [
-                    {"id": sg.id, "scope_name": sg.scope_name}
-                    for sg in org.scope_groups
-                ]
-            })
-
-        return organization_list
-
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    
 @tr.get("/get-organization/{id}")
 async def get_organization(
     session: SessionDep,
