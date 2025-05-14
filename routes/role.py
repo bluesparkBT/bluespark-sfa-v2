@@ -4,11 +4,12 @@ from sqlmodel import Session, select
 
 
 from db import SECRET_KEY, get_session
-from models.Account import AccessPolicy, Role, RoleModulePermission, User
+from models.Account import AccessPolicy, Role, RoleModulePermission, User, ScopeGroup, ScopeGroupLink
 from models.Account import ModuleName as modules
 from utils.auth_util import get_tenant, get_current_user, check_permission
 from utils.model_converter_util import get_html_types
 from utils.util_functions import validate_name
+from utils.get_hierarchy import get_organization_ids_by_scope_group
 
 
 RoleRouter = rr = APIRouter()
@@ -24,7 +25,7 @@ async def form_roles(
 ):
     try:
         if not check_permission(
-            session, "Read", "Role", current_user
+            session, "Read", "Administration", current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
@@ -40,7 +41,6 @@ async def form_roles(
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
     
-
 @rr.get("/roles")
 async def get_roles(
     session: SessionDep,
@@ -50,13 +50,19 @@ async def get_roles(
    
     try:
         if not check_permission(
-            session, "Read", "Role", current_user
+            session, "Read", "Administration", current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-        roles_data=[]
-        roles = session.exec(select(Role)).all()
+            
+        organization_ids = get_organization_ids_by_scope_group(session, current_user)
+        roles = session.exec(
+            select(Role).where(Role.organization_id.in_(organization_ids))
+        ).all()
+        
+        
+        filtered_data = []                
         if not roles:
             raise HTTPException(status_code=404, detail="Role not found")
         for role in roles:
@@ -64,13 +70,13 @@ async def get_roles(
             for perm in role.permissions:
                 if(perm.access_policy != "deny"):
                     permissions += perm.module+"("+perm.access_policy+"),"
-            roles_data.append({
+            filtered_data.append({
                 "id": role.id,
                 "role_name": role.name,
                 "roles": permissions
             })
      
-        return roles_data
+        return filtered_data
  
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -85,7 +91,7 @@ async def create_role(
 ):
     try:
         if not check_permission(
-            session, "Read", "Role", current_user
+            session, "Read", "Administration", current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
@@ -207,7 +213,7 @@ async def create_role(
 ): 
     try:
         if not check_permission(
-            session, "Create", "Role", current_user
+            session, "Create", "Administration", current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
@@ -260,7 +266,7 @@ async def update_role(
 ):
     try:
         if not check_permission(
-            session, "Update", "Role", current_user
+            session, "Update", "Administration", current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
@@ -294,7 +300,7 @@ async def delete_role(
 
     try:   
         if not check_permission(
-            session, "Delete", "Role", current_user
+            session, "Delete", "Administration", current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
