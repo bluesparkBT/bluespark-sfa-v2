@@ -6,10 +6,10 @@ from sqlalchemy.orm import selectinload
 from db import get_session
 from models.Account import User, Organization, OrganizationType, ScopeGroup, Scope, Role, ScopeGroupLink
 
-from utils.auth_util import get_tenant, get_current_user, check_permission, generate_random_password, get_password_hash
+from utils.auth_util import get_tenant, get_current_user, check_permission
 from utils.model_converter_util import get_html_types
 from utils.util_functions import validate_name, validate_image
-from utils.get_hierarchy import get_parent_organizations, get_child_organization
+from utils.get_hierarchy import get_organization_ids_by_scope_group
 from utils.form_db_fetch import fetch_organization_id_and_name
 
 TenantRouter =tr= APIRouter()
@@ -20,19 +20,18 @@ UserDep = Annotated[dict, Depends(get_current_user)]
 @tr.get("/organization-form/")
 async def get_form_fields_organization(
     session: SessionDep,
-    tenant: str 
-    # current_user: User = Depends(get_current_user)
+    tenant: str,
+    current_user: UserDep
 ):
 
     try:
-        # if not check_permission(
-        #     session, "Read", "Organization", current_user
-        #     ):
-        #     raise HTTPException(
-        #         status_code=403, detail="You Do not have the required privilege"
-        #     )
-       
-        
+        if not check_permission(
+            session, "Read", "Organization", current_user
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
+
         organization_data = {
             "id": "",
             "organization_name": "",
@@ -53,6 +52,7 @@ async def get_form_fields_organization(
 @tr.post("/create-organization/")
 async def create_organization(
     session: SessionDep,
+    current_user: UserDep,
     tenant: str,
     organization_name: str = Body(...),
     owner_name: str = Body(...),
@@ -63,12 +63,12 @@ async def create_organization(
 ):
 
     try:
-        # if not check_permission(
-        #     session, "Create", "Organization", current_user
-        #     ):
-        #     raise HTTPException(
-        #         status_code=403, detail="You Do not have the required privilege"
-        #     )
+        if not check_permission(
+            session, "Create", "Organization", current_user
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
         existing_tenant = session.exec(select(Organization).where(Organization.organization_name == organization_name)).first()
 
         if existing_tenant is not None:
@@ -117,7 +117,7 @@ async def create_organization(
 @tr.get("/get-my-organization/")
 async def get_my_organization(
     session: SessionDep,
-    tenant: str = Depends(get_tenant),
+    tenant: str,
     current_user: User = Depends(get_current_user),
 ) -> dict:
     """
@@ -177,7 +177,9 @@ async def get_organizations(
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-        # Use selectinload to eagerly load the relationship
+        
+        # organization_ids = get_organization_ids_by_scope_group(session, current_user)
+
         sgo = select(Organization).options(selectinload(Organization.scope_groups))
         organizations = session.exec(sgo).all()
 
@@ -210,7 +212,7 @@ async def get_organizations(
 async def get_organization(
     session: SessionDep,
     id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: UserDep,
     tenant: str = Depends(get_tenant),
 ):
     try:
