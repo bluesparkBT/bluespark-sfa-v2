@@ -4,7 +4,8 @@ from datetime import timedelta, date, datetime
 from fastapi import APIRouter, HTTPException, Body, status, Depends, Path
 from sqlmodel import select, Session
 from db import get_session
-from models.Account import User, ScopeGroup, ScopeGroupLink, Organization, Gender, Scope, Role, AccessPolicy
+from models.Account import User, ScopeGroup, ScopeGroupLink, Organization, RoleModulePermission, Scope, Role, AccessPolicy
+from models.Account import ModuleName as modules
 from utils.auth_util import verify_password, create_access_token, get_password_hash
 from utils.util_functions import validate_name, validate_email, validate_phone_number
 from utils.auth_util import get_tenant, get_current_user, check_permission, generate_random_password
@@ -150,6 +151,52 @@ async def delete_superadmin_user(
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@sp.get("/get-my-tenant/")
+async def get_my_tenant(
+    session: SessionDep,
+    tenant: str = Depends(get_tenant),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """
+    Retrieve the organization information for the logged-in user.
+
+    Args:
+        session (SessionDep): Database session.
+        current_user (User): The currently logged-in user.
+
+    Returns:
+        dict: organization information including name, id, owner name, and logo image.
+
+    Raises:
+        HTTPException: 404 if the organization is not found.
+    """
+    try:
+        if not check_permission(
+            session, "Read", "Organization", current_user
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
+        # Query the organization associated with the logged-in user
+        organization = session.exec(select(Organization).where(Organization.id == current_user.get("organization"))).first()
+
+        if not organization:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="organization not found for the logged-in user",
+            )
+
+        # Return the organization information
+        return {
+            "id": organization.id,
+            "organization": organization.organization_name,
+            "owner": organization.owner_name,
+            "logo": organization.logo_image,
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 @sp.get("/tenant-form/")
 async def get_tenant_form_fields(
     session: SessionDep,
@@ -192,15 +239,15 @@ async def create_tenant(
         # if not logo_image or not validate_image(logo_image):
         #     raise HTTPException(status_code=400, detail="Logo image is not valid")
 
-        new_tenant = Organization(
+        tenant = Organization(
             organization_name=tenant_name,
             description=description,
             logo_image=logo_image,
             organization_type=organization_type,
         )
-        session.add(new_tenant)
+        session.add(tenant)
         session.commit()
-        session.refresh(new_tenant)
+        session.refresh(tenant)
 
         # Fetch the System Admin ScopeGroup
         system_admin_scope_group = session.exec(
@@ -212,7 +259,7 @@ async def create_tenant(
         # Link the System Admin ScopeGroup to the tenant organization
         scope_group_link = ScopeGroupLink(
             scope_group_id=system_admin_scope_group.id,
-            organization_id=new_tenant.id,
+            organization_id=tenant.id,
         )
         session.add(scope_group_link)
         session.commit()
@@ -220,21 +267,21 @@ async def create_tenant(
         role_name = f"{tenant_name} System Admin"
         role = Role(
             name=role_name,
-            organization_id=new_tenant.id,
+            organization_id=tenant.id,
         )
         session.add(role)
         session.commit()
         session.refresh(role)
 
         password = generate_random_password()
-        # hashed_password = get_password_hash(password + tenant_name)
+        hashed_password = get_password_hash(password + f"{tenant_name.lower()}_admin")
 
         tenant_admin = User(
             username=f"{tenant_name.lower()}_admin",
             fullname=f"{tenant_name} Admin",
             email=f"{tenant_name.lower()}_admin@{tenant_name}.com",
-            hashedPassword=password,
-            organization=new_tenant.id,
+            hashedPassword = hashed_password,
+            organization_id=tenant.id,
             role_id=role.id,
             scope=Scope.managerial_scope,
             scope_group_id=system_admin_scope_group.id,
@@ -242,7 +289,18 @@ async def create_tenant(
         session.add(tenant_admin)
         session.commit()
         session.refresh(tenant_admin)
+        
+        #create role module permission for tenant system admin
+        role_module_permission= RoleModulePermission(
+            role_id=role.id,
+            module=modules.administration.value,
+            access_policy=AccessPolicy.manage
+        )
 
+        session.add(role_module_permission)
+        session.commit()
+        session.refresh(role_module_permission)
+        
         return {
             "message": "Tenant and system admin created successfully",
             "tenant": tenant_name,
@@ -253,4 +311,81 @@ async def create_tenant(
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@sp.post("/update-tenant")
+async def update_tenant(
+    session: SessionDep,
+    current_user: UserDep,
+    # tenant: str,
+
+    tenant_name: str = Body(...),
+    description: str = Body(...),
+    logo_image: str = Body(...),
+    organization_type: str = Body(...),
+):
+    try:
+        existing_tenant = session.exec(
+            select(Organization).where(Organization.organization_name == tenant_name)
+        ).first()
+        if existing_tenant:
+            raise HTTPException(status_code=400, detail="Tenant already exists")
+
+        # if not logo_image or not validate_image(logo_image):
+        #     raise HTTPException(status_code=400, detail="Logo image is not valid")
+
+        tenant = Organization(
+            organization_name=tenant_name,
+            description=description,
+            logo_image=logo_image,
+            organization_type=organization_type,
+        )
+        session.add(tenant)
+        session.commit()
+        session.refresh(tenant)
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@sp.delete("/delete-tenant/{id}")
+async def delete_tenant(
+    session: SessionDep,
+    current_user: UserDep,
+    id: int,    
+    tenant: str = Depends(get_tenant),
+):
+    """
+    Delete an organization by ID.
+
+    Args:
+        session (SessionDep): Database session.
+        id (int): ID of the organization to delete.
+
+    Returns:
+        dict: Confirmation message.
+
+    Raises:
+        HTTPException: 404 if the organization is not found.
+    """
+    try:
+        if not check_permission(
+            session, "Delete", "Organization", current_user
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
+        # Query the organization by ID
+        organization = session.get(Organization, id)
+
+        if not organization:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Organization not found",
+            )
+
+        # Delete the organization
+        session.delete(organization)
+        session.commit()
+
+        return {"message": "Organization deleted successfully"}
     
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
