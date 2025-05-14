@@ -5,7 +5,8 @@ from db import  get_session
 from models.Account import (
     Organization,
     User,
-    Role
+    Role,
+    ScopeGroup
 )
 
 from sqlmodel import Session, select
@@ -20,7 +21,7 @@ def fetch_user_id_and_name(session: SessionDep):
 def fetch_organization_id_and_name(session: SessionDep):
     
     organization_row = session.exec(select(Organization.id, Organization.organization_name)).all()
-    organizations = {row[0]: row[1] for row in organization_row}
+    organizations = {int(row[0]): row[1] for row in organization_row}
     return organizations
 
 def fetch_role_id_and_name(session: SessionDep):
@@ -29,4 +30,9 @@ def fetch_role_id_and_name(session: SessionDep):
     roles = {row[0]: row[1] for row in role_row}
     return roles
 
+def fetch_scope_group_id_and_name(session: SessionDep):
+    
+    scope_group_row = session.exec(select(ScopeGroup.id, ScopeGroup.scope_name)).all()
+    scope_groups = {row[0]: row[1] for row in scope_group_row}
+    return scope_groups
 
