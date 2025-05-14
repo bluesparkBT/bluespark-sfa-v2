@@ -81,9 +81,11 @@ async def create_superadmin_user(
             scope_name="Super Admin Scope",
         )
         
-        session.add(service_provider_scope_group)
-        session.commit()
-        session.refresh(service_provider_scope_group)
+        existing_scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.scope_name == "Super Admin Scope"))
+        if existing_scope_group is None:
+            session.add(service_provider_scope_group)
+            session.commit()
+            session.refresh(service_provider_scope_group)
 
         # Check if System Admin ScopeGroup exists
         system_admin_scope_group = session.exec(
@@ -142,6 +144,10 @@ async def delete_superadmin_user(
     super_admin_id: int = Body(...),
 ):
     try:
+        if not check_permission(session, "Delete", "Service Provider", current_user):
+            raise HTTPException(
+                status_code=403, detail="You do not have the required privilege"
+            )
         superadmin = session.exec(select(User).where(User.id == super_admin_id)).first()
         if not superadmin:
             raise HTTPException(status_code=404, detail="Superadmin not found")
@@ -151,10 +157,12 @@ async def delete_superadmin_user(
         if not scope_group:
             raise HTTPException(status_code=404, detail="ScopeGroup not found for the superadmin")
 
-        # Fetch and delete all ScopeGroupLinks associated with the ScopeGroup
+        # cascade delete all attributes linked to superadmin.
         scope_group_links = session.exec(select(ScopeGroupLink).where(ScopeGroupLink.scope_group_id == scope_group.id)).all()
         for link in scope_group_links:
             session.delete(link)
+        
+        session.delete(scope_group)
             
         session.delete(superadmin)
         session.commit()
@@ -184,7 +192,7 @@ async def get_my_tenant(
     """
     try:
         if not check_permission(
-            session, "Read", "Organization", current_user
+            session, "Read", "Service Provider", current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
@@ -209,6 +217,42 @@ async def get_my_tenant(
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@sp.get("/get-tenants")
+async def get_tenants(
+    session: SessionDep,
+    # current_user: UserDep,
+):
+    """
+    Retrieve all tenant companies that use the system.
+    """
+    try:
+        # if not check_permission(session, "Read", "Service Provider", current_user):
+        #     raise HTTPException(
+        #         status_code=403, detail="You do not have the required privilege"
+        #     )
+
+        all_tenants = session.exec(
+            select(Organization).where(
+                (Organization.parent_id == None) &
+                (Organization.organization_type == OrganizationType.company)
+            )
+        ).all()
+
+        tenant_list = [
+            {
+                "id": tenant.id,
+                "company": tenant.organization_name,
+                "owner": tenant.owner_name,
+                "description": tenant.description,
+            }
+            for tenant in all_tenants
+        ]
+
+        return tenant_list
+
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    
 @sp.get("/tenant-form/")
 async def get_tenant_form_fields(
     session: SessionDep,
@@ -216,7 +260,10 @@ async def get_tenant_form_fields(
     current_user: User = Depends(get_current_user)
 ):
     try:
-        
+        if not check_permission(session, "Read", "Service Provider", current_user):
+            raise HTTPException(
+                status_code=403, detail="You do not have the required privilege"
+            )
         tenant_data = {
             "id": "",
             "tenant_name": "",
@@ -235,7 +282,7 @@ async def get_tenant_form_fields(
 @sp.post("/create-tenant")
 async def create_tenant(
     session: SessionDep,
-    current_user: UserDep,
+    # current_user: UserDep,
     # tenant: str,
 
     tenant_name: str = Body(...),
@@ -244,14 +291,15 @@ async def create_tenant(
     organization_type: str = Body(...),
 ):
     try:
+        # if not check_permission(session, "Create", "Service Provider", current_user):
+        #     raise HTTPException(
+        #         status_code=403, detail="You do not have the required privilege"
+        #     )
         existing_tenant = session.exec(
             select(Organization).where(Organization.organization_name == tenant_name)
         ).first()
         if existing_tenant:
             raise HTTPException(status_code=400, detail="Tenant already exists")
-
-        # if not logo_image or not validate_image(logo_image):
-        #     raise HTTPException(status_code=400, detail="Logo image is not valid")
 
         tenant = Organization(
             organization_name=tenant_name,
@@ -325,7 +373,7 @@ async def create_tenant(
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@sp.post("/update-tenant")
+@sp.put("/update-tenant")
 async def update_tenant(
     session: SessionDep,
     current_user: UserDep,
@@ -337,6 +385,10 @@ async def update_tenant(
     organization_type: str = Body(...),
 ):
     try:
+        if not check_permission(session, "Create", "Service Provider", current_user):
+            raise HTTPException(
+                status_code=403, detail="You do not have the required privilege"
+            )
         existing_tenant = session.exec(
             select(Organization).where(Organization.organization_name == tenant_name)
         ).first()
@@ -381,7 +433,7 @@ async def delete_tenant(
     """
     try:
         if not check_permission(
-            session, "Delete", "Organization", current_user
+            session, "Delete", "Service Provider", current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"

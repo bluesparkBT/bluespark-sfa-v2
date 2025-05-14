@@ -51,6 +51,7 @@ def login(
         return {"access_token": token}
     
     except Exception as e:
+        traceback.print_exc()
         return {"error": str(e)}
  
 @ar.get("/get-my-user/")
@@ -436,7 +437,7 @@ async def delete_user(
 @ar.get("/scope-group-form/")
 async def form_scope(
     session: SessionDep,
-    current_user: User,    
+    current_user: UserDep,    
     tenant: str,
 ):
     try:
@@ -507,14 +508,13 @@ async def form_scope_organization(
 
 ):
     try:
-        # if not check_permission(
-        #     session, "Read", "Administration", current_user
-        #     ):
-        #     raise HTTPException(
-        #         status_code=403, detail="You Do not have the required privilege"
-        #     )
-        current_tenant = session.exec(select(Organization).where(Organization.organization_name == tenant)).first()
-        print("this is tenant:",tenant, current_tenant)
+        if not check_permission(
+            session, "Read", "Administration", current_user
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
+        current_tenant = session.exec(select(Organization).where(Organization.organization_name == current_user.organization_id)).first()
         org = {"scope_id":"", 
                 "organizations": get_child_organization(session, current_tenant.id)
                 }
