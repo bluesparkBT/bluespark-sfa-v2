@@ -9,7 +9,7 @@ from models.Account import User, Organization, OrganizationType, ScopeGroup, Sco
 from utils.auth_util import get_tenant, get_current_user, check_permission, generate_random_password, get_password_hash
 from utils.model_converter_util import get_html_types
 from utils.util_functions import validate_name, validate_image
-from utils.get_hierarchy import get_parent_organizations
+from utils.get_hierarchy import get_parent_organizations, get_child_organization
 
 TenantRouter =tr= APIRouter()
 SessionDep = Annotated[Session, Depends(get_session)]
@@ -19,9 +19,10 @@ UserDep = Annotated[dict, Depends(get_current_user)]
 @tr.get("/organization-form/")
 async def get_form_fields_organization(
     session: SessionDep,
-    tenant: str, 
-    current_user: User = Depends(get_current_user)
+    tenant: str 
+    # current_user: User = Depends(get_current_user)
 ):
+
     try:
         # if not check_permission(
         #     session, "Read", "Organization", current_user
@@ -52,9 +53,7 @@ async def get_form_fields_organization(
 @tr.post("/create-organization/")
 async def create_organization(
     session: SessionDep,
-    tenant: str = Depends(get_tenant),
-    current_user: User = Depends(get_current_user),
-    
+    tenant: str,
     organization_name: str = Body(...),
     owner_name: str = Body(...),
     description: str = Body(...),
@@ -90,8 +89,6 @@ async def create_organization(
                 detail="Logo image is not valid",
         )
             
-        organizations = session.exec(select(Organization)).all()
-        organization_list = [org.organization_name for org in organizations]
         
         organization = Organization(
             id = None,
@@ -99,7 +96,7 @@ async def create_organization(
             owner_name = owner_name,
             description = description,
             logo_image = logo_image,
-            parent_id = organization_list,
+            parent_id = parent_organization,
             organization_type = organization_type
         )
         

@@ -14,19 +14,23 @@ def get_child_organization(session: SessionDep, organization_id: int):
     """
     Fetch all child organizations (descendants) from the database.
     """
-    queue = [organization_id]
-    result = []
-
-    while queue:
-        org_id = queue.pop(0)
-        result.append(org_id)
-
-        children = session.exec(
-            select(Organization.id).where(Organization.parent_id == org_id)
-        ).all()
-        queue.extend(children)
-
-    return result  # list of organization IDs
+    if organization_id is None:
+        heirarchy = {'tenants': []}
+    else:
+        heirarchy = []
+        
+    children = session.exec(select(Organization).where(Organization.parent_id == organization_id)).all()
+    
+    for a_child in children:
+        if organization_id is None:
+            heirarchy['tenants'].append({'id': a_child.id, 'name': a_child.organization_name, 'children': get_child_organization(session, a_child.id)})
+        else:        
+            heirarchy.append({'id': a_child.id, 'name': a_child.organization_name, 'children': get_child_organization(session, a_child.id)})
+        
+    if len(children):
+        return heirarchy
+    else:
+        return []  
 
 def get_parent_organizations(session: SessionDep, organization_id: int) -> List[int]:
     """
