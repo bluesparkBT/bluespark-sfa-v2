@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi import FastAPI
-from routes.util import UtilRouter
+from routes.Util import UtilRouter
 from starlette.status import HTTP_400_BAD_REQUEST
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -13,6 +13,7 @@ from routes.serviceProvider import ServiceProvider
 from routes.accounts import AuthenticationRouter
 from routes.organizations import TenantRouter
 from routes.role import RoleRouter
+from routes.product import ProductRouter
 
 
 load_dotenv()
@@ -66,5 +67,6 @@ def on_startup():
 app.include_router(AuthenticationRouter, prefix="/{tenant}/account", tags=["account"])
 app.include_router(TenantRouter, prefix="/{tenant}/organization", tags=["organization"])
 app.include_router(RoleRouter, prefix="/{tenant}/role", tags=["role"])
+app.include_router(ProductRouter, prefix="/{tenant}/product", tags=["product"])
 app.include_router(UtilRouter, prefix="/{tenant}/utility", tags=["utility"])
 app.include_router(ServiceProvider, tags=["Service Provider"])
