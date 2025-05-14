@@ -53,7 +53,7 @@ def login(
 @sp.post("/create-superadmin/")
 async def create_superadmin_user(
     session: SessionDep,
-    # tenant: str = Depends(get_tenant), 
+    # tenant: str, 
        
     username: str = Body(...),
     email: str = Body(...),
@@ -137,7 +137,7 @@ async def create_superadmin_user(
 async def delete_superadmin_user(
     session: SessionDep,
     current_user: UserDep,    
-    # tenant: str = Depends(get_tenant),
+    # tenant: str,
 
     super_admin_id: int = Body(...),
 ):
@@ -166,7 +166,7 @@ async def delete_superadmin_user(
 @sp.get("/get-my-tenant/")
 async def get_my_tenant(
     session: SessionDep,
-    tenant: str = Depends(get_tenant),
+    # tenant: str,
     current_user: User = Depends(get_current_user),
 ) -> dict:
     """
@@ -364,7 +364,7 @@ async def delete_tenant(
     session: SessionDep,
     current_user: UserDep,
     id: int,    
-    tenant: str = Depends(get_tenant),
+    tenant: str,
 ):
     """
     Delete an organization by ID.

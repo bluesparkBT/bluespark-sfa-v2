@@ -22,7 +22,7 @@ UserDep = Annotated[dict, Depends(get_current_user)]
 @ar.post("/login/")
 def login(
     session: SessionDep,
-    tenant: str = Depends(get_tenant),
+    tenant: str,
     
     username: str = Body(...),
     password: str = Body(...)
@@ -59,7 +59,7 @@ async def get_my_user(
     current_user: UserDep,
     user_id: int,   
      
-    tenant: str = Depends(get_tenant),
+    tenant: str,
 ):
     try:
         if not check_permission(
@@ -91,7 +91,7 @@ async def get_my_user(
 async def get_users(
     session: SessionDep,
     current_user: UserDep,
-    tenant: str = Depends(get_tenant),
+    tenant: str,
 ):
     try:  
         if not check_permission(
@@ -134,7 +134,7 @@ async def get_users(
 async def get_user(
     session: SessionDep,
     id: int,
-    tenant: str = Depends(get_tenant),
+    tenant: str,
     current_user: User = Depends(get_current_user),
 ):
     try:
@@ -177,8 +177,8 @@ async def get_user(
 @ar.get("/user-form/")
 async def create_user_form(
     session: SessionDep,
+    tenant: str,
     current_user: User = Depends(get_current_user),    
-    tenant: str = Depends(get_tenant),
 
 ):
     try:
@@ -210,7 +210,7 @@ async def create_user_form(
 async def create_user(
     session: SessionDep,
     current_user: UserDep,    
-    tenant: str = Depends(get_tenant),
+    tenant: str,
 
     full_name: str = Body(...),
     username: str = Body(...),
@@ -287,8 +287,8 @@ async def create_user(
 @ar.get("/update-user-form/")
 async def update_user_form(
     session: SessionDep,
+    tenant: str,
     current_user: User = Depends(get_current_user),    
-    tenant: str = Depends(get_tenant),
 
 ):
     try:
@@ -330,7 +330,7 @@ async def update_user_form(
 async def update_uer(
     session: SessionDep,
     current_user: UserDep,    
-    tenant: str = Depends(get_tenant),
+    tenant: str,
     id: int = Body(...),
     full_name: str = Body(...),
     username: str = Body(...),
@@ -413,7 +413,7 @@ async def delete_user(
     session: SessionDep,
     current_user: UserDep,  
     id: int, 
-    tenant: str = Depends(get_tenant)
+    tenant: str
 ):
     try:
         if not check_permission(
@@ -436,9 +436,8 @@ async def delete_user(
 @ar.get("/scope-group-form/")
 async def form_scope(
     session: SessionDep,
-    current_user: User = Depends(get_current_user),    
-    tenant: str = Depends(get_tenant),
-
+    current_user: User,    
+    tenant: str,
 ):
     try:
         if not check_permission(
@@ -454,14 +453,14 @@ async def form_scope(
         
         return {"data": data, "html_types": get_html_types("scope_group")}
     except Exception as e:
-        traceback(str(e))
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
     
 @ar.post("/create-scope-group/")
 async def create_scope_group(
     session: SessionDep,
     current_user: UserDep,    
-    tenant: str = Depends(get_tenant),
+    tenant: str,
     scope_data: Dict[str, Any] = Body(...),
 ):
     try:
@@ -504,6 +503,7 @@ async def create_scope_group(
 async def form_scope_organization(
     session: SessionDep,
     current_user: UserDep,
+    tenant: str
 
 ):
     try:
@@ -513,14 +513,16 @@ async def form_scope_organization(
         #     raise HTTPException(
         #         status_code=403, detail="You Do not have the required privilege"
         #     )
-
+        current_tenant = session.exec(select(Organization).where(Organization.organization_name == tenant)).first()
+        print("this is tenant:",tenant, current_tenant)
         org = {"scope_id":"", 
-                "organizations": get_child_organization(session, current_user["organization"])
+                "organizations": get_child_organization(session, current_tenant.id)
                 }
         print(org)
         
         return {"data": org, "html_types": get_html_types("scope_organization")}
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
     
     
@@ -580,7 +582,7 @@ async def add_organization_to_scope(
 async def get_scope_groups(
     session: SessionDep,
     current_user: UserDep,    
-    tenant: str = Depends(get_tenant),
+    tenant: str,
 
 ):
     try:
@@ -644,7 +646,7 @@ async def get_scope_group(
 async def update_scope_group(
     session: SessionDep,
     current_user: UserDep,    
-    tenant: str = Depends(get_tenant),
+    tenant: str,
 
     name: str = Body(...) ,
     id: int = Body(...),

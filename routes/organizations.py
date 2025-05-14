@@ -20,7 +20,7 @@ UserDep = Annotated[dict, Depends(get_current_user)]
 async def get_organizations(
     session: SessionDep,
     current_user: UserDep,    
-    tenant: str = Depends(get_tenant),
+    tenant: str,
 
 ):
     """
@@ -213,7 +213,7 @@ async def get_organization(
     session: SessionDep,
     id: int,
     current_user: UserDep,
-    tenant: str = Depends(get_tenant),
+    tenant: str,
 ):
     try:
         if not check_permission(
@@ -243,7 +243,7 @@ async def get_organization(
 async def create_organization(
     session: SessionDep,
     current_user: UserDep,    
-    tenant: str = Depends(get_tenant),
+    tenant: str,
 
     
     id: int = Body(...),
@@ -304,7 +304,7 @@ async def delete_organization(
     session: SessionDep,
     current_user: UserDep,
     id: int,    
-    tenant: str = Depends(get_tenant),
+    tenant: str,
 ):
     """
     Delete an organization by ID.
@@ -347,7 +347,7 @@ async def delete_organization(
 # @ar.get("/get-organization-hierarchy/")
 # async def get_organization_hierarchy(
 #     session: SessionDep,
-# tenant: str = Depends(get_tenant),
+# tenant: str,
 #     current_user: UserDep,
 #     scope_group_id: int = Body(...),
 # ):
