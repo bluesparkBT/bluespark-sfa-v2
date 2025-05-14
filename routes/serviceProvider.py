@@ -226,14 +226,14 @@ async def create_tenant(
         session.commit()
         session.refresh(role)
 
-        raw_password = generate_random_password()
-        hashed_password = get_password_hash(raw_password + tenant_name)
+        password = generate_random_password()
+        # hashed_password = get_password_hash(password + tenant_name)
 
         tenant_admin = User(
             username=f"{tenant_name.lower()}_admin",
             fullname=f"{tenant_name} Admin",
             email=f"{tenant_name.lower()}_admin@{tenant_name}.com",
-            hashedPassword=hashed_password,
+            hashedPassword=password,
             organization=new_tenant.id,
             role_id=role.id,
             scope=Scope.managerial_scope,
@@ -247,7 +247,7 @@ async def create_tenant(
             "message": "Tenant and system admin created successfully",
             "tenant": tenant_name,
             "admin_username": tenant_admin.username,
-            "admin_password": raw_password 
+            "admin_password": password 
         }
 
     except Exception as e:

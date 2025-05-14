@@ -21,6 +21,7 @@ MODEL_HTML_TYPES = {
     "scope_group":{
         "id":"hidden",
         "name":"text",
+        "organizations": "hierarchical-checkbox"
     },
     "user": {
         "id": "hidden",

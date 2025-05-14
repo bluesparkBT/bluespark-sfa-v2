@@ -9,7 +9,7 @@ from utils.util_functions import validate_name, validate_email, validate_phone_n
 from utils.auth_util import get_tenant, get_current_user, check_permission, generate_random_password
 from utils.model_converter_util import get_html_types
 from utils.form_db_fetch import fetch_organization_id_and_name
-
+from utils.get_hierarchy import get_child_organization
 
 AuthenticationRouter =ar= APIRouter()
 SessionDep = Annotated[Session, Depends(get_session)]
@@ -34,6 +34,7 @@ def login(
 
         if not user or not verify_password(password+user.username, user.hashedPassword):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+        
         access_token_expires = timedelta(minutes=90)
         token = create_access_token(
             data={
@@ -285,7 +286,6 @@ async def create_user(
 
     fullname: str = Body(...),
     username: str = Body(...),
-    raw_password: str = Body(...), 
     email: str = Body(...),
     role_id: int = Body(...),
     scope: Scope = Body(...),
@@ -326,8 +326,8 @@ async def create_user(
         )
             
         # Generate and hash password
-        raw_password = generate_random_password()
-        hashed_password = get_password_hash(raw_password + username)
+        password = generate_random_password()
+        # hashed_password = get_password_hash(raw_password + username)
         
         new_user = User(
             id= None,
@@ -335,7 +335,7 @@ async def create_user(
             username=username,
             email=email,
             phone_number=phone_number,
-            hashedPassword = hashed_password,
+            hashedPassword = password,
             organization_id= organization_id,
             role_id=role_id,           
             gender=gender,
@@ -349,7 +349,7 @@ async def create_user(
 
         return {
             "message": "User registered successfully",
-            "temporary_password": raw_password }
+            "temporary_password": password }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -526,15 +526,11 @@ async def form_scope(
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-        organizations = session.exec(select(Organization)).all()
-
-        organization_list = [
-            org.organization_name
-            for org in organizations
-        ]
+        organizations_tree = get_child_organization(session, current_user["organization"])
         
         data = {"id":"", 
-                "name": ""
+                "name": "",
+                "organization": organizations_tree,
                 }
         
         return {"data": data, "html_types": get_html_types("scope_group")}
