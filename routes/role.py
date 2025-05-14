@@ -230,7 +230,7 @@ async def create_role(
         #create role
         role = Role(
             name=role_name,
-            organization_id = current_user['organization']
+            organization_id = current_user.organization_id
         )
 
 

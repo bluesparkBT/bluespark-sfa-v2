@@ -108,6 +108,7 @@ class ModuleName(str, Enum):
     route_schedule = "Route Schedule"
     penetration = "Penetration"
     administration = "Administration"
+    service_provider = "Service Provider"
 
 # class Module(SQLModel, table=True):
 #     __tablename__ = "module"
