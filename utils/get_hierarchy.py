@@ -1,13 +1,51 @@
 from sqlmodel import select, Session
 from fastapi import Depends
 from typing import Annotated, List
-from models import Account
+from models import Account, ScopeGroup, ScopeGroupLink
 from db import SECRET_KEY, get_session
 
 from models.Account import Organization
 
 
 SessionDep = Annotated[Session, Depends(get_session)]
+
+from typing import List
+from fastapi import HTTPException
+
+def get_organization_ids_by_scope_group(session, current_user) -> List[int]:
+    """
+    Get the list of organization IDs linked to the current user's ScopeGroup.
+
+    Args:
+        session: The database session.
+        current_user: The current user dictionary containing at least 'scope_group_id'.
+
+    Returns:
+        List[int]: A list of organization IDs.
+
+    Raises:
+        HTTPException: If no ScopeGroup or organizations are found.
+    """
+    # Fetch the user's scope group object
+    user_scope_group = session.exec(
+        select(ScopeGroup).where(ScopeGroup.id == current_user.scope_group_id)
+    ).first()
+
+    if not user_scope_group:
+        raise HTTPException(
+            status_code=404, detail="ScopeGroup not found for the current user"
+        )
+
+    # Get organization IDs associated with this scope group
+    organization_ids = [org.id for org in user_scope_group.organizations]
+
+    if not organization_ids:
+        raise HTTPException(
+            status_code=404,
+            detail="No organizations found for the user's ScopeGroup",
+        )
+
+    return organization_ids
 
 
 def get_child_organization(session: SessionDep, organization_id: int):

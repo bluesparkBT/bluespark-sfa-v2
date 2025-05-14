@@ -52,7 +52,7 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     return encoded_jwt
 
 
-def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+def get_current_user(session: SessionDep,credentials: HTTPAuthorizationCredentials = Depends(security)):
     """
     Get the current user from the JWT token in the Authorization header.
 
@@ -78,17 +78,19 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
         username = payload.get("sub")
         if username is None:
             raise credentials_exception
-        return payload
+        
+        user_db = session.exec(select(User).where(User.username == username)).first()
+        
+        return user_db
     except InvalidTokenError:
         raise credentials_exception
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
-    
 
 
 def generate_random_password(length: int = 12) -> str:
     """Generate a secure random password with uppercase, lowercase, digits, and punctuation."""
-    characters = string.ascii_letters + string.digits + string.punctuation
+    characters = string.ascii_letters + string.digits
     return ''.join(random.SystemRandom().choice(characters) for _ in range(length))
 
 def check_permission(
@@ -129,7 +131,7 @@ def check_permission(
             print(f"Module '{endpoint_group}' not found")
             return False
         
-        print(module)
+        print(f"Module :'{endpoint_group}'")
 
         permission = session.exec(
             select(RoleModulePermission)
