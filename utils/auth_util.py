@@ -97,7 +97,7 @@ def check_permission(
     session: Session,
     policy_type: str,
     endpoint_group: str,
-    user_id: int,
+    user: int,
 ) -> bool:
     """
     Checks if the user has the required access policy for a specific module.
@@ -113,9 +113,12 @@ def check_permission(
     """
     try:
         # Debug step-by-step checks
-        print(f"Checking permission for user_id={user_id}, module={endpoint_group}, policy={policy_type}")
+        print(f"Checking permission for user_id={user}, module={endpoint_group}, policy={policy_type}")
+        print(f"User Data is: the id of the user= {user.id}")
+
         
-        user = session.exec(select(User).where(User.id == user_id['user_id'])).first()
+        user = session.exec(select(User).where(User.id == user.id)).first()
+        print(f"filtered user is: {user}")
         if not user or not user.role_id:
             print("User not found or has no role")
             return False

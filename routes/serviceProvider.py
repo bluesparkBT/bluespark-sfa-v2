@@ -4,7 +4,7 @@ from datetime import timedelta, date, datetime
 from fastapi import APIRouter, HTTPException, Body, status, Depends, Path
 from sqlmodel import select, Session
 from db import get_session
-from models.Account import User, ScopeGroup, ScopeGroupLink, Organization, RoleModulePermission, Scope, Role, AccessPolicy
+from models.Account import User, ScopeGroup, ScopeGroupLink, Organization, OrganizationType, RoleModulePermission, Scope, Role, AccessPolicy
 from models.Account import ModuleName as modules
 from utils.auth_util import verify_password, create_access_token, get_password_hash
 from utils.util_functions import validate_name, validate_email, validate_phone_number
@@ -53,7 +53,7 @@ def login(
 @sp.post("/create-superadmin/")
 async def create_superadmin_user(
     session: SessionDep,
-    # tenant: str = Depends(get_tenant), 
+    # tenant: str, 
        
     username: str = Body(...),
     email: str = Body(...),
@@ -68,13 +68,13 @@ async def create_superadmin_user(
                 detail="Superadmin already registered",
             )
         
-        organization = Organization(
+        service_provider = Organization(
             organization_name=service_provider_company,
         )
 
-        session.add(organization)
+        session.add(service_provider)
         session.commit()
-        session.refresh(organization)
+        session.refresh(service_provider)
         
 
         service_provider_scope_group = ScopeGroup(
@@ -99,19 +99,31 @@ async def create_superadmin_user(
         
         scope_group_link = ScopeGroupLink(
             scope_group_id=service_provider_scope_group.id,
-            organization_id=organization.id,
+            organization_id=service_provider.id,
         )
         
         session.add(scope_group_link)
         session.commit()
         session.refresh(scope_group_link)
         
+        #create role
+        role = Role(
+            name="Super Admin",
+            organization_id = service_provider.id
+        )
+
+
+        session.add(role)
+        session.commit()
+        session.refresh(role)
+        
         super_admin_user = User(
             username=username,
             email=email,
             hashedPassword=get_password_hash(password + username),
-            organization_id=organization.id,
+            organization_id=service_provider.id,
             scope_group_id=service_provider_scope_group.id,
+            role_id = role.id
         )
         session.add(super_admin_user)
         session.commit()
@@ -125,7 +137,7 @@ async def create_superadmin_user(
 async def delete_superadmin_user(
     session: SessionDep,
     current_user: UserDep,    
-    # tenant: str = Depends(get_tenant),
+    # tenant: str,
 
     super_admin_id: int = Body(...),
 ):
@@ -154,7 +166,7 @@ async def delete_superadmin_user(
 @sp.get("/get-my-tenant/")
 async def get_my_tenant(
     session: SessionDep,
-    tenant: str = Depends(get_tenant),
+    # tenant: str,
     current_user: User = Depends(get_current_user),
 ) -> dict:
     """
@@ -178,7 +190,7 @@ async def get_my_tenant(
                 status_code=403, detail="You Do not have the required privilege"
             )
         # Query the organization associated with the logged-in user
-        organization = session.exec(select(Organization).where(Organization.id == current_user.get("organization"))).first()
+        organization = session.exec(select(Organization).where(Organization.id == current_user.organization_id)).first()
 
         if not organization:
             raise HTTPException(
@@ -207,10 +219,12 @@ async def get_tenant_form_fields(
         
         tenant_data = {
             "id": "",
-            "organization_name": "",
+            "tenant_name": "",
             "owner_name": "",
             "description": "",
-            "logo_image": ""
+            "logo_image": "",
+            "organization_type" : {i.value: i.value for i in OrganizationType},
+            
             }
         
 
@@ -350,7 +364,7 @@ async def delete_tenant(
     session: SessionDep,
     current_user: UserDep,
     id: int,    
-    tenant: str = Depends(get_tenant),
+    tenant: str,
 ):
     """
     Delete an organization by ID.
