@@ -36,6 +36,7 @@ class Organization(SQLModel, table=True):
     description: Optional[str] = Field(default=None, index=True)
     organization_type: OrganizationType = Field(default=OrganizationType.company)
     parent_id: Optional[int] = Field(default=None,  foreign_key="organization.id")
+    inheritance_group: List[int] = Field(default=None, foreign_key='inheritance_group.id')
     scope_groups: List["ScopeGroup"] = Relationship(
         back_populates="organizations",
         link_model=ScopeGroupLink
@@ -109,14 +110,6 @@ class ModuleName(str, Enum):
     penetration = "Penetration"
     administration = "Administration"
     service_provider = "Service Provider"
-
-# class Module(SQLModel, table=True):
-#     __tablename__ = "module"
-
-#     id: int = Field(primary_key=True)
-#     name: str
-#     permissions: List["RoleModulePermission"] = Relationship(back_populates="module")
-
 
 class RoleModulePermission(SQLModel, table=True):
     __tablename__ = "role_module_permission"

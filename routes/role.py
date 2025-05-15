@@ -20,7 +20,7 @@ UserDep = Annotated[dict, Depends(get_current_user)]
 @rr.get("/roles-form")
 async def form_roles(
     session: SessionDep,
-    tenant: str = Depends(get_tenant),
+    tenant: str,
     current_user: User = Depends(get_current_user),
 ):
     try:
@@ -44,7 +44,7 @@ async def form_roles(
 @rr.get("/roles")
 async def get_roles(
     session: SessionDep,
-    tenant: str = Depends(get_tenant), 
+    tenant: str, 
     current_user: User = Depends(get_current_user),
 ):
    
@@ -86,7 +86,7 @@ async def get_roles(
 async def create_role(
     session: SessionDep,
     id: int,
-    tenant: str = Depends(get_tenant),
+    tenant: str,
     current_user: User = Depends(get_current_user),
 ):
     try:
@@ -108,7 +108,7 @@ async def create_role(
 @rr.get("/modules-form")
 async def form_modules(
     session: SessionDep,
-    tenant: str = Depends(get_tenant),
+    tenant: str,
     current_user: User = Depends(get_current_user),
 ):
     try:
@@ -135,7 +135,7 @@ async def form_modules(
 @rr.post("/update-role-module")
 async def update_role(
     session: SessionDep,
-    tenant: str = Depends(get_tenant),
+    tenant: str,
     
     role_id: int = Body(...),
     module: str = Body(...),
@@ -168,7 +168,7 @@ async def update_role(
 @rr.get("/my-role")
 async def get_my_role(
     session: SessionDep,
-    tenant: str = Depends(get_tenant),
+    tenant: str,
     current_user: User = Depends(get_current_user),
 ):
     try:
@@ -206,7 +206,7 @@ async def get_my_role(
 @rr.post("/create-role")
 async def create_role(
     session: SessionDep,
-    tenant: str = Depends(get_tenant),
+    tenant: str,
     
     role_data: Dict[str, Any] = Body(...),
     current_user: User = Depends(get_current_user),
@@ -258,8 +258,7 @@ async def create_role(
 @rr.put("/update-role")
 async def update_role(
     session: SessionDep,
-    tenant: str = Depends(get_tenant),
-    
+    tenant: str,
     name: str = Body(...) ,
     id: int = Body(...),
     current_user: User = Depends(get_current_user),
@@ -294,7 +293,7 @@ async def update_role(
 async def delete_role(
     session: SessionDep,
     id: int,    
-    tenant: str = Depends(get_tenant),
+    tenant: str,
     current_user: User = Depends(get_current_user),
 ):
 

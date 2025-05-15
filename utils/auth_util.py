@@ -118,7 +118,7 @@ def check_permission(
 
         
         user = session.exec(select(User).where(User.id == user.id)).first()
-        print(f"filtered user is: {user}")
+        # print(f"filtered user is: {user}")
         if not user or not user.role_id:
             print("User not found or has no role")
             return False
@@ -139,9 +139,9 @@ def check_permission(
         permission = session.exec(
             select(RoleModulePermission)
             .where(
-                RoleModulePermission.role_id == role.id,
-                RoleModulePermission.module == module,
-            )
+                RoleModulePermission.role_id == role.id
+            ).where(
+                RoleModulePermission.module == module)
         ).first()
 
         if not permission:
