@@ -3,6 +3,7 @@ MODEL_HTML_TYPES = {
     "Organization": {
         "id": "hidden",
         "organization_name": "text",
+        "tenant_name":"text",
         "owner_name": "text",
         "description": "textarea",
         "logo_image": "file",
@@ -21,7 +22,11 @@ MODEL_HTML_TYPES = {
     "scope_group":{
         "id":"hidden",
         "name":"text",
+    },
+    "scope_organization":{
+        "scope_id":"hidden",
         "organizations": "hierarchical-checkbox"
+
     },
     "user": {
         "id": "hidden",
@@ -42,9 +47,5 @@ MODEL_HTML_TYPES = {
         "id_number": "text",
         "gender": "select",
         "password": "text"
-    },
-    "scope_organization":{
-        "scope_id":"hidden",
-        "organizations":"checkbox",
-    },
+    }
 }
