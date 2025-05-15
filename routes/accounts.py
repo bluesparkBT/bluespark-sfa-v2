@@ -512,7 +512,7 @@ async def form_scope_organization(
             )
         current_tenant = session.exec(select(Organization).where(Organization.organization_name == tenant)).first()
         org = {"id":current_tenant.id, 
-                "children": get_child_organization(session, current_tenant.id)
+                "organizations": get_child_organization(session, current_tenant.id)
                 }
         print(org)
         

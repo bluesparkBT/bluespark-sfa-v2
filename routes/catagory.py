@@ -150,7 +150,7 @@ def get_category(
         raise HTTPException(status_code=400, detail=str(e))  
     
 # update a single category by ID
-@tr.put("/update-category-{category_id}")
+@tr.put("/update-category")
 def update_category(
     session: SessionDep,
     current_user: User = Depends(get_current_user),
