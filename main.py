@@ -14,6 +14,7 @@ from routes.accounts import AuthenticationRouter
 from routes.organizations import TenantRouter
 from routes.role import RoleRouter
 from routes.product import ProductRouter
+from routes.catagory import CatagoryRouter
 
 
 load_dotenv()
@@ -60,14 +61,14 @@ async def validation_exception_handler(request, exc):
         content={"error": "Invalid input", "details": exc.errors()},
     )
 
-@app.on_event("startup")
-def on_startup():
-    create_db_and_tables()
+# @app.on_event("startup")
+# def on_startup():
+#     create_db_and_tables()
     
 app.include_router(AuthenticationRouter, prefix="/{tenant}/account", tags=["account"])
 app.include_router(TenantRouter, prefix="/{tenant}/organization", tags=["organization"])
 app.include_router(RoleRouter, prefix="/{tenant}/role", tags=["role"])
-app.include_router(ProductRouter, prefix="/{tenant}/product", tags=["product"])
+app.include_router(CatagoryRouter, prefix="/{tenant}/catagory", tags=["catagory"])
 app.include_router(UtilRouter, prefix="/{tenant}/utility", tags=["utility"])
 app.include_router(ProductRouter, prefix="/{tenant}/product", tags=["product"])
 app.include_router(ServiceProvider, tags=["service provider"])
