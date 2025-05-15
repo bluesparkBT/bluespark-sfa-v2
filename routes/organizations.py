@@ -27,17 +27,18 @@ async def get_organizations(
     Retrieve all organizations with their associated scope groups.
     """
     try:
-        # if not check_permission(
-        #     session, "Read", "Organization", current_user
-        #     ):
-        #     raise HTTPException(
-        #         status_code=403, detail="You Do not have the required privilege"
-        #     )
+        if not check_permission(
+            session, "Read", "Organization", current_user
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
         
-        # organization_ids = get_organization_ids_by_scope_group(session, current_user)
+        organization_ids = get_organization_ids_by_scope_group(session, current_user)
 
-        sgo = select(Organization).options(selectinload(Organization.scope_groups))
-        organizations = session.exec(sgo).all()
+        # sgo = select(Organization).options(selectinload(Organization.scope_groups))
+        # organizations = session.exec(sgo).all()
+        organizations = session.exec(select(Organization).where(Organization.id.in_(organization_ids)))
 
         if not organizations:
             raise HTTPException(status_code=404, detail="No organizations found")
@@ -110,12 +111,12 @@ async def create_organization(
 ):
 
     try:
-        # if not check_permission(
-        #     session, "Create", "Organization", current_user
-        #     ):
-        #     raise HTTPException(
-        #         status_code=403, detail="You Do not have the required privilege"
-        #     )
+        if not check_permission(
+            session, "Create", "Organization", current_user
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
         existing_tenant = session.exec(select(Organization).where(Organization.organization_name == organization_name)).first()
 
         if existing_tenant is not None:
@@ -135,9 +136,6 @@ async def create_organization(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Logo image is not valid",
         )
-            
-
-
         
         organization = Organization(
             id = None,
@@ -181,12 +179,12 @@ async def get_my_organization(
         HTTPException: 404 if the organization is not found.
     """
     try:
-        if not check_permission(
-            session, "Read", "Organization", current_user
-            ):
-            raise HTTPException(
-                status_code=403, detail="You Do not have the required privilege"
-            )
+        # if not check_permission(
+        #     session, "Read", "Organization", current_user
+        #     ):
+        #     raise HTTPException(
+        #         status_code=403, detail="You Do not have the required privilege"
+        #     )
         # Query the organization associated with the logged-in user
         organization = session.exec(select(Organization).where(Organization.id == current_user.organization_id)).first()
 
@@ -201,7 +199,7 @@ async def get_my_organization(
             "id": organization.id,
             "organization": organization.organization_name,
             "owner": organization.owner_name,
-            "logo": organization.logo_image,
+            # "logo": organization.logo_image,
         }
         
     except Exception as e:
