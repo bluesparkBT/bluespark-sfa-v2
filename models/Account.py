@@ -36,7 +36,7 @@ class Organization(SQLModel, table=True):
     description: Optional[str] = Field(default=None, index=True)
     organization_type: OrganizationType = Field(default=OrganizationType.company)
     parent_id: Optional[int] = Field(default=None,  foreign_key="organization.id")
-    inheritance_group: List[int] = Field(default=None, foreign_key='inheritance_group.id')
+    inheritance_group: Optional[int] = Field(default=None, foreign_key='inheritance_group.id')
     scope_groups: List["ScopeGroup"] = Relationship(
         back_populates="organizations",
         link_model=ScopeGroupLink

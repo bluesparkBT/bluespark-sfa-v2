@@ -64,12 +64,8 @@ def get_child_organization(session: SessionDep, organization_id: int):
             heirarchy['tenants'].append({'id': a_child.id, 'name': a_child.organization_name, 'children': get_child_organization(session, a_child.id)})
         else:        
             heirarchy.append({'id': a_child.id, 'name': a_child.organization_name, 'children': get_child_organization(session, a_child.id)})
-        
-    if len(children):
-        return heirarchy
-    else:
-        heirarchy.append({'id': organization_id, 'children': []})
-        return heirarchy
+               
+    return heirarchy
 
 def get_parent_organizations(session: SessionDep, organization_id: int) -> List[int]:
     """
