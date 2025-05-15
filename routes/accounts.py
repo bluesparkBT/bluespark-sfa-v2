@@ -514,9 +514,9 @@ async def form_scope_organization(
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-        current_tenant = session.exec(select(Organization).where(Organization.organization_name == current_user.organization_id)).first()
+        # current_tenant = session.exec(select(Organization).where(Organization.organization_name == current_user.organization_id)).first()
         org = {"scope_id":"", 
-                "organizations": get_child_organization(session, current_tenant.id)
+                "organizations": get_child_organization(session, current_user.organization_id)
                 }
         print(org)
         

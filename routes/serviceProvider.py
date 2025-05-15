@@ -7,7 +7,7 @@ from db import get_session
 from models.Account import User, ScopeGroup, ScopeGroupLink, Organization, OrganizationType, RoleModulePermission, Scope, Role, AccessPolicy
 from models.Account import ModuleName as modules
 from utils.auth_util import verify_password, create_access_token, get_password_hash
-from utils.util_functions import validate_name, validate_email, validate_phone_number
+from utils.util_functions import validate_name, validate_email, validate_phone_number, parse_enum
 from utils.auth_util import get_tenant, get_current_user, check_permission, generate_random_password
 from utils.model_converter_util import get_html_types
 from utils.form_db_fetch import fetch_organization_id_and_name
@@ -244,11 +244,48 @@ async def get_tenants(
                 "company": tenant.organization_name,
                 "owner": tenant.owner_name,
                 "description": tenant.description,
+
             }
             for tenant in all_tenants
         ]
 
         return tenant_list
+
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    
+@sp.get("/get-tenant/{id}")
+async def get_tenant(
+    session: SessionDep,
+    # current_user: UserDep,
+    id: int
+):
+    """
+    Retrieve all tenant companies that use the system.
+    """
+    try:
+        # if not check_permission(session, "Read", "Service Provider", current_user):
+        #     raise HTTPException(
+        #         status_code=403, detail="You do not have the required privilege"
+        #     )
+
+        tenant = session.exec(
+            select(Organization).where(
+                (Organization.id == id)) ).first()
+     
+
+        tenant_data = {
+                "id": tenant.id,
+                "tenant_name": tenant.organization_name,
+                "owner_name": tenant.owner_name,
+                "description": tenant.description,
+                "logo_image": tenant.logo_image,
+                "organization_type": tenant.organization_type
+                
+            }
+       
+
+        return tenant_data
 
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -305,7 +342,7 @@ async def create_tenant(
             organization_name=tenant_name,
             description=description,
             logo_image=logo_image,
-            organization_type=organization_type,
+            organization_type=parse_enum(OrganizationType,organization_type,"Organization Type")
         )
         session.add(tenant)
         session.commit()
@@ -378,8 +415,9 @@ async def update_tenant(
     session: SessionDep,
     current_user: UserDep,
     # tenant: str,
-
+    id: int = Body(...),
     tenant_name: str = Body(...),
+    owner_name: str = Body(...),
     description: str = Body(...),
     logo_image: str = Body(...),
     organization_type: str = Body(...),
@@ -390,23 +428,25 @@ async def update_tenant(
                 status_code=403, detail="You do not have the required privilege"
             )
         existing_tenant = session.exec(
-            select(Organization).where(Organization.organization_name == tenant_name)
+            select(Organization).where(Organization.id == id)
         ).first()
-        if existing_tenant:
-            raise HTTPException(status_code=400, detail="Tenant already exists")
+        if not existing_tenant:
+            raise HTTPException(status_code=400, detail="Tenant does not exist")
 
         # if not logo_image or not validate_image(logo_image):
         #     raise HTTPException(status_code=400, detail="Logo image is not valid")
+      
 
-        tenant = Organization(
-            organization_name=tenant_name,
-            description=description,
-            logo_image=logo_image,
-            organization_type=organization_type,
-        )
-        session.add(tenant)
+        existing_tenant.id = id,
+        existing_tenant.organization_name=tenant_name,
+        existing_tenant.owner_name = owner_name,
+        existing_tenant.description=description,
+        existing_tenant.logo_image=logo_image,
+        existing_tenant.organization_type=parse_enum(OrganizationType,organization_type,"Organization Type")
+ 
+        session.add(existing_tenant)
         session.commit()
-        session.refresh(tenant)
+        session.refresh(existing_tenant)
         
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
