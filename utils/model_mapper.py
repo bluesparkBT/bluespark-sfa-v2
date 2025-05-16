@@ -1,6 +1,6 @@
 MODEL_HTML_TYPES = {
 
-    "Organization": {
+    "organization": {
         "id": "hidden",
         "organization_name": "text",
         "tenant_name":"text",
@@ -10,11 +10,11 @@ MODEL_HTML_TYPES = {
         "parent_organization": "select",
         "organization_type": "select",
     },
-    "Role":{
+    "role":{
         "id":"hidden",
         "name":"text",
     },
-    "Policy":{
+    "policy":{
         "role_id":"hidden",
         "module":"select",
         "policy":"radio"
@@ -47,5 +47,20 @@ MODEL_HTML_TYPES = {
         "id_number": "text",
         "gender": "select",
         "password": "text"
-    }
+    },
+    "address": {
+        "id": "hidden",
+        "country": "text",
+        "city": "text",
+        "sub_city": "text",
+        "woreda": "text",
+        "landmark": "text",
+    },
+    "location": {
+        "id": "hidden",
+        "name": "text",
+        "address": "select",
+        "latitude": "number",
+        "longitude": "number",
+    },
 }

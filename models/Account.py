@@ -21,10 +21,12 @@ class ScopeGroup(SQLModel, table=True):
     organizations: List["Organization"] = Relationship(back_populates="scope_groups", link_model=ScopeGroupLink)
 
 class OrganizationType(str, Enum):
+    service_provider = "Service Provider"
+    company = "Company"    
     distributor = "Distributor"
     subagent = "SubAgent"
     retailer = "Retailer"
-    company = "Company"
+
 
 class Organization(SQLModel, table=True): 
     __tablename__ = "organization"
@@ -88,28 +90,35 @@ class AccessPolicy(str, Enum):
     manage = "manage"
     
 class ModuleName(str, Enum):
-
+    
+    service_provider = "Service Provider"
+    administrative = "Administrative"
+    adddress = "Address"
     category = "Category"
-    product = "Product"
     dashboard = "Dashboard"
+    deposit = "Deposit"
     finance = "Finance"
-    sales = "Sales"
-    presales = "Presales"
-    trade_marketing = "Trade Marketing"
-    visit = "Visit"
+    product = "Product"
+    penetration = "Penetration"
+    presales = "Presales"    
+    inheritance = "Inheritance"
+    inventory_management = "Inventory Management"
     order = "Order"
+    organization = "Organization"
+    sales = "Sales"
+    stock = "Stock"
+    role = "Role"
     route = "Route"
+    route_schedule = "Route Schedule"
+    trade_marketing = "Trade Marketing"
     territory = "Territory"
     point_of_sale = "Point Of Sale"
-    address = "Address"
     users = "Users"
-    role = "Role"
-    organization = "Organization"
-    inventory_management = "Inventory Management"
-    route_schedule = "Route Schedule"
-    penetration = "Penetration"
-    administration = "Administration"
-    service_provider = "Service Provider"
+    visit = "Visit"
+    vehichle = "Vehicle"
+    warehouse = "Warehouse"
+    warehouse_stop = "Warehouse-stop"
+
 
 class RoleModulePermission(SQLModel, table=True):
     __tablename__ = "role_module_permission"
