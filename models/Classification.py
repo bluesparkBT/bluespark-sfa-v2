@@ -11,9 +11,9 @@ class ClassificationGroup(SQLModel, table=True):
     organization_id: int = Field(foreign_key="organization.id")  # Reference to Organization
 
     # Optional references
-    point_of_sale_id: Optional[int] = Field(default=None, foreign_key="pointsale.id")
+    #point_of_sale_id: Optional[int] = Field(default=None, foreign_key="point_of_sale.id")
     territory_id: Optional[int] = Field(default=None, foreign_key="territory.id")
-    route_id: Optional[int] = Field(default=None, foreign_key="route.id")
+    # route_id: Optional[int] = Field(default=None, foreign_key="route.id")
 
     # Relationship with CustomerDiscount
     customer_discounts: list["CustomerDiscount"] = Relationship(back_populates="classification_group")

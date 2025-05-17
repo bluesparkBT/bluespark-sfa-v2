@@ -1,6 +1,6 @@
 MODEL_HTML_TYPES = {
 
-    "Organization": {
+    "organization": {
         "id": "hidden",
         "organization_name": "text",
         "tenant_name":"text",
@@ -10,11 +10,11 @@ MODEL_HTML_TYPES = {
         "parent_organization": "select",
         "organization_type": "select",
     },
-    "Role":{
+    "role":{
         "id":"hidden",
         "name":"text",
     },
-    "Policy":{
+    "policy":{
         "role_id":"hidden",
         "module":"select",
         "policy":"radio"
@@ -47,5 +47,48 @@ MODEL_HTML_TYPES = {
         "id_number": "text",
         "gender": "select",
         "password": "text"
-    }
+    },
+    "address": {
+        "id": "hidden",
+        "country": "text",
+        "city": "text",
+        "sub_city": "text",
+        "woreda": "text",
+        "landmark": "text",
+    },
+    "location": {
+        "id": "hidden",
+        "name": "text",
+        "address": "select",
+        "latitude": "number",
+        "longitude": "number",
+    },
+    "warehouse":{
+        "id":"hidden",
+        "warehouse_name":"text",
+        "organization":"select",
+        "location":"text"
+    },
+     "warehouse_storeadmin":{
+        "warehouse_id":"hidden",
+        "store_admin": "checkbox"
+    },
+    "stock":{
+        "id":"hidden",
+        "warehouse":"select",
+        "product":"select",
+        "category":"select",
+        "sub_category": "select",
+        "quantity": "number",
+        "stock_type": "select"
+    },
+    "warehouse_stop":{
+        "id":"hidden",
+        "request_type":"select",
+        "vehicle":"select",
+        "stock": "select",
+        "quantity": "number",
+        "stock_type": "select"
+    },
+
 }
