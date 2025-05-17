@@ -10,7 +10,7 @@ from models.Account import (
 )
 from models.Product import Category, Product
 from models.Inheritance import InheritanceGroup
-from models.Inventory_Management import Stock, Warehouse
+from models.Warehouse import Stock, StockType, Warehouse, Vehicle
 from utils.get_hierarchy import get_organization_ids_by_scope_group
 from utils.auth_util import get_current_user
 from sqlmodel import Session, select
@@ -76,7 +76,7 @@ def fetch_category_id_and_name(session: SessionDep, current_user: UserDep):
 
     category_row = session.exec(
         select(Category.id, Category.name)
-        .where(Role.organization_id.in_(organization_ids))
+        .where(Category.organization_id.in_(organization_ids))
         ).all()
     categories = {row[0]: row[1] for row in category_row}
     return categories
@@ -95,7 +95,7 @@ def fetch_warehouse_id_and_name(session: SessionDep, current_user: UserDep):
     organization_ids = get_organization_ids_by_scope_group(session, current_user)
 
     warehouse_row = session.exec(
-        select(Warehouse.id, Warehouse.name)
+        select(Warehouse.id, Warehouse.warehouse_name)
         .where(Warehouse.organization_id.in_(organization_ids))
         ).all()
     warehouses = {row[0]: row[1] for row in warehouse_row}
@@ -103,13 +103,17 @@ def fetch_warehouse_id_and_name(session: SessionDep, current_user: UserDep):
 
 def fetch_stocks_id_and_name(session: SessionDep, current_user: UserDep):
     organization_ids = get_organization_ids_by_scope_group(session, current_user)
-
     stock_row = session.exec(
-        select(Stock.id, Stock.name)
-        .where(Stock.organization_id.in_(organization_ids))
-        ).all()
+        select(Stock.id, Stock.stock_type, Product.name)
+        .join(Warehouse, Warehouse.id == Stock.warehouse_id)
+        .join(Product, Product.id == Stock.product_id)
+        .where(Warehouse.organization_id.in_(organization_ids))
+    ).all()
+
+    print(stock_row)
+
     stocks = {
-        row.id: row.product_virtual.name + convert_promotional(row.is_promotional)
+        row[0] :row[2] + convert_promotional(row[1])
         for row in stock_row
     }
     return stocks
@@ -125,8 +129,8 @@ def fetch_vehicle_id_and_name(session: SessionDep, current_user: UserDep):
     return vehicles
 
 
-def convert_promotional(promo: bool):
-    if promo:
-        return " Promotional"
+def convert_promotional(stock_type: StockType):
+    if stock_type == StockType.promotional:
+        return "(Promotional)"
     else:
         return ""

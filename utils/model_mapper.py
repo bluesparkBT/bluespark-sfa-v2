@@ -63,4 +63,32 @@ MODEL_HTML_TYPES = {
         "latitude": "number",
         "longitude": "number",
     },
+    "warehouse":{
+        "id":"hidden",
+        "warehouse_name":"text",
+        "organization":"select",
+        "location":"text"
+    },
+     "warehouse_storeadmin":{
+        "warehouse_id":"hidden",
+        "store_admin": "checkbox"
+    },
+    "stock":{
+        "id":"hidden",
+        "warehouse":"select",
+        "product":"select",
+        "category":"select",
+        "sub_category": "select",
+        "quantity": "number",
+        "stock_type": "select"
+    },
+    "warehouse_stop":{
+        "id":"hidden",
+        "request_type":"select",
+        "vehicle":"select",
+        "stock": "select",
+        "quantity": "number",
+        "stock_type": "select"
+    },
+
 }

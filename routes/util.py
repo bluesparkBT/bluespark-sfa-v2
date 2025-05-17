@@ -40,5 +40,7 @@ async def get_form_fields_warehouse(current_user: UserDep, endpoint: str) -> lis
         return ["point_of_sale"]
     elif endpoint == "Organization":
         return ["scope_groups"]
+    elif endpoint == "Warehouse Stop":
+        return ["confirmed"]
     else:
         return []
