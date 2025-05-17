@@ -90,5 +90,29 @@ MODEL_HTML_TYPES = {
         "quantity": "number",
         "stock_type": "select"
     },
+    "category": {
+        "id": "hidden",
+        "name": "text",
+        "UNSPC Code": "text",
+        "description": "textarea",
+        "image": "file",
+        "parent_category": "select",
+        "organization_id": "select"
+    },
+    "product": {
+        "id": "hidden",
+        "sku": "text",
+        "name": "text",
+        "description": "textarea",
+        "image": "file",
+        "brand": "text",
+        "batch_number": "text",
+        "code": "text",
+        "price": "number",
+        "unit": "text",
+        "category": "select",
+        "organization_id": "hidden"
+    },
+    
 
 }

@@ -18,7 +18,7 @@ class Product(SQLModel, table=True):
     category_id: Optional[int] = Field(default=None, foreign_key="category.id", index=True)
     category: Optional["Category"] = Relationship(back_populates="products")
     organization_id: Optional[int] = Field(default=None, foreign_key="organization.id", index=True)
-    # inheritance_groups: List["InheritanceGroup"] = Relationship(back_populates="products", link_model=ProductLink)
+    inheritance_groups: List["InheritanceGroup"] = Relationship(back_populates="products", link_model=ProductLink)
     stocks: List["Stock"] = Relationship(back_populates="product")
 
 
@@ -30,10 +30,10 @@ class Category(SQLModel, table=True):
     code: int = Field(default=None, index=True)
     name: str = Field(default=None, index=True)
     description: Optional[str] = Field(default=None)
-    parent_category: (Optional[int]) = Field(foreign_key = "category.id")
+    parent_category: Optional [int] = Field(foreign_key = "category.id")
     products: List["Product"] = Relationship(back_populates="category")
-    organization_id: Optional[int] = Field(default=None, foreign_key="organization.id", index=True)
-    # inheritance_groups: List["InheritanceGroup"] = Relationship(back_populates="categories", link_model=CategoryLink)
+    organization_id: Optional [int] = Field(default=None, foreign_key="organization.id", index=True)
+    inheritance_groups: List["InheritanceGroup"] = Relationship(back_populates="categories", link_model=CategoryLink)
     category_stocks: List["Stock"] = Relationship(
         back_populates="category",
         sa_relationship_kwargs={"foreign_keys": "[Stock.category_id]"}

@@ -9,7 +9,7 @@ from models.Account import (
     ScopeGroup
 )
 from models.Product import Category, Product
-from models.Inheritance import InheritanceGroup
+from models.Inheritance import InheritanceGroup, ProductLink, CategoryLink
 from models.Warehouse import Stock, StockType, Warehouse, Vehicle
 from utils.get_hierarchy import get_organization_ids_by_scope_group
 from utils.auth_util import get_current_user
@@ -134,3 +134,53 @@ def convert_promotional(stock_type: StockType):
         return "(Promotional)"
     else:
         return ""
+    
+def add_category_link(session: SessionDep, inheritance_group_id: int, category_id: int):
+
+# Check if the link already exists to prevent duplicates
+    existing_link = session.exec(
+        select(CategoryLink).where(
+            CategoryLink.inheritance_group_id == inheritance_group_id,
+            CategoryLink.category_id == category_id
+        )
+    ).first()
+
+    if existing_link:
+        return {"message": "Category already linked to inheritance group"}
+
+    # Create new category link
+    new_link = CategoryLink(
+        inheritance_group_id=inheritance_group_id,
+        category_id=category_id
+    )
+
+    session.add(new_link)
+    session.commit()
+    session.refresh(new_link)
+
+    return {"message": "Category linked successfully", "link": new_link}
+
+def add_product_link(session: SessionDep, inheritance_group_id: int, product_id: int):
+
+# Check if the link already exists to prevent duplicates
+    existing_link = session.exec(
+        select(ProductLink).where(
+            ProductLink.inheritance_group_id == inheritance_group_id,
+            ProductLink.product_id == product_id
+        )
+    ).first()
+
+    if existing_link:
+        return {"message": "product already linked to inheritance group"}
+
+    # Create new category link
+    new_link = ProductLink(
+        inheritance_group_id=inheritance_group_id,
+        product_id=product_id
+    )
+
+    session.add(new_link)
+    session.commit()
+    session.refresh(new_link)
+
+    return {"message": "product linked successfully", "link": new_link}
