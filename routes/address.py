@@ -69,7 +69,7 @@ async def get_address_by_id(session: SessionDep, current_user: UserDep, tenant: 
     """
     try:
         if not check_permission(
-            session, "Read","Address", current_user
+            session, "Read",["Address", "Administrative"], current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
@@ -84,7 +84,7 @@ async def get_address_by_id(session: SessionDep, current_user: UserDep, tenant: 
         error_details = traceback.format_exc()
         raise HTTPException(status_code=400, detail=error_details)
 
-@ar.get("/form")
+@ar.get("/address-form")
 async def get_form_fields_address(session: SessionDep, current_user: UserDep, tenant: str):
     address = Address(
         id="",
@@ -126,7 +126,7 @@ async def create_address(
     """
     try:
         # if not check_permission(
-        #     session, "Create", "Address", current_user
+        #     session, "Create", ["Address", "Administrative"], current_user
         #     ):
         #     raise HTTPException(
         #         status_code=403, detail="You Do not have the required privilege"
@@ -172,7 +172,7 @@ async def update_address(
     try:
         address = session.exec(select(Address).where(Address.id == address_id)).first()
 
-        if not check_permission(session, "Update", "Address", current_user):
+        if not check_permission(session, "Update", ["Address", "Administrative"], current_user):
             raise HTTPException(status_code=403, detail="Permission denied")
         
         if not address:
@@ -226,7 +226,7 @@ async def delete_address(
         raise HTTPException(status_code=404, detail="Address not found")
 
     # Optionally check for permission
-    # if not check_permission(session, "Delete", "Address", current_user):
+    # if not check_permission(session, "Delete", ["Address", "Administrative"], current_user):
     #     raise HTTPException(status_code=403, detail="Permission denied")
 
     try:

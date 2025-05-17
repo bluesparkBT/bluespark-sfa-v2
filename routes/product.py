@@ -102,7 +102,7 @@ def get_product(
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
     
-@pr.get("/products-form")
+@pr.get("/product-form")
 def get_product_form(
     tenant: str,
     session: SessionDep, 
@@ -144,7 +144,7 @@ def get_product_form(
         traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
             
-@pr.post("/create-products")
+@pr.post("/create-product")
 def create_product(
     session: SessionDep, 
     current_user: UserDep,
