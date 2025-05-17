@@ -9,24 +9,132 @@ from utils.util_functions import validate_name
 from models.Account import User, AccessPolicy, Organization, OrganizationType, ScopeGroup, Scope, Role, ScopeGroupLink
 from utils.auth_util import get_current_user, check_permission
 from utils.get_hierarchy import get_organization_ids_by_scope_group
+from models.Account import Organization
+from utils.form_db_fetch import fetch_category_id_and_name, fetch_category_name
+
+import traceback
+
+
+CatagoryRouter = c = APIRouter()
 
 SessionDep = Annotated[Session, Depends(get_session)]
+UserDep = Annotated[dict, Depends(get_current_user)]
 
-CatagoryRouter = tr = APIRouter()
+
+
+@c.get("/Category-form/")
+def get_category_form(
+    tenant: str,
+    category: Category ,
+    session: SessionDep,
+    current_user: User = Depends(get_current_user),
+) :
+    """   Retrieves the form structure for creating a new category.
+    """
+    try:
+        # Check permission
+        if not check_permission(
+            session, "Create", "Category", current_user
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )   
+        # Define the form structure
+        
+        category_data = fetch_category_id_and_name(session)
+
+        # Extract only category names
+        category_names = list(category_data.values())
+
+          # This will display a list of category names
+
+        form_structure = {
+            "id": "",
+            "code": "",
+            "description": "",
+            "image": "",
+            "parent_category": category_names,
+            # "products": "",
+        } 
+
+        return {"data": form_structure, "html_types": get_html_types("category")}
+
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=400, detail=str(e))
+    
+
+#get inheritance group  
+@c.get("/get-categories")
+def get_category(
+        session: SessionDep,
+        organization_id: int,
+        current_user: User = Depends(get_current_user),
+
+):
+    
+    try: 
+        # Fetch the inheritance group from the organization
+        inherited_group = session.exec(
+            select(Organization.inheritance_group).where(Organization.id == current_user.organization_id)
+        ).first()
+        if inherited_group:
+
+            inherited_categories = inherited_group.categories
+        else:
+            inherited_categories = []
+        # Fetch products associated with the inheritance group
+        organization_categories = session.exec(
+            select(Category).where(Category.organization_id == current_user.organization_id)
+        ).all()
+        # categories = organization_group.categories
+
+        organization_categories.extend(inherited_categories)
+
+        new_category_list = []
+        for category in organization_categories:
+            new_category_list.append({
+                "id": category.id,
+                "Category Name": category.name,
+                "Parent Category id": category.parent_category,
+                "Parent Category name": category.parent_category,
+                "UNSPC Code": category.code,
+                "Description": category.description,
+            })
+
+
+    #      inherited_categories = inherited_group.categories
+
+    #     # Fetch products associated with the inheritance group
+    #     categories = session.exec(
+    #         select(Category).where(Category.organization_id == current_user.organization_id)
+    #     ).all()
+    #     # categories = organization_group.categories
+    #     All_categories = categories + P_categories
+
+    #     return All_categories
+
+    #     return 
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=400, detail=str(e))
+    
+
+
 
 
 # Create a new category
-@tr.post("/create-category")
+@c.post("/create-category")
 def create_category(
     session: SessionDep,
+    tenant: str,
     current_user: User = Depends(get_current_user),
     code: int = Body(...),
-    parent_category: int = Body(...),
+    parent_category: int | str = Body(...),
     name: str = Body(...),
     description: str = Body(...),
-    organization: int = Body(...),
-
-) -> Category:
+    organization: int = Body(...)
+):
     try:
         if not check_permission(
             session, "Create", "Catagory", current_user
@@ -70,52 +178,54 @@ def create_category(
         raise HTTPException(status_code=400, detail=str(e))
 
 # Get all categories
-@tr.get("/get-categories")
-def get_categories(
-    session: SessionDep,
-    current_user: User = Depends(get_current_user),
-) -> List[dict]:
-    try:
-        if not check_permission(
-            session, "Read", "Catagory", current_user
-            ):
-            raise HTTPException(
-                status_code=403, detail="You Do not have the required privilege"
-            )
+# @c.get("/get-categories")
+# def get_categories(
+#     session: SessionDep, 
+#     current_user: UserDep,
+#     tenant: str,
+# ) -> List[dict]:
+#     try:
+#         if not check_permission(
+#             session, "Read", "Catagory", current_user
+#             ):
+#             raise HTTPException(
+#                 status_code=403, detail="You Do not have the required privilege"
+#             )
 
-        organization_ids= get_organization_ids_by_scope_group(session, current_user)
+#         organization_ids= get_organization_ids_by_scope_group(session, current_user)
 
-        # Fetch categories based on organization IDs
-        db_categories = session.exec(
-            select(Category).where(Category.organization_id.in_(organization_ids))
-        ).all()
+#         # Fetch categories based on organization IDs
+#         db_categories = session.exec(
+#             select(Category).where(Category.organization_id.in_(organization_ids))
+#         ).all()
 
 
-        # Validate retrieved categories
-        if not db_categories:
-            raise HTTPException(status_code=404, detail="No categories found")
+#         # Validate retrieved categories
+#         if not db_categories:
+#             raise HTTPException(status_code=404, detail="No categories found")
         
-        catagory_list = []
+#         catagory_list = []
         
-        for db_category in db_categories:
-            catagory_list.append({
-                "id": db_category.id,
-                "Category Name": db_category.name,
-                "Parent Category": db_category.parent_category,
-                "UNSPC Code": db_category.code,
-                "Description": db_category.description,
-            })
+#         for db_category in db_categories:
+#             catagory_list.append({
+#                 "id": db_category.id,
+#                 "Category Name": db_category.name,
+#                 "Parent Category": db_category.parent_category,
+#                 "UNSPC Code": db_category.code,
+#                 "Description": db_category.description,
+#             })
 
-        return catagory_list
+#         return catagory_list
 
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+#     except Exception as e:
+#         raise HTTPException(status_code=400, detail=str(e))
     
-@tr.get("/get-category/{category_id}")
+@c.get("/get-category/{category_id}")
 def get_category(
+    session: SessionDep, 
+    current_user: UserDep,
+    tenant: str,
     category_id: int,
-    session: SessionDep,
-    current_user: User = Depends(get_current_user),
 ) -> Category:
     try:
         if not check_permission(
@@ -150,15 +260,17 @@ def get_category(
         raise HTTPException(status_code=400, detail=str(e))  
     
 # update a single category by ID
-@tr.put("/update-category")
+@c.put("/update-category-{category_id}")
 def update_category(
-    session: SessionDep,
-    current_user: User = Depends(get_current_user),
-    category_id: int = Body(...),
+    session: SessionDep, 
+    current_user: UserDep,
+    tenant: str,
+    category_id: int,
+
     updated_code: int = Body(...),
     updated_name: str = Body(...),
     updated_description: str = Body(...),
-    updated_parent_category: Optional[int] = Body(None),
+    updated_parent_category: int = Body(...),
     updated_organization: int = Body(...),
 ) -> Category:
     try:
@@ -210,11 +322,12 @@ def update_category(
 
 
 # Delete a category by ID
-@tr.delete("/archive-category/{category_id}")
+@c.delete("/archive-category/{category_id}")
 def delete_category(
+    session: SessionDep, 
+    current_user: UserDep,
+    tenant: str,
     category_id: int,
-    session: SessionDep,
-    current_user: User = Depends(get_current_user),
 ) :
     try:
         # Check permission

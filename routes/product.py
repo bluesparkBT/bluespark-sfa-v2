@@ -9,34 +9,82 @@ from utils.util_functions import validate_name
 from models.Account import User, AccessPolicy, Organization, OrganizationType, ScopeGroup, Scope, Role, ScopeGroupLink
 from utils.auth_util import get_current_user, get_tenant, check_permission
 from utils.get_hierarchy import get_organization_ids_by_scope_group
+from utils.form_db_fetch import fetch_product_id_and_name
+ProductRouter = pr = APIRouter()
 
 SessionDep = Annotated[Session, Depends(get_session)]
+UserDep = Annotated[dict, Depends(get_current_user)]
 
-ProductRouter = tr = APIRouter()
+@pr.get("/products-form")
+def get_product_form(
+    session: SessionDep, 
+    current_user: UserDep,
+    tenant: str,
+    category: Category ,
 
-@tr.post("/create-products")
-def create_product( session: SessionDep, 
-                    category: int = Body(...),
-                    organization: int = Body(...),
-                    sku: str = Body(...),
-                    name: str = Body(...),
-                    description: Optional[str] = Body(None),
-                    image: Optional[str] = Body(None),
-                    brand: Optional[str] = Body(None),  
-                    batch_number: Optional[str] = Body(None),
-                    code: Optional[str] = Body(None),
-                    price: Optional[float] = Body(None),
-                    unit: Optional[str] = Body(None),
-                    current_user: User = Depends(get_current_user),
+) :
+    try:
+        if not check_permission(
+            session, "Create", "Product", current_user
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
+        product_data = fetch_product_id_and_name(session)
+
+        # product_name = product_data.get("name")
+
+        product_name = list(product_data.values())
+
+
+        form_structure = {
+            "id": "",
+            "sku": "",
+            "name": "",
+            "description": "",
+            "image": "",
+            "brand": "",
+            "batch_number": "",
+            "code": "",
+            "price": "",
+            "unit": "",
+            "category": product_name ,
+        }
+
+        return {"data": form_structure, "html_types": get_html_types("product")}
+
+    except Exception as e:
+        # traceback.print_exc()
+        raise HTTPException(status_code=400, detail=str(e))
+            
+
+
+
+@pr.post("/create-products")
+def create_product(
+    session: SessionDep, 
+    current_user: UserDep,
+    tenant: str,
+    category: int = Body(...),
+    organization: int = Body(...),
+    sku: str = Body(...),
+    name: str = Body(...),
+    description: Optional[str] = Body(None),
+    image: Optional[str] = Body(None),
+    brand: Optional[str] = Body(None),  
+    batch_number: Optional[str] = Body(None),
+    code: Optional[str] = Body(None),
+    price: Optional[float] = Body(None),
+    unit: Optional[str] = Body(None),
 ):
         # Check if a product with the same SKU already exists (optional)
         try:
-            if not check_permission(
-                session, "Create", "Product", current_user
-                ):
-                raise HTTPException(
-                    status_code=403, detail="You Do not have the required privilege"
-                )
+            # if not check_permission(
+            #     session, "Create", "Product", current_user
+            #     ):
+            #     raise HTTPException(
+            #         status_code=403, detail="You Do not have the required privilege"
+            #     )
                 
                 # Validate SKU and Code uniqueness
             existing_product = session.exec(
@@ -85,10 +133,11 @@ def create_product( session: SessionDep,
             raise HTTPException(status_code=400, detail=str(e))
 
 # Get all products
-@tr.get("/get-products")
+@pr.get("/get-products")
 def get_products(
-    session: SessionDep,
-    current_user: User = Depends(get_current_user),
+    session: SessionDep, 
+    current_user: UserDep,
+    tenant: str,
 ) :
     try:
         if not check_permission(
@@ -126,11 +175,12 @@ def get_products(
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 # Get a product by ID
-@tr.get("/get-product/{product_id}")            
+@pr.get("/get-product/{product_id}")            
 def get_product(
+    session: SessionDep, 
+    current_user: UserDep,
+    tenant: str,
     product_id: int,
-    session: SessionDep,
-    current_user: User = Depends(get_current_user),
 ) :
     try:
         if not check_permission(
@@ -168,11 +218,12 @@ def get_product(
         raise HTTPException(status_code=400, detail=str(e))
     
 # Update a single product by ID
-@tr.put("/update-product/{product_id}") 
+@pr.put("/update-product/{product_id}") 
 def update_product(
+    session: SessionDep, 
+    current_user: UserDep,
+    tenant: str,
     product_id: int,
-    session: SessionDep,
-    current_user: User = Depends(get_current_user),
     sku: str = Body(...),
     name: str = Body(...),
     description: Optional[str] = Body(None),
@@ -205,7 +256,7 @@ def update_product(
             
         if not selected_product  :
             raise HTTPException(status_code=400, 
-                                detail="Product  already exists")
+                                detail="Product  is not found in your organization")
         # Validate the name
         if not validate_name(name):
             raise HTTPException(status_code=400, detail="Invalid product name")
@@ -246,11 +297,13 @@ def update_product(
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 # Delete a product by ID
-@tr.delete("/delete-product/{product_id}")
+@pr.delete("/delete-product/{product_id}")
 def delete_product(
+    session: SessionDep, 
+    current_user: UserDep,
+    tenant: str,
     product_id: int,
-    session: SessionDep,
-    current_user: User = Depends(get_current_user),
+ 
 ) :
     try:
         if not check_permission(
