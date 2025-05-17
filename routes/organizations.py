@@ -49,6 +49,7 @@ async def get_organizations(
                 "logo": org.logo_image,
                 "description": org.description,
                 "organization_type": org.organization_type,
+                "inheritance_group": org.inheritance_group,
                 "parent_organization": org.parent_id,
                 "scope_groups": [
                     {"id": sg.id, "scope_name": sg.scope_name}
@@ -243,8 +244,9 @@ async def create_organization(
     owner_name: str = Body(...),
     description: str = Body(...),
     logo_image: str = Body(...),
+    inheritance_group: int | str = Body(...),
     organization_type: str = Body(...),    
-    parent_organization: int = Body(...)
+    parent_organization: int | str = Body(...)
 ):
 
     try:
@@ -277,9 +279,12 @@ async def create_organization(
         existing_tenant.organization_name = organization_name
         existing_tenant.owner_name = owner_name
         existing_tenant.description = description
+        if inheritance_group:
+            existing_tenant.inheritance_group= inheritance_group
         existing_tenant.logo_image = logo_image
         existing_tenant.organization_type = organization_type
-        existing_tenant.parent_id = parent_organization
+        if parent_organization:
+            existing_tenant.parent_id = parent_organization
             
         session.add(existing_tenant)
         session.commit()
