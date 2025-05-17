@@ -188,7 +188,7 @@ def create_category(
         raise HTTPException(status_code=400, detail=str(e))
  
 # update a single category by ID
-@c.put("/update-category-{category_id}")
+@c.put("/update-category/{category_id}")
 def update_category(
     session: SessionDep, 
     current_user: UserDep,

@@ -16,7 +16,7 @@ InheritanceRouter =In= APIRouter()
 SessionDep = Annotated[Session, Depends(get_session)]
 UserDep = Annotated[dict, Depends(get_current_user)]
 
-@In.get("/get-inheritancies")
+@In.get("/get-inheritances")
 async def get_inheritance_groups(
     session: SessionDep,
     current_user: UserDep,    
@@ -34,7 +34,7 @@ async def get_inheritance_groups(
         if not inheritance_groups:
             raise HTTPException(status_code=404, detail="No inheritance groups found")
 
-        return {"data": inheritance_groups}
+        return inheritance_groups
 
     except Exception as e:
         traceback.format_exc()
