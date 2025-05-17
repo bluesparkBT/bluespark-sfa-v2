@@ -13,7 +13,7 @@ from utils.model_converter_util import get_html_types
 import traceback
 
 # frontend domain
-Domain= "http://172.0.0.1:8000"
+Domain= "http://172.10.10.203:5000"
 
 ServiceProvider =sp= APIRouter()
 SessionDep = Annotated[Session, Depends(get_session)]
