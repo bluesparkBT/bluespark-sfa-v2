@@ -43,7 +43,7 @@ def get_products(
         
         Product_list = []
         for db_product in db_products:
-            Product_list.append({
+            Product_temp= {
                 "id": db_product.id,
                 "Product Name": db_product.name,
                 "SKU": db_product.sku,
@@ -53,7 +53,9 @@ def get_products(
                 "Code": db_product.code,
                 "Price": db_product.price,
                 "Unit": db_product.unit,
-            })
+            }
+            if Product_temp not in Product_list:
+                Product_list.append(Product_temp)
         return Product_list
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

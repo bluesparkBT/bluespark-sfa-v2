@@ -52,14 +52,16 @@ def get_category(
 
         category_list = []
         for category in organization_categories:
-            category_list.append({
+            category_temp = {
                 "id": category.id,
                 "Category Name": category.name,
                 "Parent Category id": category.parent_category,
                 "Parent Category name": category.parent_category,
                 "UNSPC Code": category.code,
                 "Description": category.description,
-            })
+            }
+            if category_temp not in category_list:
+                category_list.append(category_temp)
 
         return category_list
 

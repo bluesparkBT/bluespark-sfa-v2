@@ -74,6 +74,9 @@ async def create_inheritance_group(
     current_user: UserDep,
     tenant : str,
     name: str = Body(...), 
+    products: int = Body(...),
+    category: int = Body(...)
+
 
 ):
     """
@@ -88,6 +91,7 @@ async def create_inheritance_group(
         
         new_group = InheritanceGroup(
             name=name
+
             )
         session.add(new_group)
         session.commit()
@@ -99,39 +103,42 @@ async def create_inheritance_group(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-#@In.post("/add-inheritance/")
-# async def add_inheritance_group(             
-#     session: SessionDep,
-#     current_user: UserDep,
-#     new_inheritance_id: int,
-#     name: str,
-#     new_category_id: int,
-#     new_product_id: int,
-# ):
-#     inheritance_group = session.exec(
-#             select(Organization.inheritance_group).where(Organization.id == current_user.organization_id)
-#         ).first()
-#     if not inheritance_group:
-#         raise HTTPException(status_code=404, detail="Inheritance group not found")
-#     check_category = session.exec(
-#             select(Category).where(Category.id == new_category_id)
-#         ).first()
-#     check_product = session.exec(
-#             select(Product).where(Product.id == new_product_id)
-#         ).first()
+@In.post("/add-inheritance/")
+async def add_inheritance_group(             
+    session: SessionDep,
+    current_user: UserDep,
+    tenant: str,
+    inheritance_id: int = Body(...),
+    category_id: int | str = Body(...),
+    product_id: int | str = Body(...),
+):
+    inheritance_group = session.exec(
+            select(Organization.inheritance_group).where(Organization.id == current_user.organization_id)
+        ).first()
+    if not inheritance_group:
+        raise HTTPException(status_code=404, detail="Inheritance group not found")
     
-#     if check_category.organization_id != None:
+    if category_id:
+        check_category = session.exec(
+                select(Category).where(Category.id == category_id)
+            ).first()
+        if check_category.organization_id != None:
+            category_link_status = add_category_link(session,inheritance_id, category_id)
+    else:
+        category_link_status = {"message": "catagory not defined"}
+    if product_id:
 
-#         add_category_link(session,new_inheritance_id, new_category_id)
- 
-#     if check_product.organization_id != None:
-#         add_product_link(session, new_inheritance_id, new_product_id)
+        check_product = session.exec(
+                select(Product).where(Product.id == product_id)
+            ).first()
+        if check_product.organization_id != None:
+            product_link_status = add_product_link(session, inheritance_id, product_id)
+    else:
+        product_link_status =  {"message": "product not defined"}
 
-
-    # Check if the inheritance group already existsi
     
   
-    #return {"message": "Inheritance group updated"}
+    return {"message": {"Category": category_link_status, "Product": product_link_status}}
 
 @In.put("/update-inheritance/{inheritance_id}")
 async def update_inheritance_group(
