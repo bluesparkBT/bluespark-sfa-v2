@@ -178,6 +178,7 @@ async def create_role(
         #create role module permission
         for module in modules:
             role_module_permission= RoleModulePermission(
+                id=None,
                 role_id=role.id,
                 module=module.value,
                 access_policy=AccessPolicy.deny

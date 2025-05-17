@@ -1,5 +1,6 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import List, Optional
+from models.Inheritance import ProductLink, CategoryLink
 
 class Product(SQLModel, table=True):
     __tablename__ = "product"
@@ -17,6 +18,9 @@ class Product(SQLModel, table=True):
     category_id: Optional[int] = Field(default=None, foreign_key="category.id", index=True)
     category: Optional["Category"] = Relationship(back_populates="products")
     organization_id: Optional[int] = Field(default=None, foreign_key="organization.id", index=True)
+    # inheritance_groups: List["InheritanceGroup"] = Relationship(back_populates="products", link_model=ProductLink)
+    stocks: List["Stock"] = Relationship(back_populates="product")
+
 
 
 class Category(SQLModel, table=True):
@@ -29,4 +33,13 @@ class Category(SQLModel, table=True):
     parent_category: (Optional[int]) = Field(foreign_key = "category.id")
     products: List["Product"] = Relationship(back_populates="category")
     organization_id: Optional[int] = Field(default=None, foreign_key="organization.id", index=True)
+    # inheritance_groups: List["InheritanceGroup"] = Relationship(back_populates="categories", link_model=CategoryLink)
+    category_stocks: List["Stock"] = Relationship(
+        back_populates="category",
+        sa_relationship_kwargs={"foreign_keys": "[Stock.category_id]"}
+    )
+    subcategory_stocks: List["Stock"] = Relationship(
+        back_populates="subcategory",
+        sa_relationship_kwargs={"foreign_keys": "[Stock.subcategory_id]"}
+    )
 

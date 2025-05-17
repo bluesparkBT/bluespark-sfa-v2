@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi import FastAPI
 from routes.util import UtilRouter
+from routes.warehouse import WarehouseRouter
 from starlette.status import HTTP_400_BAD_REQUEST
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -75,3 +76,4 @@ app.include_router(ProductRouter, prefix="/{tenant}/product", tags=["product"])
 app.include_router(RoleRouter, prefix="/{tenant}/role", tags=["role"])
 app.include_router(UtilRouter, prefix="/{tenant}/utility", tags=["utility"])
 app.include_router(ServiceProvider, tags=["service provider"])
+app.include_router(WarehouseRouter, prefix="/{tenant}/warehouse", tags=["warehouse"])

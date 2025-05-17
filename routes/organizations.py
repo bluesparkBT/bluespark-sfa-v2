@@ -149,7 +149,7 @@ async def get_form_fields_organization(
 
     try:
         if not check_permission(
-            session, "Read", "Administrative", current_user
+            session, "Read", "Organization", current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"

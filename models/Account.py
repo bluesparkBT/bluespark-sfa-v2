@@ -1,3 +1,4 @@
+from models.Warehouse import WarehouseStoreAdminLink
 from sqlmodel import SQLModel, Field, Relationship
 from enum import Enum
 from datetime import  datetime
@@ -43,6 +44,7 @@ class Organization(SQLModel, table=True):
         back_populates="organizations",
         link_model=ScopeGroupLink
     )
+    warehouses: Optional[List["Warehouse"]] = Relationship(back_populates="organization")
 class Gender(str, Enum):
     """
     Enum Class representing gender options.
@@ -123,7 +125,7 @@ class ModuleName(str, Enum):
 class RoleModulePermission(SQLModel, table=True):
     __tablename__ = "role_module_permission"
 
-    id: int = Field(primary_key=True)
+    id: Optional[int] = Field(default=None, primary_key=True)
     role_id: int = Field(foreign_key="role.id")
     module: str 
     access_policy: Optional[AccessPolicy] = Field(default=AccessPolicy.deny)
@@ -154,6 +156,15 @@ class User(SQLModel, table=True):
     id_type: Optional[IdType] = Field(default=None)
     id_number: Optional[str] = Field(default=None)    
     #address_id: Optional[int] = Field(default=None, foreign_key="address.id", index=True)
+    warehouses: Optional[List["Warehouse"]] = Relationship(back_populates="store_admins", link_model=WarehouseStoreAdminLink)
+    requester_warehouse_stops: List["WarehouseStop"] = Relationship(
+        back_populates="requester",
+        sa_relationship_kwargs={"foreign_keys": "[WarehouseStop.requester_id]"}
+    )
+    approver_warehouse_stops: List["WarehouseStop"] = Relationship(
+        back_populates="approver",
+        sa_relationship_kwargs={"foreign_keys": "[WarehouseStop.approver_id]"}
+    )
 
 
 
