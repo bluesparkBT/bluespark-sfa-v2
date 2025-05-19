@@ -25,12 +25,12 @@ def has_superadmin_created(
     session: SessionDep
 ) ->bool:
     existing_superadmin = session.exec(select(User).where(User.role_id == Role.id == "Super Admin")).first()
-    if existing_superadmin is not None:
+    if existing_superadmin:
+        print("Super admin and tenant already exisits")
         return True
     else: 
         return False
     
-
 
 @sp.post("/login/")
 def login(
@@ -40,10 +40,12 @@ def login(
     password: str = Body(...)
 ):
     try:
-        user = session.exec(select(User).where(User.username == tenant_users(username, tenant))).first()
+        user = session.exec(select(User).where(User.username == username)).first()
+        print("superadmin user is: ", user)
         
         if not user or not verify_password(password+user.username, user.hashedPassword):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+        
         access_token_expires = timedelta(minutes=90)
         token = create_access_token(
             data={
@@ -142,7 +144,8 @@ async def create_superadmin_user(
             modules.service_provider.value,
             modules.role.value,
             modules.administrative.value,
-            modules.scope_group.value
+            modules.scope_group.value,
+            modules.users.value
         ]
         for module in modules_to_grant: 
             role_module_permission= RoleModulePermission(
@@ -254,11 +257,10 @@ async def get_service_provider(
         traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
 
-@sp.get("/get-my-tenant/")
+@sp.get("/{tenant}/get-my-tenant/")
 async def get_my_tenant(
     session: SessionDep,
-    tenant: str,
-    
+    tenant: str,    
 ) -> dict:
     """
     Retrieve the organization information for the logged-in user.
@@ -275,8 +277,8 @@ async def get_my_tenant(
     """
     try:
         # Query the organization associated with the logged-in user
-        organization = session.exec(select(Organization).where(Organization.name == tenant)).first()
-        print(organization)
+        organization = session.exec(select(Organization).where(Organization.organization_name == tenant)).first()
+        print("the current tenant is ",organization)
         if not organization:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -322,6 +324,7 @@ async def get_tenants(
                 "company": tenant.organization_name,
                 "owner": tenant.owner_name,
                 "description": tenant.description,
+                "logo": tenant.logo_image
 
             }
             for tenant in all_tenants
@@ -417,8 +420,8 @@ async def create_tenant(
         #     select(Organization).where(Organization.organization_name == verify_tenant(tenant_name))
         # ).first()
         
-        if verify_tenant(tenant_name, hashed_tenant_name):
-            raise HTTPException(status_code=400, detail="Tenant already exists")
+        # if verify_tenant(tenant_name, hashed_tenant_name):
+        #     raise HTTPException(status_code=400, detail="Tenant already exists")
         
         hashed_tenant_name = get_tenant_hash(tenant_name) 
         tenant = Organization(
@@ -492,7 +495,7 @@ async def create_tenant(
 
         tenant_admin = User(
             username= tenant_users("admin", hashed_tenant_name),
-            fullname=f"{tenant_name} \System Admin",
+            fullname=f"{tenant_name} System Admin",
             email=f"{tenant_name.lower()}_admin@{tenant_name}.com",
             hashedPassword = hashed_password,
             organization_id=tenant.id,
@@ -507,8 +510,8 @@ async def create_tenant(
         return {
             "message": "Tenant and system admin created successfully",
             "tenant": tenant_name,
-            "Domain": f"{Domain}/{hashed_tenant_name}/signin/",
-            "user name":"admin",
+            "domain": f"{Domain}/{hashed_tenant_name}/signin/",
+            "user_name":"admin",
             "password": password 
         }
 

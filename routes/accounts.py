@@ -7,7 +7,7 @@ from db import get_session
 from models.Account import User, ScopeGroup, ScopeGroupLink, Organization, Gender, Scope, Role, AccessPolicy, IdType
 from utils.auth_util import verify_password, create_access_token, get_password_hash
 from utils.util_functions import validate_name, validate_email, validate_phone_number, parse_datetime_field, format_date_for_input, parse_enum
-from utils.auth_util import get_current_user, check_permission, generate_random_password, tenant_users
+from utils.auth_util import get_current_user, check_permission, generate_random_password, tenant_users, extract_username
 from utils.model_converter_util import get_html_types
 from utils.get_hierarchy import get_child_organization, get_organization_ids_by_scope_group
 from utils.form_db_fetch import fetch_organization_id_and_name, fetch_role_id_and_name, fetch_scope_group_id_and_name
@@ -30,6 +30,7 @@ def login(
 ):
     try:
         user = session.exec(select(User).where(User.username == tenant_users(username, tenant))).first()
+        print("tenant sytem admin user:", user)
 
         if not user or not verify_password(password+user.username, user.hashedPassword):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
@@ -59,7 +60,7 @@ async def get_my_user(
 ):
     try:
         if not check_permission(
-            session, "Read", "Users", current_user
+            session, "Read", ["Users", "Administrative"], current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
@@ -70,7 +71,7 @@ async def get_my_user(
         return {
             "id": user.id,
             "fullname": user.fullname,
-            "username": user.username,
+            "username": extract_username(user.username, tenant),
             "email": user.email,
             "phone_number": user.phone_number,
             "organization": user.organization_id,

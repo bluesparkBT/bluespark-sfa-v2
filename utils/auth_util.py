@@ -12,6 +12,7 @@ from sqlmodel import Session
 from models.Account import AccessPolicy, RoleModulePermission, Role, User, ModuleName
 from sqlmodel import select
 from typing import Literal
+import hashlib
 import traceback
 import string
 import random
@@ -37,17 +38,25 @@ def get_tenant(
 def tenant_users(username: str, tenant_name: str) -> str:
     return f"{tenant_name.lower()}_{username}"
 
+def extract_username(username: str, tenant_name: str) -> str:
+    prefix = f"{tenant_name.lower()}_"
+    if username.startswith(prefix):
+        return username[len(prefix):]
+    raise ValueError("Username does not match the given tenant prefix.")
+
+def get_tenant_hash(tenant_name: str) -> str:
+    return hashlib.sha256(tenant_name.encode('utf-8')).hexdigest()
+
+def verify_tenant(tenant_name: str, hashed_tenant_name: str) -> bool:
+    return bcrypt.checkpw(tenant_name.encode(), hashed_tenant_name.encode())
+
 def get_password_hash(password: str) -> str:
     return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
 def verify_password(password: str, hashed: str) -> bool:
     return bcrypt.checkpw(password.encode(), hashed.encode())
 
-def get_tenant_hash(tenant_name: str) -> str:
-    return bcrypt.hashpw(tenant_name.encode(), bcrypt.gensalt()).decode()
 
-def verify_tenant(tenant_name: str, hashed_tenant_name: str) -> bool:
-    return bcrypt.checkpw(tenant_name.encode(), hashed_tenant_name.encode())
 
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None):

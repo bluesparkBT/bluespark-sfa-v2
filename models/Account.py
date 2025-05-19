@@ -45,8 +45,9 @@ class Organization(SQLModel, table=True):
         back_populates="organizations",
         link_model=ScopeGroupLink
     )
-    warehouses: Optional[List["Warehouse"]] = Relationship(back_populates="organization"),
-    active: bool =Field(default= True, index=True)
+    active:Optional[bool] =Field(default= True, index=True)
+    warehouses: Optional[List["Warehouse"]] = Relationship(back_populates="organization")
+
     
 class Gender(str, Enum):
     """

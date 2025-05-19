@@ -15,6 +15,47 @@ TenantRouter =tr= APIRouter()
 SessionDep = Annotated[Session, Depends(get_session)]
 UserDep = Annotated[dict, Depends(get_current_user)]
 
+@tr.get("/get-my-tenant/")
+async def get_my_tenant(
+    session: SessionDep,
+    tenant: str,    
+) -> dict:
+    """
+    Retrieve the organization information for the logged-in user.
+
+    Args:
+        session (SessionDep): Database session.
+        current_user (User): The currently logged-in user.
+
+    Returns:
+        dict: organization information including name, id, owner name, and logo image.
+
+    Raises:
+        HTTPException: 404 if the organization is not found.
+    """
+    try:
+        # Query the organization associated with the logged-in user
+        organization = session.exec(select(Organization).where(Organization.organization_name == tenant)).first()
+        print("the current tenant is ",organization)
+        if not organization:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="tenant not found for the logged-in user",
+            )
+
+        # Return the organization information
+        return {
+            "id": organization.id,
+            "organization": organization.organization_name,
+            "owner": organization.owner_name,
+            "logo": organization.logo_image,
+        }
+        
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @tr.get("/get-organizations/")
 async def get_organizations(
     session: SessionDep,
