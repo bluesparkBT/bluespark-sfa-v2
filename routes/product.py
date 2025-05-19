@@ -1,15 +1,14 @@
-from typing import Annotated, List, Dict, Any, Optional
+from typing import Annotated
 from db import SECRET_KEY, get_session
 from sqlmodel import Session, select
-from fastapi import APIRouter, HTTPException, Body, status, Depends
+from fastapi import APIRouter, HTTPException, Body, Depends
 from db import get_session
 from utils.model_converter_util import get_html_types
-from models.Product import Product, Category
+from models.Product import Product
 from utils.util_functions import validate_name
-from models.Account import User, AccessPolicy, Organization, OrganizationType, ScopeGroup, Scope, Role, ScopeGroupLink
-from utils.auth_util import get_current_user, get_tenant, check_permission
+from utils.auth_util import get_current_user, check_permission
 from utils.get_hierarchy import get_organization_ids_by_scope_group
-from utils.form_db_fetch import fetch_category_id_and_name, fetch_organization_id_and_name
+from utils.form_db_fetch import fetch_category_id_and_name
 import traceback 
 ProductRouter = pr = APIRouter()
 
@@ -161,7 +160,6 @@ def create_product(
     price: float = Body(...),
     unit: str = Body(...)
 ):
-        # Check if a product with the same SKU already exists (optional)
         try:
             if not check_permission(
                 session, "Update",["Administrative", "Product"], current_user
@@ -171,11 +169,11 @@ def create_product(
                 )  
                 
                 # Validate SKU and Code uniqueness
-            existing_product = session.exec(
-                    select(Product).where(Product.code == code)
-                ).first()
-                
-            if existing_product:
+            organization_ids = get_organization_ids_by_scope_group(session, current_user)
+            db_category_code = session.exec(
+            select(Product.code).where(Product.organization_id.in_(organization_ids), Product.code == code)
+        ).first()
+            if db_category_code:
                 raise HTTPException(status_code=400, 
                                     detail="Product  already exists")
             # Validate the name

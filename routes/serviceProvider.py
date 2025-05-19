@@ -8,16 +8,29 @@ from models.Account import User, ScopeGroup, ScopeGroupLink, Organization, Organ
 from models.Account import ModuleName as modules
 from utils.auth_util import verify_password, create_access_token, get_password_hash
 from utils.util_functions import validate_name, validate_email, validate_phone_number, parse_enum
-from utils.auth_util import get_current_user, check_permission, generate_random_password
+from utils.auth_util import get_current_user, check_permission, generate_random_password, get_tenant_hash, verify_tenant, tenant_users
 from utils.model_converter_util import get_html_types
 import traceback
 
 # frontend domain
 Domain= "http://172.10.10.203:5000"
+service_provider_company = "Bluespark"
 
 ServiceProvider =sp= APIRouter()
 SessionDep = Annotated[Session, Depends(get_session)]
 UserDep = Annotated[dict, Depends(get_current_user)]
+
+@sp.get("/has-superadmin")
+def has_superadmin_created(
+    session: SessionDep
+) ->bool:
+    existing_superadmin = session.exec(select(User).where(User.role_id == Role.id == "Super Admin")).first()
+    if existing_superadmin is not None:
+        return True
+    else: 
+        return False
+    
+
 
 @sp.post("/login/")
 def login(
@@ -26,9 +39,8 @@ def login(
     username: str = Body(...),
     password: str = Body(...)
 ):
-    
     try:
-        user = session.exec(select(User).where(User.username == username)).first()
+        user = session.exec(select(User).where(User.username == tenant_users(username, tenant))).first()
         
         if not user or not verify_password(password+user.username, user.hashedPassword):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
@@ -51,22 +63,29 @@ def login(
 @sp.post("/create-superadmin/")
 async def create_superadmin_user(
     session: SessionDep,
-
     username: str = Body(...),
     email: str = Body(...),
     password: str = Body(...),
-    service_provider_company: str = Body(...),
 ):
     try:
-        existing_superadmin = session.exec(select(User).where(User.username== username)).first()
+        # existing_service_provider = session.exec(select(Organization).where(Organization.organization_name == "Bluespark"))
+        # if existing_service_provider:
+        #     print("Exisitng service provider: ", existing_service_provider)
+        #     raise HTTPException(
+        #         status_code=status.HTTP_400_BAD_REQUEST,
+        #         detail="Service Provider already registered",
+        #     )
+            
+        existing_superadmin = session.exec(select(User).where(User.role_id == Role.id == "Super Admin")).first()
         if existing_superadmin is not None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Superadmin already registered",
             )
-        
+
         service_provider = Organization(
-            organization_name=service_provider_company,
+            organization_name= "Bluespark",
+            owner_name = "Mekonen",
             organization_type = OrganizationType.service_provider.value
         )
 
@@ -88,17 +107,17 @@ async def create_superadmin_user(
             session.refresh(service_provider_scope_group)
 
         # Check if System Admin Scope group exists
-        system_admin_scope_group = session.exec(
-            select(ScopeGroup).where(ScopeGroup.scope_name == "System Admin Scope")
-        ).first()
+        # system_admin_scope_group = session.exec(
+        #     select(ScopeGroup).where(ScopeGroup.scope_name == "System Admin Scope")
+        # ).first()
         
-        if not system_admin_scope_group:        
-            tenant_scope_group = ScopeGroup(
-                scope_name="System Admin Scope",
-            )
-            session.add(tenant_scope_group)
-            session.commit()
-            session.refresh(tenant_scope_group)
+        # if not system_admin_scope_group:        
+        #     tenant_scope_group = ScopeGroup(
+        #         scope_name="System Admin Scope",
+        #     )
+        #     session.add(tenant_scope_group)
+        #     session.commit()
+        #     session.refresh(tenant_scope_group)
         
         scope_group_link = ScopeGroupLink(
             scope_group_id=service_provider_scope_group.id,
@@ -123,6 +142,7 @@ async def create_superadmin_user(
             modules.service_provider.value,
             modules.role.value,
             modules.administrative.value,
+            modules.scope_group.value
         ]
         for module in modules_to_grant: 
             role_module_permission= RoleModulePermission(
@@ -187,10 +207,11 @@ async def delete_superadmin_user(
         traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
 
-@sp.get("/get-my-tenant/")
-async def get_my_tenant(
+@sp.get("/get-service-provider/")
+async def get_service_provider(
     session: SessionDep,
     current_user: User = Depends(get_current_user),
+    
 ) -> dict:
     """
     Retrieve the organization information for the logged-in user.
@@ -219,6 +240,47 @@ async def get_my_tenant(
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="organization not found for the logged-in user",
+            )
+
+        # Return the organization information
+        return {
+            "id": organization.id,
+            "organization": organization.organization_name,
+            "owner": organization.owner_name,
+            "logo": organization.logo_image,
+        }
+        
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=400, detail=str(e))
+
+@sp.get("/get-my-tenant/")
+async def get_my_tenant(
+    session: SessionDep,
+    tenant: str,
+    
+) -> dict:
+    """
+    Retrieve the organization information for the logged-in user.
+
+    Args:
+        session (SessionDep): Database session.
+        current_user (User): The currently logged-in user.
+
+    Returns:
+        dict: organization information including name, id, owner name, and logo image.
+
+    Raises:
+        HTTPException: 404 if the organization is not found.
+    """
+    try:
+        # Query the organization associated with the logged-in user
+        organization = session.exec(select(Organization).where(Organization.name == tenant)).first()
+        print(organization)
+        if not organization:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="tenant not found for the logged-in user",
             )
 
         # Return the organization information
@@ -350,18 +412,22 @@ async def create_tenant(
             raise HTTPException(
                 status_code=403, detail="You do not have the required privilege"
             )
-        existing_tenant = session.exec(
-            select(Organization).where(Organization.organization_name == tenant_name)
-        ).first()
-        if existing_tenant:
+            
+        # existing_tenant = session.exec(
+        #     select(Organization).where(Organization.organization_name == verify_tenant(tenant_name))
+        # ).first()
+        
+        if verify_tenant(tenant_name, hashed_tenant_name):
             raise HTTPException(status_code=400, detail="Tenant already exists")
-
+        
+        hashed_tenant_name = get_tenant_hash(tenant_name) 
         tenant = Organization(
-            organization_name=tenant_name,
+            organization_name = hashed_tenant_name,
             owner_name = owner_name,
             description=description,
             logo_image=logo_image,
-            organization_type=OrganizationType.company.value
+            organization_type=OrganizationType.company.value,
+            tenant_domain = f"{Domain}/{hashed_tenant_name}"
         )
         session.add(tenant)
         session.commit()
@@ -388,9 +454,8 @@ async def create_tenant(
         session.add(scope_group_link)
         session.commit()
 
-        role_name = f"{tenant_name} System Admin"
         role = Role(
-            name=role_name,
+            name=f"{tenant_name} System Admin",
             organization_id=tenant.id,
         )
         session.add(role)
@@ -398,29 +463,36 @@ async def create_tenant(
         session.refresh(role)
 
         # List of modules the tenatn system Admin should have access to
-        modules_to_grant = [
-            modules.organization.value,
-            modules.role.value,
-            modules.administrative.value,
-            modules.users.value,
+        # modules_to_grant = [
+        #     modules.organization.value,
+        #     modules.role.value,
+        #     modules.administrative.value,
+        #     modules.users.value,
             
-        ]
-        for module in modules_to_grant: 
-            role_module_permission= RoleModulePermission(
+        # ]
+        # for module in modules_to_grant: 
+        #     role_module_permission= RoleModulePermission(
+        #         role_id=role.id,
+        #         module=module,
+        #         access_policy=AccessPolicy.manage
+        #     )
+        #     session.add(role_module_permission)
+        # session.commit()
+
+        for mod in modules:
+            role_module_permission = RoleModulePermission(
                 role_id=role.id,
-                module=module,
+                module=mod.value,
                 access_policy=AccessPolicy.manage
             )
             session.add(role_module_permission)
-        session.commit()
-        
         
         password = generate_random_password()
-        hashed_password = get_password_hash(password + f"{tenant_name.lower()}_admin")
+        hashed_password = get_password_hash(password + tenant_users("admin", hashed_tenant_name))
 
         tenant_admin = User(
-            username=f"{tenant_name.lower()}_admin",
-            fullname=f"{tenant_name} Admin",
+            username= tenant_users("admin", hashed_tenant_name),
+            fullname=f"{tenant_name} \System Admin",
             email=f"{tenant_name.lower()}_admin@{tenant_name}.com",
             hashedPassword = hashed_password,
             organization_id=tenant.id,
@@ -434,9 +506,10 @@ async def create_tenant(
         
         return {
             "message": "Tenant and system admin created successfully",
-            "tenant": f"/{Domain}/{tenant_name}/signin/",
-            "admin_username": tenant_admin.username,
-            "admin_password": password 
+            "tenant": tenant_name,
+            "Domain": f"{Domain}/{hashed_tenant_name}/signin/",
+            "user name":"admin",
+            "password": password 
         }
 
     except Exception as e:

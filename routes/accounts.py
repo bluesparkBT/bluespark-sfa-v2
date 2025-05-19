@@ -7,12 +7,13 @@ from db import get_session
 from models.Account import User, ScopeGroup, ScopeGroupLink, Organization, Gender, Scope, Role, AccessPolicy, IdType
 from utils.auth_util import verify_password, create_access_token, get_password_hash
 from utils.util_functions import validate_name, validate_email, validate_phone_number, parse_datetime_field, format_date_for_input, parse_enum
-from utils.auth_util import get_tenant, get_current_user, check_permission, generate_random_password
+from utils.auth_util import get_current_user, check_permission, generate_random_password, tenant_users
 from utils.model_converter_util import get_html_types
 from utils.get_hierarchy import get_child_organization, get_organization_ids_by_scope_group
 from utils.form_db_fetch import fetch_organization_id_and_name, fetch_role_id_and_name, fetch_scope_group_id_and_name
 import traceback
 
+Domain= "http://172.10.10.203:5000"
 
 AuthenticationRouter =ar= APIRouter()
 SessionDep = Annotated[Session, Depends(get_session)]
@@ -28,8 +29,7 @@ def login(
     password: str = Body(...)
 ):
     try:
-        user = session.exec(select(User).where(User.username == username)).first()
-        print(user)
+        user = session.exec(select(User).where(User.username == tenant_users(username, tenant))).first()
 
         if not user or not verify_password(password+user.username, user.hashedPassword):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
@@ -55,7 +55,6 @@ async def get_my_user(
     session: SessionDep,
     current_user: UserDep,
     tenant: str,
-    user_id: int,   
 
 ):
     try:
@@ -65,7 +64,7 @@ async def get_my_user(
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-        user = session.exec(select(User).where(User.id == user_id)).first()
+        user = session.exec(select(User).where(User.id == current_user.id)).first()
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
         return {
@@ -210,7 +209,7 @@ async def create_user(
     tenant: str,
 
     full_name: str = Body(...),
-    username: str = Body(...),
+    user_name: str = Body(...),
     email: str = Body(...),
     role: int = Body(...),
     scope: str = Body(...),
@@ -228,7 +227,7 @@ async def create_user(
                 status_code=403, detail="You Do not have the required privilege"
             )
             
-        existing_user = session.exec(select(User).where(User.username == username)).first()
+        existing_user = session.exec(select(User).where(User.username == user_name)).first()
         if existing_user:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -254,13 +253,13 @@ async def create_user(
         # Generate and hash password
 
         password = generate_random_password()
-        hashed_password = get_password_hash(password + username)
+        hashed_password = get_password_hash(password + user_name)
 
         
         new_user = User(
             id= None,
             fullname=full_name,
-            username=username,
+            username= tenant_users(user_name, tenant),
             email=email,
             phone_number=phone_number,
             hashedPassword = hashed_password,
@@ -277,7 +276,9 @@ async def create_user(
 
         return {
             "message": "User registered successfully",
-            "temporary_password": password }
+            "Domain" : f"Domain/{tenant}/signin",
+            "username": user_name,
+            "password": password }
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))

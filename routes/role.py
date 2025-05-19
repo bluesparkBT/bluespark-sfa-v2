@@ -155,7 +155,7 @@ async def create_role(
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-       
+       #check exisiting role
         role_name = role_data.get("name")
 
         if validate_name(role_name) == False:

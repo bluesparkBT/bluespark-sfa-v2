@@ -45,9 +45,13 @@ app.add_middleware(
 )
 @app.middleware("http")
 async def extract_tenant(request: Request, call_next):
-    parts = request.url.path.strip("/").split("/")
-    if parts:
-        request.state.tenant = parts[0]
+    path_parts = request.url.path.strip("/").split("/")
+    # if parts:
+    #     request.state.tenant = parts[0]
+    if len(path_parts) > 0:
+        request.state.tenant = path_parts[0]
+    else:
+        request.state.tenant = None
     response = await call_next(request)
     return response
 

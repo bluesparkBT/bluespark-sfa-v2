@@ -4,7 +4,7 @@ from sqlmodel import select, Session
 from sqlalchemy.orm import selectinload
 from db import get_session
 from models.Account import User, Organization, OrganizationType, ScopeGroup, Scope, Role, ScopeGroupLink
-from utils.auth_util import get_tenant, get_current_user, check_permission
+from utils.auth_util import get_current_user, check_permission
 from utils.model_converter_util import get_html_types
 from utils.util_functions import validate_name, validate_image
 from utils.get_hierarchy import get_organization_ids_by_scope_group
@@ -225,6 +225,13 @@ async def create_organization(
         session.add(organization)
         session.commit()
         session.refresh(organization)
+
+        scope_group_link = ScopeGroupLink(
+            scope_group_id=current_user.scope_group_id,
+            organization_id=organization.id,
+        )
+        session.add(scope_group_link)
+        session.commit()
         
         return {"message": "Organization created successfully", "organization": organization_name}
     

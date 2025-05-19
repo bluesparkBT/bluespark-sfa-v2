@@ -8,7 +8,7 @@ from sqlmodel import Session, select
 from db import SECRET_KEY, get_session
 from models.Warehouse import RequestStatus, RequestType, LogType, StockLog, StockType, Warehouse, WarehouseStop, WarehouseStoreAdminLink, Stock, Vehicle
 from models.Account import User
-from utils.auth_util import get_tenant, get_current_user, check_permission
+from utils.auth_util import get_current_user, check_permission
 from utils.model_converter_util import get_html_types
 from utils.util_functions import validate_name, parse_enum, parse_datetime_field, format_date_for_input
 from utils.form_db_fetch import fetch_organization_id_and_name, fetch_user_id_and_name, fetch_product_id_and_name,fetch_category_id_and_name, fetch_warehouse_id_and_name, fetch_vehicle_id_and_name, fetch_stocks_id_and_name

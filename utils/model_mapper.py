@@ -113,6 +113,9 @@ MODEL_HTML_TYPES = {
         "category": "select",
         "organization_id": "hidden"
     },
-    
+    "inheritance": {
+        "id": "hidden",
+        "name": "text"
+    }
 
 }

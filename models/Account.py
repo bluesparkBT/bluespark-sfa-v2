@@ -36,6 +36,7 @@ class Organization(SQLModel, table=True):
     organization_name: str = Field(index=True)
     owner_name: Optional[str] = Field(default=None,index=True)
     logo_image: Optional[str] = Field(default=None)
+    tenant_domain: Optional[str] =Field()
     description: Optional[str] = Field(default=None, index=True)
     organization_type: OrganizationType = Field(default=OrganizationType.company)
     parent_id: Optional[int] = Field(default=None,  foreign_key="organization.id")
@@ -44,7 +45,9 @@ class Organization(SQLModel, table=True):
         back_populates="organizations",
         link_model=ScopeGroupLink
     )
-    warehouses: Optional[List["Warehouse"]] = Relationship(back_populates="organization")
+    warehouses: Optional[List["Warehouse"]] = Relationship(back_populates="organization"),
+    active: bool =Field(default= True, index=True)
+    
 class Gender(str, Enum):
     """
     Enum Class representing gender options.
@@ -109,6 +112,7 @@ class ModuleName(str, Enum):
     organization = "Organization"
     sales = "Sales"
     stock = "Stock"
+    scope_group = "Scope Group"
     role = "Role"
     route = "Route"
     route_schedule = "Route Schedule"
