@@ -45,7 +45,7 @@ async def get_roles(
             permissions = ""
             for perm in role.permissions:
                 if(perm.access_policy != "deny"):
-                    permissions += perm.module+"("+perm.access_policy+"),"
+                    permissions += perm.module+"("+perm.access_policy+"), "
             filtered_data.append({
                 "id": role.id,
                 "role_name": role.name,
@@ -176,11 +176,36 @@ async def create_role(
         session.refresh(role)
    
         #create role module permission
-        for module in modules:
+        modules_to_grant = [
+            modules.administrative.value,
+            modules.address.value,
+            modules.category.value,
+            modules.dashboard.value,
+            modules.deposit.value,
+            modules.finance.value,
+            modules.product.value,
+            modules.penetration.value,
+            modules.presales.value,
+            modules.order.value,
+            modules.role.value,
+            modules.scope_group.value,
+            modules.users.value,
+            modules.inheritance.value,
+            modules.sales.value,
+            modules.organization.value,
+            modules.territory.value,
+            modules.route.value,
+            modules.stock.value,
+            modules.warehouse_stop.value,
+            modules.warehouse.value,
+            #add more 
+            
+        ]
+        for module in modules_to_grant: 
             role_module_permission= RoleModulePermission(
                 id=None,
                 role_id=role.id,
-                module=module.value,
+                module=module,
                 access_policy=AccessPolicy.deny
             )
 

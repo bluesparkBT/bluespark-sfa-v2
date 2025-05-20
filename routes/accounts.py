@@ -29,7 +29,9 @@ def login(
     password: str = Body(...)
 ):
     try:
-        user = session.exec(select(User).where(User.username == tenant_users(username, tenant))).first()
+        current_tenant = session.exec(select(Organization).where(Organization.tenant_hashed == tenant)).first()
+        print("the organization get from", current_tenant)
+        user = session.exec(select(User).where(User.username == tenant_users(username, current_tenant.organization_name))).first()
         print("tenant sytem admin user:", user)
 
         if not user or not verify_password(password+user.username if username == "admin" else password+username, user.hashedPassword):
@@ -68,11 +70,22 @@ async def get_my_user(
         user = session.exec(select(User).where(User.id == current_user.id)).first()
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
+        
+        # Determine if it's the service provider (super admin)
+        if not tenant or tenant.lower() == "provider":
+            username_display = user.username
+        else:
+            current_tenant = session.exec(
+                select(Organization).where(Organization.tenant_hashed == tenant)
+            ).first()
+            if not current_tenant:
+                raise HTTPException(status_code=404, detail="Tenant not found")
+            username_display = extract_username(user.username, current_tenant.organization_name)
+
         return {
             "id": user.id,
             "fullname": user.fullname,
-            "username": extract_username(user.username, tenant),
-            "email": user.email,
+            "username": username_display,
             "phone_number": user.phone_number,
             "organization": user.organization_id,
             "role_id": user.role_id,
@@ -251,6 +264,9 @@ async def create_user(
                 detail="Phone number is not valid",
         )
             
+        current_tenant = session.exec(select(Organization).where(Organization.tenant_hashed == tenant)).first()
+        print("the organization get from", current_tenant)   
+               
         # Generate and hash password
         user_name = username
 
@@ -261,7 +277,7 @@ async def create_user(
         new_user = User(
             id= None,
             fullname=full_name,
-            username= tenant_users(user_name, tenant),
+            username= tenant_users(user_name, current_tenant.organization_name),
             email=email,
             phone_number=phone_number,
             hashedPassword = hashed_password,
