@@ -5,6 +5,8 @@ from utils.form_db_fetch import add_category_link, add_product_link
 from db import SECRET_KEY, get_session
 from models.Account import User, AccessPolicy, Organization, OrganizationType, ScopeGroup, Scope, Role, ScopeGroupLink
 from models.Product import Product, Category
+from utils.model_converter_util import get_html_types
+
 from utils.form_db_fetch import get_organization_ids_by_scope_group
 import traceback
 
@@ -41,6 +43,35 @@ async def get_inheritance_groups(
         raise HTTPException(status_code=400, detail=str(e))
 
 @In.get("/get-inheritance/{inheritance_id}")
+
+@In.get("/inheritance-form/")
+def het_inheritance_form(
+     tenant: str,
+    session: SessionDep,
+    current_user: UserDep,   
+):
+    try:
+        # Check permission
+        if not check_permission(
+            session, "Create",["Administrative", "Inheritance"], current_user
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )   
+
+        form_structure = {
+            "id": "",
+            "name": "",
+            # "parent_category": fetch_category_id_and_name(session, current_user),
+      } 
+
+        return {"data": form_structure, "html_types": get_html_types("Inheritance")}
+
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=400, detail=str(e))    
+
+
 async def get_inheritance_group(
     session: SessionDep,
     current_user: UserDep,
@@ -79,8 +110,7 @@ async def create_inheritance_group(
 
 
 ):
-    """
-    """
+ 
     try:
         if not check_permission(
             session, "Create", ["Inheritance", "Administrative"], current_user

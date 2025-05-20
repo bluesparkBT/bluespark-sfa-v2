@@ -12,7 +12,7 @@ class Product(SQLModel, table=True):
     image: Optional[str] = Field(default=None)
     brand: Optional[str] = Field(default=None, index=True)
     batch_number: Optional[str] = Field(default=None, index=True)
-    code: Optional[str] = Field(default=None, index=True)
+    code: str = Field(default=None, index=True)
     price: float = Field(default=None)
     unit: Optional[str] = Field(default=None)
     category_id: Optional[int] = Field(default=None, foreign_key="category.id", index=True)
@@ -24,10 +24,10 @@ class Product(SQLModel, table=True):
 
 
 class Category(SQLModel, table=True):
-    __tablename__ = "category"
+    __tablename__ = "category"  
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    code: int = Field(default=None, index=True)
+    code: str = Field(default=None, index=True)
     name: str = Field(default=None, index=True)
     description: Optional[str] = Field(default=None)
     parent_category: Optional [int] = Field(foreign_key = "category.id")

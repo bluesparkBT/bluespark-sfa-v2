@@ -8,6 +8,8 @@ from models.Product import Product, Category
 from models.Inheritance import InheritanceGroup
 from utils.util_functions import validate_name
 from models.Account import Organization
+from models.Account import User, ScopeGroup, ScopeGroupLink, Organization, Gender, Scope, Role, AccessPolicy, IdType
+
 from utils.auth_util import get_current_user, check_permission
 from utils.get_hierarchy import get_organization_ids_by_scope_group
 from utils.form_db_fetch import fetch_category_id_and_name, fetch_organization_id_and_name
@@ -29,6 +31,12 @@ def get_category(
 ):
     
     try: 
+        if not check_permission(
+            session, "Update",["Administrative", "Product"], current_user
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )  
         # Fetch the inheritance group from the organization
         inherited_group_id = session.exec(
             select(Organization.inheritance_group).where(Organization.id == current_user.organization_id)
@@ -43,8 +51,18 @@ def get_category(
         else:
             inherited_categories = []
         # Fetch products associated with the inheritance group
+
+        
+        # organization_ids = get_organization_ids_by_scope_group(session, current_user)
+        scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == current_user.scope_group_id)).first()
+   
+        if scope_group != None:
+            existing_orgs = [organization.id for organization in scope_group.organizations ]
+        if scope_group == None:
+            existing_orgs= []
+
         organization_categories = session.exec(
-            select(Category).where(Category.organization_id == current_user.organization_id)
+            select(Category).where(Category.organization_id.in_(existing_orgs))
         ).all()
         # categories = organization_group.categories
 
@@ -141,24 +159,28 @@ def create_category(
     tenant: str,
     current_user: UserDep,
     name: str = Body(...),
-    code: int = Body(...),
+    code: str = Body(...),
     description: str = Body(...),
-    parent_category: Optional [int] = Body(...),
+    # parent_category: Optional [int] = Body(...),
     organization: int = Body(...)
 ):
     try:
+        
         if not check_permission(
             session, "Create",[ "Catagory", "Administrative"], current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-            
-        existing_category = session.exec(
-                    select(Category).where(Category.code == code)
-                ).first()
+        organization_ids = get_organization_ids_by_scope_group(session, current_user)
+        db_category_code = session.exec(
+            select(Category.code).where(Category.organization_id.in_(organization_ids), Category.code == code)
+        ).first()
+        # existing_category = session.exec(
+        #             select(Category).where(Category.code == code)
+        #         ).first()
         
-        if existing_category:
+        if db_category_code:
             raise HTTPException(status_code=400, detail="Category with this code already exists")
        
 
@@ -174,8 +196,7 @@ def create_category(
         new_category = Category(
             code=code, 
             name=name, 
-            parent_category=parent_category,
-            description=description,
+#            description=description,
             organization_id=organization,
             
             )
@@ -197,10 +218,10 @@ def update_category(
     tenant: str,
     category_id: int,
 
-    updated_code: int = Body(...),
+    updated_code: str = Body(...),
     updated_name: str = Body(...),
     updated_description: str = Body(...),
-    updated_parent_category: int = Body(...),
+    # updated_parent_category: int = Body(...),
     updated_organization: int = Body(...),
 ):
     try:
@@ -232,8 +253,11 @@ def update_category(
         selected_category.name = updated_name
         selected_category.code = updated_code
         selected_category.description = updated_description
-        selected_category.parent_category = updated_parent_category
-        selected_category.organization_id = updated_organization
+        # selected_category.parent_category = updated_parent_category
+        if updated_organization == organization_ids:
+            selected_category.organization_id = updated_organization
+        else:
+            {"message": "invalid input select your owen organization id"}    
  
         # Commit the changes and refresh the object
         session.add(selected_category)

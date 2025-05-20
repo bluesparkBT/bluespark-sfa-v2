@@ -226,6 +226,15 @@ async def create_organization(
         session.commit()
         session.refresh(organization)
         
+    
+        # Link the System Admin ScopeGroup to the tenant organization
+        scope_group_link = ScopeGroupLink(
+            scope_group_id=current_user.scope_group_id,
+            organization_id=organization.id,
+        )
+        session.add(scope_group_link)
+        session.commit()
+
         return {"message": "Organization created successfully", "organization": organization_name}
     
     except Exception as e:
