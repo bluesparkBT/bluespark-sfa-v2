@@ -19,7 +19,9 @@ class ScopeGroup(SQLModel, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     scope_name: str = Field(index=True, unique=True)
+    parent_id: Optional[int] = Field(foreign_key="organization.id", default=None)
     organizations: List["Organization"] = Relationship(back_populates="scope_groups", link_model=ScopeGroupLink)
+    parent_organization: Optional["Organization"] = Relationship(back_populates="parent_scope_groups")
 
 class OrganizationType(str, Enum):
     service_provider = "Service Provider"
@@ -47,6 +49,7 @@ class Organization(SQLModel, table=True):
     )
     active:Optional[bool] =Field(default= True, index=True)
     warehouses: Optional[List["Warehouse"]] = Relationship(back_populates="organization")
+    parent_scope_groups: Optional[List["ScopeGroup"]] = Relationship(back_populates="parent_organization")
 
     
 class Gender(str, Enum):

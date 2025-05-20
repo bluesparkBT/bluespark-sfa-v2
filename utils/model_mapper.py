@@ -25,6 +25,7 @@ MODEL_HTML_TYPES = {
     },
     "scope_organization":{
         "scope_id":"hidden",
+        "parent_organization": "checkbox",
         "organizations": "hierarchical-checkbox"
 
     },
