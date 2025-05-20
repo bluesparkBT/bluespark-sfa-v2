@@ -281,7 +281,7 @@ async def get_my_tenant(
     """
     try:
         # Query the organization associated with the logged-in user
-        organization = session.exec(select(Organization).where(Organization.organization_name == tenant)).first()
+        organization = session.exec(select(Organization).where(Organization.tenant_hashed == tenant)).first()
         print("the current tenant is ",organization)
         if not organization:
             raise HTTPException(
