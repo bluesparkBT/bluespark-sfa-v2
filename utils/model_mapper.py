@@ -1,19 +1,20 @@
 MODEL_HTML_TYPES = {
 
-    "Organization": {
+    "organization": {
         "id": "hidden",
         "organization_name": "text",
+        "tenant_name":"text",
         "owner_name": "text",
         "description": "textarea",
         "logo_image": "file",
         "parent_organization": "select",
         "organization_type": "select",
     },
-    "Role":{
+    "role":{
         "id":"hidden",
         "name":"text",
     },
-    "Policy":{
+    "policy":{
         "role_id":"hidden",
         "module":"select",
         "policy":"radio"
@@ -21,7 +22,11 @@ MODEL_HTML_TYPES = {
     "scope_group":{
         "id":"hidden",
         "name":"text",
+    },
+    "scope_organization":{
+        "scope_id":"hidden",
         "organizations": "hierarchical-checkbox"
+
     },
     "user": {
         "id": "hidden",
@@ -43,8 +48,74 @@ MODEL_HTML_TYPES = {
         "gender": "select",
         "password": "text"
     },
-    "scope_organization":{
-        "scope_id":"hidden",
-        "organizations":"checkbox",
+    "address": {
+        "id": "hidden",
+        "country": "text",
+        "city": "text",
+        "sub_city": "text",
+        "woreda": "text",
+        "landmark": "text",
     },
+    "location": {
+        "id": "hidden",
+        "name": "text",
+        "address": "select",
+        "latitude": "number",
+        "longitude": "number",
+    },
+    "warehouse":{
+        "id":"hidden",
+        "warehouse_name":"text",
+        "organization":"select",
+        "location":"text"
+    },
+     "warehouse_storeadmin":{
+        "warehouse_id":"hidden",
+        "store_admin": "checkbox"
+    },
+    "stock":{
+        "id":"hidden",
+        "warehouse":"select",
+        "product":"select",
+        "category":"select",
+        "sub_category": "select",
+        "quantity": "number",
+        "stock_type": "select"
+    },
+    "warehouse_stop":{
+        "id":"hidden",
+        "request_type":"select",
+        "vehicle":"select",
+        "stock": "select",
+        "quantity": "number",
+        "stock_type": "select"
+    },
+    "category": {
+        "id": "hidden",
+        "name": "text",
+        "UNSPC Code": "text",
+        "description": "textarea",
+        "image": "file",
+        "parent_category": "select",
+        "organization_id": "select"
+    },
+    "product": {
+        "id": "hidden",
+        "sku": "text",
+        "name": "text",
+        "description": "textarea",
+        "image": "file",
+        "brand": "text",
+        "batch_number": "text",
+        "code": "text",
+        "price": "number",
+        "unit": "text",
+        "category": "select",
+        "organization_id": "hidden"
+    },
+    "inheritance": {
+        "id": "hidden",
+        "name": "text"
+    }
+
 }

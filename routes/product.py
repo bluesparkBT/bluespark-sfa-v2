@@ -1,176 +1,306 @@
-from typing import Annotated, List, Dict, Any, Optional
+from typing import Annotated
 from db import SECRET_KEY, get_session
 from sqlmodel import Session, select
-from fastapi import APIRouter, HTTPException, Body, status, Depends
+from fastapi import APIRouter, HTTPException, Body, Depends
 from db import get_session
-from models.Product import Product, Category
+from utils.model_converter_util import get_html_types
+from models.Product import Product
 from utils.util_functions import validate_name
+from utils.auth_util import get_current_user, check_permission
+from utils.get_hierarchy import get_organization_ids_by_scope_group
+from utils.form_db_fetch import fetch_category_id_and_name
+import traceback 
+ProductRouter = pr = APIRouter()
 
 SessionDep = Annotated[Session, Depends(get_session)]
+UserDep = Annotated[dict, Depends(get_current_user)]
 
-ProductRouter = tr = APIRouter()
+@pr.get("/get-products")
+def get_products(
+    session: SessionDep, 
+    current_user: UserDep,
+    tenant: str,
+) :
+    try:
+        if not check_permission(
+            session, "Read",  ["Administrative", "Product"], current_user
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
+            
+        organization_ids= get_organization_ids_by_scope_group(session, current_user)
 
-# Create a new category
-@tr.post("/create-catagory")
-def create_category(session: SessionDep, 
-                    code: int = Body(...), 
-                    name: str = Body(...), 
-                    description: str = Body(...)) -> Category: 
-    
-        # Validate the name
-        if not validate_name(name):
-            raise HTTPException(status_code=400, detail="Invalid category name format")
+        # Fetch categories based on organization IDs
+        db_products = session.exec(
+            select(Product).where(Product.organization_id.in_(organization_ids))
+        ).all()
+
+        #validate the retrived products
+        if not db_products:
+            raise HTTPException(status_code=404, detail="No products found")
         
-        # Validate the description
-        if not validate_name(description):
-            raise HTTPException(status_code=400, detail="Invalid category description format")
+        Product_list = []
+        for db_product in db_products:
+            Product_temp= {
+                "id": db_product.id,
+                "Product Name": db_product.name,
+                "SKU": db_product.sku,
+                "Description": db_product.description,
+                "Brand": db_product.brand,
+                "Batch Number": db_product.batch_number,
+                "Code": db_product.code,
+                "Price": db_product.price,
+                "Unit": db_product.unit,
+            }
+            if Product_temp not in Product_list:
+                Product_list.append(Product_temp)
+        return Product_list
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
-        # Check if a category with the same code already exists
-        # existing_category = session.query(Category).filter(Category.code == code).first()
-        # existing_tenant = session.exec(select(Organization).where(Organization.organization_name == organization_name)).first()
-        existing_category = session.exec(select(Category).where(Category.code == code)).first()
-
-        if existing_category:
-            raise HTTPException(status_code=400, detail="Category with this code already exists")
-        # Create a new category entry from validated input
-        new_category = Category(code=code, name=name, description=description)
-        session.add(new_category)
-        session.commit()
-        session.refresh(new_category)
-        return new_category
-
-#get all categories
-@tr.get("/categories")
-def get_categories(session: SessionDep) -> List[Category]:
-    categories = session.exec(select(Category)).all()
-    
-    if not categories:
-        raise HTTPException(status_code=404, detail="No categories found")
-    return categories
-
-
-#find category by id
-@tr.get("/category/{category_id}")
-def get_category(category_id: int, session: SessionDep) -> Category:
-    db_category = session.get(Category, category_id)
-    if not db_category:
-        raise HTTPException(status_code=404, detail="Category not found")
-    return db_category
-
-#update category
-@tr.put("/category/{category_id}")
-def update_category(
-    session: SessionDep,
-    category_id: int,
-    code: Optional[int] = Body(None),
-    name: Optional[str] = Body(None),   
-    description: Optional[str] = Body(None)
-):
-    db_category = session.get(Category, category_id)
-    if not db_category:
-        raise HTTPException(status_code=404, detail="Category not found")
-    
-    # Validate the name if provided
-    if name is not None and not validate_name(name):
-        raise HTTPException(status_code=400, detail="Invalid category name format")
-    
-    # Validate the description if provided
-    if description is not None and not validate_name(description):
-        raise HTTPException(status_code=400, detail="Invalid category description format")
-    
-    # Check if a category with the same code exists (excluding the current category)
-    if code is not None:
-        existing_category = session.exec(
-            select(Category).where(Category.code == code, Category.id != category_id)
+@pr.get("/get-product/{product_id}")            
+def get_product(
+    session: SessionDep, 
+    current_user: UserDep,
+    tenant: str,
+    product_id: int,
+) :
+    try:
+        if not check_permission(
+            session, "Read", ["Administrative","Product"], current_user
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
+            
+ 
+        # Fetch categories based on organization IDs
+        db_product = session.exec(
+            select(Product).where(Product.id == product_id)
         ).first()
-        if existing_category:
-            raise HTTPException(status_code=400, detail="Category with this code already exists")
+
+        #validate the retrived products
+        if not db_product:
+            raise HTTPException(status_code=404, detail="No products found")
+        
+        product_list = []
+        product_list.append({
+            "id": db_product.id,
+            "Product Name": db_product.name,
+            "SKU": db_product.sku,
+            "Description": db_product.description,
+            "Brand": db_product.brand,
+            "Batch Number": db_product.batch_number,
+            "Code": db_product.code,
+            "Price": db_product.price,
+            "Unit": db_product.unit,
+        })
+        
+        return product_list
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
     
-    # Update the category fields if provided
-    if code is not None:
-        db_category.code = code
-    if name is not None:
-        db_category.name = name
-    if description is not None:
-        db_category.description = description
+@pr.get("/product-form")
+def get_product_form(
+    tenant: str,
+    session: SessionDep, 
+    current_user: UserDep,
+) :
+    try:
+        # Check permission
+        if not check_permission(
+            session, "Create",["Administrative", "Product"], current_user
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )  
+        
+        # product_data = fetch_product_id_and_name(session)
 
-    # Commit the changes and refresh the object
-    session.add(db_category)
-    session.commit()
-    session.refresh(db_category)
-    return db_category
+        # # product_name = product_data.get("name")
 
-#@tr.delete("/category/{category_id}")
-@tr.delete("/category/{category_id}")
-def delete_category(category_id: int, session: SessionDep) -> Dict[str, Any]:
-    db_category = session.get(Category, category_id)
-    if not db_category:
-        raise HTTPException(status_code=404, detail="Category not found")
-    session.delete(db_category)
-    session.commit()
-    return {"message": "Category deleted successfully"}
-
-# @tr.post("/products/create", response_model=Product)
-# def create_product(product: Product, session: Session = Depends(get_session)):
-#     # Check if a product with the same SKU or code already exists (optional)
-#     existing_product = session.query(Product).filter(
-#         (Product.suk == product.suk) | (Product.code == product.code)
-#     ).first()
-    
-#     if existing_product:
-#         raise HTTPException(status_code=400, detail="Product with the same SKU or code already exists")
-
-#     # Create a new product entry from validated input
-#     new_product = Product(**product.dict())
-
-#     session.add(new_product)
-#     session.commit()
-#     session.refresh(new_product)
-
-#     return new_product
+        # product_name = list(product_data.values())
 
 
+        form_structure = {
+            "id": "",
+            "sku": "",
+            "name": "",
+            "description": "",
+            "image": "",
+            "brand": "",
+            "batch_number": "",
+            "code": "",
+            "price": "",
+            "unit": "",
+            "category": fetch_category_id_and_name(session, current_user) ,
+        }
 
+        return {"data": form_structure, "html_types": get_html_types("product")}
 
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=400, detail=str(e))
+            
+@pr.post("/create-product")
+def create_product(
+    session: SessionDep, 
+    current_user: UserDep,
+    tenant: str,
+    category: int = Body(...),
+    organization: int = Body(...),
+    sku: str = Body(...),
+    name: str = Body(...),
+    description: str= Body(...),
+    image: str = Body(...),
+    brand: str = Body(...),  
+    batch_number: str = Body(...),
+    code: str = Body(...),
+    price: float = Body(...),
+    unit: str = Body(...)
+):
+        try:
+            if not check_permission(
+                session, "Update",["Administrative", "Product"], current_user
+                ):
+                raise HTTPException(
+                    status_code=403, detail="You Do not have the required privilege"
+                )  
+                
+                # Validate SKU and Code uniqueness
+            organization_ids = get_organization_ids_by_scope_group(session, current_user)
+            db_category_code = session.exec(
+            select(Product.code).where(Product.organization_id.in_(organization_ids), Product.code == code)
+        ).first()
+            if db_category_code:
+                raise HTTPException(status_code=400, 
+                                    detail="Product  already exists")
+            # Validate the name
+            if not validate_name(name):
+                raise HTTPException(status_code=400, detail="Invalid product name")
+           
 
-# @tr.post("/products/create", response_model=Product)
-# def create_product(product: Product, session: Session = Depends(get_session)):
-#     # Validate if SKU and Code are unique before insertion
-#     existing_product = session.query(Product).filter(
-#         (Product.suk == product.suk) | (Product.code == product.code)
-#     ).first()
+            # Create a new product entry from validated input
+            new_product = Product(
+                                sku=sku,
+                                name=name,
+                                description=description,
+                                image=image,
+                                brand=brand,
+                                batch_number=batch_number,
+                                category_id=category,
+                                organization_id=organization,
+                                code=code,
+                                price=price,
+                                unit=unit,  
+            )
 
-#     if existing_product:
-#         raise HTTPException(status_code=400, detail="Product with the same SKU or code already exists")
+            session.add(new_product)
+            session.commit()
+            session.refresh(new_product)
+            return new_product
+        
+        except Exception as e:
+            traceback.print_exc()
+            raise HTTPException(status_code=400, detail=str(e))
 
-#     # Create the new product entry with validated data
-#     new_product = Product(
-#         suk=product.suk,
-#         name=product.name,
-#         description=product.description,
-#         image=product.image,
-#         brand=product.brand,
-#         batch_number=product.batch_number,
-#         code=product.code,
-#         price=product.price,
-#         unit=product.unit,
-#         category_id=product.category_id
-#     )
+@pr.put("/update-product/{product_id}") 
+def update_product(
+    session: SessionDep, 
+    current_user: UserDep,
+    tenant: str,
+    product_id: int,
 
-#     session.add(new_product)
-#     session.commit()
-#     session.refresh(new_product)
+    category: int = Body(...),
+    organization: int = Body(...),
+    sku: str = Body(...),
+    name: str = Body(...),
+    description: str= Body(...),
+    image: str = Body(...),
+    brand: str = Body(...),  
+    batch_number: str = Body(...),
+    code: str = Body(...),
+    price: float = Body(...),
+    unit: str = Body(...)
+):
+    try:
+        if not check_permission(
+            session, "Update", "Product", current_user
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
+            
 
-#     return new_product
+        # Fetch categories based on organization IDs
+        organization_ids = get_organization_ids_by_scope_group(session, current_user)
 
+        selected_product = session.exec(
+            select(Product).where(Product.organization_id.in_(organization_ids), Product.id == product_id)
+        ).first()
+            
+        if not selected_product  :
+            raise HTTPException(status_code=400, 
+                                detail="Product  is not found in your organization")
 
-# @tr.get("/produt/{product_id}")
-# def get_product(product_id: int ,  session: Session = Depends(get_session)):
+        # Update the product entry
+     
+        
 
-#     db_product = session.get(Product, product_id)
-#     if not db_product:
-#         raise HTTPException(status_code=404, detail="product is not found")
-#     if db_product:
-#         return db_product
+        selected_product.sku = sku
+        selected_product.name = name
+        selected_product.description = description
+        selected_product.image = image
+        selected_product.brand = brand
+        selected_product.batch_number = batch_number
+        selected_product.code = code
+        selected_product.price = price
+        selected_product.unit = unit
+        selected_product.category_id = category
+        selected_product.organization_id = organization
 
+        
+        session.add(selected_product)
+        session.commit()
+        session.refresh(selected_product)
 
+        
+        return {
+                "message": "Product updated successfully",
+        }   
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@pr.delete("/delete-product/{product_id}")
+def delete_product(
+    session: SessionDep, 
+    current_user: UserDep,
+    tenant: str,
+    product_id: int,
+ 
+) :
+    try:
+        if not check_permission(
+            session, "Delete", "Product", current_user
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
+            
+        # Fetch categories based on organization IDs
+        selected_product = session.exec(
+            select(Product).where(Product.id == product_id)
+        ).first()
+
+        if not selected_product:
+            raise HTTPException(status_code=404, detail="Product not found")
+        
+        session.delete(selected_product)
+        session.commit()
+        
+        return {
+                "message": "Product deleted successfully",
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))

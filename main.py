@@ -5,15 +5,20 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi import FastAPI
 from routes.util import UtilRouter
+from routes.warehouse import WarehouseRouter
 from starlette.status import HTTP_400_BAD_REQUEST
 from fastapi.middleware.cors import CORSMiddleware
 
 from db import create_db_and_tables
 from routes.serviceProvider import ServiceProvider
 from routes.accounts import AuthenticationRouter
-from routes.organizations import TenantRouter
-from routes.role import RoleRouter
+from routes.address import AddressRouter
+from routes.catagory import CatagoryRouter
+from routes.inheritance import InheritanceRouter
 from routes.product import ProductRouter
+from routes.role import RoleRouter
+from routes.organizations import TenantRouter
+
 
 
 load_dotenv()
@@ -40,9 +45,13 @@ app.add_middleware(
 )
 @app.middleware("http")
 async def extract_tenant(request: Request, call_next):
-    parts = request.url.path.strip("/").split("/")
-    if parts:
-        request.state.tenant = parts[0]
+    path_parts = request.url.path.strip("/").split("/")
+    # if parts:
+    #     request.state.tenant = parts[0]
+    if len(path_parts) > 0:
+        request.state.tenant = path_parts[0]
+    else:
+        request.state.tenant = None
     response = await call_next(request)
     return response
 
@@ -65,9 +74,12 @@ def on_startup():
     create_db_and_tables()
     
 app.include_router(AuthenticationRouter, prefix="/{tenant}/account", tags=["account"])
+app.include_router(AddressRouter, prefix="/{tenant}/address", tags=["address"])
+app.include_router(CatagoryRouter, prefix="/{tenant}/catagory", tags=["catagory"])
+app.include_router(InheritanceRouter, prefix="/{tenant}/inheritance", tags = ["inheritance"])
 app.include_router(TenantRouter, prefix="/{tenant}/organization", tags=["organization"])
+app.include_router(ProductRouter, prefix="/{tenant}/product", tags=["product"])
 app.include_router(RoleRouter, prefix="/{tenant}/role", tags=["role"])
-app.include_router(ProductRouter, prefix="/{tenant}/product", tags=["product"])
 app.include_router(UtilRouter, prefix="/{tenant}/utility", tags=["utility"])
-app.include_router(ProductRouter, prefix="/{tenant}/product", tags=["product"])
 app.include_router(ServiceProvider, tags=["service provider"])
+app.include_router(WarehouseRouter, prefix="/{tenant}/warehouse", tags=["warehouse"])

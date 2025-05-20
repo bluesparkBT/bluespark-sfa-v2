@@ -4,18 +4,33 @@ from datetime import timedelta, date, datetime
 from fastapi import APIRouter, HTTPException, Body, status, Depends, Path
 from sqlmodel import select, Session
 from db import get_session
-from models.Account import User, ScopeGroup, ScopeGroupLink, Organization, RoleModulePermission, Scope, Role, AccessPolicy
+from models.Account import User, ScopeGroup, ScopeGroupLink, Organization, OrganizationType, RoleModulePermission, Scope, Role, AccessPolicy
 from models.Account import ModuleName as modules
 from utils.auth_util import verify_password, create_access_token, get_password_hash
-from utils.util_functions import validate_name, validate_email, validate_phone_number
-from utils.auth_util import get_tenant, get_current_user, check_permission, generate_random_password
+from utils.util_functions import validate_name, validate_email, validate_phone_number, parse_enum
+from utils.auth_util import get_current_user, check_permission, generate_random_password, get_tenant_hash, verify_tenant, tenant_users
 from utils.model_converter_util import get_html_types
-from utils.form_db_fetch import fetch_organization_id_and_name
+import traceback
 
+# frontend domain
+Domain= "http://172.10.10.203:5000"
+service_provider_company = "Bluespark"
 
 ServiceProvider =sp= APIRouter()
 SessionDep = Annotated[Session, Depends(get_session)]
 UserDep = Annotated[dict, Depends(get_current_user)]
+
+@sp.get("/has-superadmin")
+def has_superadmin_created(
+    session: SessionDep
+) ->bool:
+    existing_superadmin = session.exec(select(User).where(User.role_id == Role.id == "Super Admin")).first()
+    if existing_superadmin:
+        print("Super admin and tenant already exisits")
+        return True
+    else: 
+        return False
+    
 
 @sp.post("/login/")
 def login(
@@ -24,17 +39,13 @@ def login(
     username: str = Body(...),
     password: str = Body(...)
 ):
-    
-
     try:
         user = session.exec(select(User).where(User.username == username)).first()
-        print(user)
+        print("superadmin user is: ", user)
         
-        if not user and not user.organization_id:
-            raise HTTPException(status_code=400, detail="User missing company or organization info")
-
         if not user or not verify_password(password+user.username, user.hashedPassword):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+        
         access_token_expires = timedelta(minutes=90)
         token = create_access_token(
             data={
@@ -48,70 +59,111 @@ def login(
         return {"access_token": token}
     
     except Exception as e:
+        traceback.print_exc()
         return {"error": str(e)}
 
 @sp.post("/create-superadmin/")
 async def create_superadmin_user(
     session: SessionDep,
-    # tenant: str = Depends(get_tenant), 
-       
     username: str = Body(...),
     email: str = Body(...),
     password: str = Body(...),
-    service_provider_company: str = Body(...),
 ):
     try:
-        existing_superadmin = session.exec(select(User).where(User.username== username)).first()
+        # existing_service_provider = session.exec(select(Organization).where(Organization.organization_name == "Bluespark"))
+        # if existing_service_provider:
+        #     print("Exisitng service provider: ", existing_service_provider)
+        #     raise HTTPException(
+        #         status_code=status.HTTP_400_BAD_REQUEST,
+        #         detail="Service Provider already registered",
+        #     )
+            
+        existing_superadmin = session.exec(select(User).where(User.role_id == Role.id == "Super Admin")).first()
         if existing_superadmin is not None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Superadmin already registered",
             )
-        
-        organization = Organization(
-            organization_name=service_provider_company,
+
+        service_provider = Organization(
+            organization_name= "Bluespark",
+            owner_name = "Mekonen",
+            organization_type = OrganizationType.service_provider.value
         )
 
-        session.add(organization)
+        session.add(service_provider)
         session.commit()
-        session.refresh(organization)
+        session.refresh(service_provider)
         
-
-        service_provider_scope_group = ScopeGroup(
-            scope_name="Super Admin Scope",
-        )
-        
-        session.add(service_provider_scope_group)
-        session.commit()
-        session.refresh(service_provider_scope_group)
-
-        # Check if System Admin ScopeGroup exists
-        system_admin_scope_group = session.exec(
-            select(ScopeGroup).where(ScopeGroup.scope_name == "System Admin Scope")
+        # Check if Super Admin Scope group exists
+        existing_scope_group = session.exec(
+            select(ScopeGroup).where(ScopeGroup.scope_name == "Super Admin Scope")
         ).first()
-        if not system_admin_scope_group:        
-            tenant_scope_group = ScopeGroup(
-                scope_name="System Admin Scope",
-            )
-            session.add(tenant_scope_group)
+
+        if existing_scope_group:
+            service_provider_scope_group = existing_scope_group
+        else:
+            service_provider_scope_group = ScopeGroup(scope_name="Super Admin Scope")
+            session.add(service_provider_scope_group)
             session.commit()
-            session.refresh(tenant_scope_group)
+            session.refresh(service_provider_scope_group)
+
+        # Check if System Admin Scope group exists
+        # system_admin_scope_group = session.exec(
+        #     select(ScopeGroup).where(ScopeGroup.scope_name == "System Admin Scope")
+        # ).first()
+        
+        # if not system_admin_scope_group:        
+        #     tenant_scope_group = ScopeGroup(
+        #         scope_name="System Admin Scope",
+        #     )
+        #     session.add(tenant_scope_group)
+        #     session.commit()
+        #     session.refresh(tenant_scope_group)
         
         scope_group_link = ScopeGroupLink(
             scope_group_id=service_provider_scope_group.id,
-            organization_id=organization.id,
+            organization_id=service_provider.id,
         )
         
         session.add(scope_group_link)
         session.commit()
         session.refresh(scope_group_link)
         
+        #create role
+        role = Role(
+            name="Super Admin",
+            organization_id = service_provider.id
+        )
+        session.add(role)
+        session.commit()
+        session.refresh(role)
+
+        # List of modules the Super Admin should have access to
+        modules_to_grant = [
+            modules.service_provider.value,
+            modules.role.value,
+            modules.administrative.value,
+            modules.scope_group.value,
+            modules.users.value
+        ]
+        for module in modules_to_grant: 
+            role_module_permission= RoleModulePermission(
+                role_id=role.id,
+                module=module,
+                access_policy=AccessPolicy.manage
+            )
+            session.add(role_module_permission)
+        session.commit()
+        
+        
         super_admin_user = User(
             username=username,
             email=email,
             hashedPassword=get_password_hash(password + username),
-            organization_id=organization.id,
+            organization_id=service_provider.id,
             scope_group_id=service_provider_scope_group.id,
+            role_id = role.id
         )
         session.add(super_admin_user)
         session.commit()
@@ -119,17 +171,21 @@ async def create_superadmin_user(
 
         return {"message": "Superadmin created successfully"}
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
 
 @sp.delete("/delete-superadmin/")
 async def delete_superadmin_user(
     session: SessionDep,
     current_user: UserDep,    
-    # tenant: str = Depends(get_tenant),
 
     super_admin_id: int = Body(...),
 ):
     try:
+        if not check_permission(session, "Delete", "Service Provider", current_user):
+            raise HTTPException(
+                status_code=403, detail="You do not have the required privilege"
+            )
         superadmin = session.exec(select(User).where(User.id == super_admin_id)).first()
         if not superadmin:
             raise HTTPException(status_code=404, detail="Superadmin not found")
@@ -139,23 +195,26 @@ async def delete_superadmin_user(
         if not scope_group:
             raise HTTPException(status_code=404, detail="ScopeGroup not found for the superadmin")
 
-        # Fetch and delete all ScopeGroupLinks associated with the ScopeGroup
+        # cascade delete all attributes linked to superadmin.
         scope_group_links = session.exec(select(ScopeGroupLink).where(ScopeGroupLink.scope_group_id == scope_group.id)).all()
         for link in scope_group_links:
             session.delete(link)
+        
+        session.delete(scope_group)
             
         session.delete(superadmin)
         session.commit()
 
         return {"message": "Superadmin and all related entities deleted successfully"}
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
 
-@sp.get("/get-my-tenant/")
-async def get_my_tenant(
+@sp.get("/get-service-provider/")
+async def get_service_provider(
     session: SessionDep,
-    tenant: str = Depends(get_tenant),
     current_user: User = Depends(get_current_user),
+    
 ) -> dict:
     """
     Retrieve the organization information for the logged-in user.
@@ -172,13 +231,13 @@ async def get_my_tenant(
     """
     try:
         if not check_permission(
-            session, "Read", "Organization", current_user
+            session, "Read", "Service Provider", current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
         # Query the organization associated with the logged-in user
-        organization = session.exec(select(Organization).where(Organization.id == current_user.get("organization"))).first()
+        organization = session.exec(select(Organization).where(Organization.id == current_user.organization_id)).first()
 
         if not organization:
             raise HTTPException(
@@ -195,55 +254,183 @@ async def get_my_tenant(
         }
         
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
 
+@sp.get("/{tenant}/get-my-tenant/")
+async def get_my_tenant(
+    session: SessionDep,
+    tenant: str,    
+) -> dict:
+    """
+    Retrieve the organization information for the logged-in user.
+
+    Args:
+        session (SessionDep): Database session.
+        current_user (User): The currently logged-in user.
+
+    Returns:
+        dict: organization information including name, id, owner name, and logo image.
+
+    Raises:
+        HTTPException: 404 if the organization is not found.
+    """
+    try:
+        # Query the organization associated with the logged-in user
+        organization = session.exec(select(Organization).where(Organization.organization_name == tenant)).first()
+        print("the current tenant is ",organization)
+        if not organization:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="tenant not found for the logged-in user",
+            )
+
+        # Return the organization information
+        return {
+            "id": organization.id,
+            "organization": organization.organization_name,
+            "owner": organization.owner_name,
+            "logo": organization.logo_image,
+        }
+        
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=400, detail=str(e))
+
+@sp.get("/get-tenants")
+async def get_tenants(
+    session: SessionDep,
+    current_user: UserDep,
+):
+    """
+    Retrieve all tenant companies that use the system.
+    """
+    try:
+        if not check_permission(session, "Read", "Service Provider", current_user):
+            raise HTTPException(
+                status_code=403, detail="You do not have the required privilege"
+            )
+
+        all_tenants = session.exec(
+            select(Organization).where(
+                (Organization.parent_id == None) &
+                (Organization.organization_type == OrganizationType.company)
+            )
+        ).all()
+
+        tenant_list = [
+            {
+                "id": tenant.id,
+                "company": tenant.organization_name,
+                "owner": tenant.owner_name,
+                "description": tenant.description,
+                "logo": tenant.logo_image
+
+            }
+            for tenant in all_tenants
+        ]
+
+        return tenant_list
+
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=400, detail=str(e))
+    
+@sp.get("/get-tenant/{id}")
+async def get_tenant(
+    session: SessionDep,
+    current_user: UserDep,
+    id: int
+):
+    """
+    Retrieve all tenant companies that use the system.
+    """
+    try:
+        if not check_permission(session, "Read", "Service Provider", current_user):
+            raise HTTPException(
+                status_code=403, detail="You do not have the required privilege"
+            )
+
+        tenant = session.exec(
+            select(Organization).where(
+                (Organization.id == id)) ).first()
+     
+
+        tenant_data = {
+                "id": tenant.id,
+                "tenant_name": tenant.organization_name,
+                "owner_name": tenant.owner_name,
+                "description": tenant.description,
+                "logo_image": tenant.logo_image,
+                "organization_type": tenant.organization_type
+                
+            }
+       
+
+        return tenant_data
+
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=400, detail=str(e))
+    
 @sp.get("/tenant-form/")
 async def get_tenant_form_fields(
     session: SessionDep,
-    # tenant: str, 
-    current_user: User = Depends(get_current_user)
+    current_user: UserDep
 ):
     try:
-        
+        if not check_permission(session, "Read", "Service Provider", current_user):
+            raise HTTPException(
+                status_code=403, detail="You do not have the required privilege"
+            )
         tenant_data = {
             "id": "",
-            "organization_name": "",
+            "tenant_name": "",
             "owner_name": "",
             "description": "",
-            "logo_image": ""
+            "logo_image": "",
+            # "organization_type" : {i.value: i.value for i in OrganizationType},
+            
             }
         
 
-        return {"data": tenant_data, "html_types": get_html_types(Organization)}
+        return {"data": tenant_data, "html_types": get_html_types('organization')}
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
 
 @sp.post("/create-tenant")
 async def create_tenant(
     session: SessionDep,
     current_user: UserDep,
-    # tenant: str,
 
     tenant_name: str = Body(...),
+    owner_name: str = Body(...),
     description: str = Body(...),
     logo_image: str = Body(...),
-    organization_type: str = Body(...),
+
 ):
     try:
-        existing_tenant = session.exec(
-            select(Organization).where(Organization.organization_name == tenant_name)
-        ).first()
-        if existing_tenant:
-            raise HTTPException(status_code=400, detail="Tenant already exists")
-
-        # if not logo_image or not validate_image(logo_image):
-        #     raise HTTPException(status_code=400, detail="Logo image is not valid")
-
+        if not check_permission(session, "Create", "Service Provider", current_user):
+            raise HTTPException(
+                status_code=403, detail="You do not have the required privilege"
+            )
+            
+        # existing_tenant = session.exec(
+        #     select(Organization).where(Organization.organization_name == verify_tenant(tenant_name))
+        # ).first()
+        
+        # if verify_tenant(tenant_name, hashed_tenant_name):
+        #     raise HTTPException(status_code=400, detail="Tenant already exists")
+        
+        hashed_tenant_name = get_tenant_hash(tenant_name) 
         tenant = Organization(
-            organization_name=tenant_name,
+            organization_name = hashed_tenant_name,
+            owner_name = owner_name,
             description=description,
             logo_image=logo_image,
-            organization_type=organization_type,
+            organization_type=OrganizationType.company.value,
+            tenant_domain = f"{Domain}/{hashed_tenant_name}"
         )
         session.add(tenant)
         session.commit()
@@ -251,10 +438,16 @@ async def create_tenant(
 
         # Fetch the System Admin ScopeGroup
         system_admin_scope_group = session.exec(
-            select(ScopeGroup).where(ScopeGroup.scope_name == "System Admin Scope")
+            select(ScopeGroup).where(ScopeGroup.scope_name == f"{tenant_name} Admin Scope")
         ).first()
         if not system_admin_scope_group:
-            raise HTTPException(status_code=400, detail="System Admin ScopeGroup not found")
+            system_admin_scope_group = ScopeGroup(
+                scope_name=f"{tenant_name} Admin Scope",
+            )
+            session.add(system_admin_scope_group)
+            session.commit()
+            session.refresh(system_admin_scope_group)
+            
 
         # Link the System Admin ScopeGroup to the tenant organization
         scope_group_link = ScopeGroupLink(
@@ -264,21 +457,45 @@ async def create_tenant(
         session.add(scope_group_link)
         session.commit()
 
-        role_name = f"{tenant_name} System Admin"
         role = Role(
-            name=role_name,
+            name=f"{tenant_name} System Admin",
             organization_id=tenant.id,
         )
         session.add(role)
         session.commit()
         session.refresh(role)
 
+        # List of modules the tenatn system Admin should have access to
+        # modules_to_grant = [
+        #     modules.organization.value,
+        #     modules.role.value,
+        #     modules.administrative.value,
+        #     modules.users.value,
+            
+        # ]
+        # for module in modules_to_grant: 
+        #     role_module_permission= RoleModulePermission(
+        #         role_id=role.id,
+        #         module=module,
+        #         access_policy=AccessPolicy.manage
+        #     )
+        #     session.add(role_module_permission)
+        # session.commit()
+
+        for mod in modules:
+            role_module_permission = RoleModulePermission(
+                role_id=role.id,
+                module=mod.value,
+                access_policy=AccessPolicy.manage
+            )
+            session.add(role_module_permission)
+        
         password = generate_random_password()
-        hashed_password = get_password_hash(password + f"{tenant_name.lower()}_admin")
+        hashed_password = get_password_hash(password + tenant_users("admin", hashed_tenant_name))
 
         tenant_admin = User(
-            username=f"{tenant_name.lower()}_admin",
-            fullname=f"{tenant_name} Admin",
+            username= tenant_users("admin", hashed_tenant_name),
+            fullname=f"{tenant_name} System Admin",
             email=f"{tenant_name.lower()}_admin@{tenant_name}.com",
             hashedPassword = hashed_password,
             organization_id=tenant.id,
@@ -290,102 +507,103 @@ async def create_tenant(
         session.commit()
         session.refresh(tenant_admin)
         
-        #create role module permission for tenant system admin
-        role_module_permission= RoleModulePermission(
-            role_id=role.id,
-            module=modules.administration.value,
-            access_policy=AccessPolicy.manage
-        )
-
-        session.add(role_module_permission)
-        session.commit()
-        session.refresh(role_module_permission)
-        
         return {
             "message": "Tenant and system admin created successfully",
             "tenant": tenant_name,
-            "admin_username": tenant_admin.username,
-            "admin_password": password 
+            "domain": f"{Domain}/{hashed_tenant_name}/signin/",
+            "user_name":"admin",
+            "password": password 
         }
 
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
 
-@sp.post("/update-tenant")
+@sp.put("/update-tenant")
 async def update_tenant(
     session: SessionDep,
     current_user: UserDep,
-    # tenant: str,
-
+    id: int = Body(...),
     tenant_name: str = Body(...),
+    owner_name: str = Body(...),
     description: str = Body(...),
     logo_image: str = Body(...),
-    organization_type: str = Body(...),
+    # organization_type: str = Body(...),
 ):
     try:
+        if not check_permission(session, "Update", "Service Provider", current_user):
+            raise HTTPException(
+                status_code=403, detail="You do not have the required privilege"
+            )
+
         existing_tenant = session.exec(
-            select(Organization).where(Organization.organization_name == tenant_name)
+            select(Organization).where(Organization.id == id)
         ).first()
-        if existing_tenant:
-            raise HTTPException(status_code=400, detail="Tenant already exists")
 
-        # if not logo_image or not validate_image(logo_image):
-        #     raise HTTPException(status_code=400, detail="Logo image is not valid")
+        if not existing_tenant:
+            raise HTTPException(status_code=400, detail="Tenant does not exist")
 
-        tenant = Organization(
-            organization_name=tenant_name,
-            description=description,
-            logo_image=logo_image,
-            organization_type=organization_type,
-        )
-        session.add(tenant)
+        existing_tenant.organization_name = tenant_name
+        existing_tenant.owner_name = owner_name
+        existing_tenant.description = description
+        existing_tenant.logo_image = logo_image
+        # existing_tenant.organization_type = parse_enum(
+        #     OrganizationType, organization_type, "Organization Type"
+        # )
+
+        session.add(existing_tenant)
         session.commit()
-        session.refresh(tenant)
+        session.refresh(existing_tenant)
         
+        updated_data = {
+            "tenant_name": existing_tenant.organization_name,
+            "tenant owner": existing_tenant.owner_name,
+        }
+
+        return {"message": "Tenant updated successfully", "tenant": updated_data}
+
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
 
-@sp.delete("/delete-tenant/{id}")
-async def delete_tenant(
-    session: SessionDep,
-    current_user: UserDep,
-    id: int,    
-    tenant: str = Depends(get_tenant),
-):
-    """
-    Delete an organization by ID.
 
-    Args:
-        session (SessionDep): Database session.
-        id (int): ID of the organization to delete.
+# @sp.delete("/delete-tenant/{id}") 
+# async def delete_tenant(
+#     session: SessionDep,
+#     current_user: UserDep,
+#     tenant: str,
+#     id: int
+# ):
+#     """
+#     Delete an organization by ID.
+#     """
+#     try:
+#         if not check_permission(session, "Delete", "Service Provider", current_user):
+#             raise HTTPException(
+#                 status_code=403, detail="You do not have the required privilege"
+#             )
 
-    Returns:
-        dict: Confirmation message.
+#         # Fetch the tenant/organization
+#         tenant = session.get(Organization, id)
+#         if not tenant:
+#             raise HTTPException(
+#                 status_code=status.HTTP_404_NOT_FOUND,
+#                 detail="Organization not found",
+#             )
 
-    Raises:
-        HTTPException: 404 if the organization is not found.
-    """
-    try:
-        if not check_permission(
-            session, "Delete", "Organization", current_user
-            ):
-            raise HTTPException(
-                status_code=403, detail="You Do not have the required privilege"
-            )
-        # Query the organization by ID
-        organization = session.get(Organization, id)
+#         # Delete all roles linked to this organization
+#         roles = session.exec(
+#             select(Role).where(Role.organization_id == tenant.id)
+#         ).all()
+#         for role in roles:
+#             session.delete(role)
 
-        if not organization:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Organization not found",
-            )
+#         # Now delete the tenant
+#         session.delete(tenant)
+#         session.commit()
 
-        # Delete the organization
-        session.delete(organization)
-        session.commit()
+#         return {"message": "Organization and related roles deleted successfully"}
 
-        return {"message": "Organization deleted successfully"}
-    
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+#     except Exception as e:
+#         traceback.print_exc()
+#         raise HTTPException(status_code=400, detail=str(e))

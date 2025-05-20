@@ -7,12 +7,13 @@ from db import get_session
 from models.Account import User, ScopeGroup, ScopeGroupLink, Organization, Gender, Scope, Role, AccessPolicy, IdType
 from utils.auth_util import verify_password, create_access_token, get_password_hash
 from utils.util_functions import validate_name, validate_email, validate_phone_number, parse_datetime_field, format_date_for_input, parse_enum
-from utils.auth_util import get_tenant, get_current_user, check_permission, generate_random_password
+from utils.auth_util import get_current_user, check_permission, generate_random_password, tenant_users, extract_username
 from utils.model_converter_util import get_html_types
 from utils.get_hierarchy import get_child_organization, get_organization_ids_by_scope_group
 from utils.form_db_fetch import fetch_organization_id_and_name, fetch_role_id_and_name, fetch_scope_group_id_and_name
+import traceback
 
-
+Domain= "http://172.10.10.203:5000"
 
 AuthenticationRouter =ar= APIRouter()
 SessionDep = Annotated[Session, Depends(get_session)]
@@ -22,18 +23,14 @@ UserDep = Annotated[dict, Depends(get_current_user)]
 @ar.post("/login/")
 def login(
     session: SessionDep,
-    tenant: str = Depends(get_tenant),
+    tenant: str,
     
     username: str = Body(...),
     password: str = Body(...)
 ):
-    
     try:
-        user = session.exec(select(User).where(User.username == username)).first()
-        print(user)
-        
-        if not user and not user.organization_id:
-            raise HTTPException(status_code=400, detail="User missing company or organization info")
+        user = session.exec(select(User).where(User.username == tenant_users(username, tenant))).first()
+        print("tenant sytem admin user:", user)
 
         if not user or not verify_password(password+user.username, user.hashedPassword):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
@@ -51,30 +48,30 @@ def login(
         return {"access_token": token}
     
     except Exception as e:
+        traceback.print_exc()
         return {"error": str(e)}
  
 @ar.get("/get-my-user/")
 async def get_my_user(
     session: SessionDep,
     current_user: UserDep,
-    user_id: int,   
-     
-    tenant: str = Depends(get_tenant),
+    tenant: str,
+
 ):
     try:
         if not check_permission(
-            session, "Read", "Users", current_user
+            session, "Read", ["Users", "Administrative"], current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-        user = session.exec(select(User).where(User.id == user_id)).first()
+        user = session.exec(select(User).where(User.id == current_user.id)).first()
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
         return {
             "id": user.id,
             "fullname": user.fullname,
-            "username": user.username,
+            "username": extract_username(user.username, tenant),
             "email": user.email,
             "phone_number": user.phone_number,
             "organization": user.organization_id,
@@ -84,18 +81,18 @@ async def get_my_user(
             "scope_group_id": user.scope_group_id,
         }
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
 
-    
 @ar.get("/get-users/")
 async def get_users(
     session: SessionDep,
     current_user: UserDep,
-    tenant: str = Depends(get_tenant),
+    tenant: str,
 ):
     try:  
         if not check_permission(
-            session, "Read", "Users", current_user
+            session, "Read", ["Administrative", "Users"], current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
@@ -134,8 +131,8 @@ async def get_users(
 async def get_user(
     session: SessionDep,
     id: int,
-    tenant: str = Depends(get_tenant),
-    current_user: User = Depends(get_current_user),
+    tenant: str,
+    current_user: UserDep,
 ):
     try:
         if not check_permission(
@@ -171,14 +168,14 @@ async def get_user(
        
         return user_data
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
-
 
 @ar.get("/user-form/")
 async def create_user_form(
     session: SessionDep,
-    current_user: User = Depends(get_current_user),    
-    tenant: str = Depends(get_tenant),
+    tenant: str,
+    current_user: UserDep,    
 
 ):
     try:
@@ -194,26 +191,26 @@ async def create_user_form(
             "username": "",
             "email": "",
             "phone_number": "",
-            "organization": fetch_organization_id_and_name(session),
-            "role": fetch_role_id_and_name(session),
+            "organization": fetch_organization_id_and_name(session, current_user),
+            "role": fetch_role_id_and_name(session, current_user),
             "scope": {scope.value: scope.value for scope in Scope},
-            "scope_group": fetch_scope_group_id_and_name(session),
+            "scope_group": fetch_scope_group_id_and_name(session, current_user),
             "gender": {gender.value: gender.value for gender in Gender},
         }
 
         return {"data": user_data, "html_types": get_html_types("user")}
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
-
-      
+   
 @ar.post("/create-user/")
 async def create_user(
     session: SessionDep,
     current_user: UserDep,    
-    tenant: str = Depends(get_tenant),
+    tenant: str,
 
     full_name: str = Body(...),
-    username: str = Body(...),
+    user_name: str = Body(...),
     email: str = Body(...),
     role: int = Body(...),
     scope: str = Body(...),
@@ -231,7 +228,7 @@ async def create_user(
                 status_code=403, detail="You Do not have the required privilege"
             )
             
-        existing_user = session.exec(select(User).where(User.username == username)).first()
+        existing_user = session.exec(select(User).where(User.username == user_name)).first()
         if existing_user:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -257,13 +254,13 @@ async def create_user(
         # Generate and hash password
 
         password = generate_random_password()
-        hashed_password = get_password_hash(password + username)
+        hashed_password = get_password_hash(password + user_name)
 
         
         new_user = User(
             id= None,
             fullname=full_name,
-            username=username,
+            username= tenant_users(user_name, tenant),
             email=email,
             phone_number=phone_number,
             hashedPassword = hashed_password,
@@ -280,15 +277,18 @@ async def create_user(
 
         return {
             "message": "User registered successfully",
-            "temporary_password": password }
+            "Domain" : f"Domain/{tenant}/signin",
+            "username": user_name,
+            "password": password }
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
 
 @ar.get("/update-user-form/")
 async def update_user_form(
     session: SessionDep,
-    current_user: User = Depends(get_current_user),    
-    tenant: str = Depends(get_tenant),
+    tenant: str,
+    current_user: UserDep,    
 
 ):
     try:
@@ -306,10 +306,10 @@ async def update_user_form(
             "username": "",
             "email": "",
             "phone_number": "",
-            "organization": fetch_organization_id_and_name(session),
-            "role": fetch_role_id_and_name(session),
+            "organization": fetch_organization_id_and_name(session, current_user),
+            "role": fetch_role_id_and_name(session, current_user),
             "scope": {scope.value: scope.value for scope in Scope},
-            "scope_group": fetch_scope_group_id_and_name(session),
+            "scope_group": fetch_scope_group_id_and_name(session, current_user),
             "gender": {gender.value: gender.value for gender in Gender},
             "date_of_birth": "",
             "date_of_joining": "",
@@ -324,13 +324,14 @@ async def update_user_form(
 
         return {"data": user_data, "html_types": get_html_types("user")}
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
     
 @ar.put("/update-user/")
 async def update_uer(
     session: SessionDep,
     current_user: UserDep,    
-    tenant: str = Depends(get_tenant),
+    tenant: str,
     id: int = Body(...),
     full_name: str = Body(...),
     username: str = Body(...),
@@ -411,18 +412,14 @@ async def update_uer(
 @ar.delete("/delete-user/{id}/")
 async def delete_user(
     session: SessionDep,
-    current_user: UserDep,  
-    id: int, 
-    tenant: str = Depends(get_tenant)
+    current_user: UserDep,
+    id: int
 ):
     try:
-        if not check_permission(
-            session, "Delete", "Users", current_user
-            ):
-            raise HTTPException(
-                status_code=403, detail="You Do not have the required privilege"
-            )
-        user = session.exec(select(User).where(User.id == id)).first()
+        if not check_permission(session, "Delete", "Users", current_user):
+            raise HTTPException(status_code=403, detail="You do not have the required privilege")
+
+        user = session.get(User, id)
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
 
@@ -430,19 +427,88 @@ async def delete_user(
         session.commit()
 
         return {"message": "User deleted successfully"}
+    
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
 
-@ar.get("/scope-group-form/")
-async def form_scope(
+
+@ar.get("/get-scope-groups/")
+async def get_scope_groups(
     session: SessionDep,
-    current_user: User = Depends(get_current_user),    
-    tenant: str = Depends(get_tenant),
+    current_user: UserDep,    
+    tenant: str,
 
 ):
     try:
         if not check_permission(
-            session, "Read", "Administration", current_user
+            session, "Read", "Administrative", current_user
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
+        scope_groups = session.exec(select(ScopeGroup)).all()
+        if not scope_groups:
+            raise HTTPException(status_code=404, detail="No scope groups found")
+        
+        scope_group_list = []
+        
+        for scope_group in scope_groups:
+            scope_group_list.append({
+                "id": scope_group.id,
+                "scope_name": scope_group.scope_name,
+                "organizations": [org.organization_name for org in scope_group.organizations],
+            })
+            
+        return scope_group_list
+
+        
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=400, detail=str(e))
+   
+ 
+@ar.get("/get-scope-group/{id}")
+async def get_scope_group(
+    session: SessionDep,
+    current_user: UserDep,
+    id: int
+):
+    try:
+        if not check_permission(
+            session, "Read", "Administrative", current_user
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
+            
+        scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == id)).first()
+        if not scope_group:
+            raise HTTPException(status_code=404, detail="Scope Group not found")
+   
+       
+            
+        return {
+                "id": scope_group.id,
+                "name": scope_group.scope_name,
+                "organizations": [org.id for org in scope_group.organizations],
+            }
+
+        
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@ar.get("/scope-group-form/")
+async def form_scope(
+    session: SessionDep,
+    current_user: UserDep,    
+    tenant: str,
+):
+    try:
+        if not check_permission(
+            session, "Read", "Administrative", current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
@@ -450,23 +516,24 @@ async def form_scope(
         
         data = {"id":"", 
                 "name": "",
+                "organization": "",
                 }
         
         return {"data": data, "html_types": get_html_types("scope_group")}
     except Exception as e:
-        print(str(e))
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
     
 @ar.post("/create-scope-group/")
 async def create_scope_group(
     session: SessionDep,
     current_user: UserDep,    
-    tenant: str = Depends(get_tenant),
+    tenant: str,
     scope_data: Dict[str, Any] = Body(...),
 ):
     try:
         if not check_permission(
-            session, "Create", "Administration", current_user
+            session, "Create", "Administrative", current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
@@ -498,31 +565,32 @@ async def create_scope_group(
 
         return scope_group.id
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
     
 @ar.get("/scope-organization-form/")
 async def form_scope_organization(
     session: SessionDep,
     current_user: UserDep,
-
+    tenant: str
 ):
     try:
         if not check_permission(
-            session, "Read", "Administration", current_user
+            session, "Read", "Administrative", current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-
-        org = {"scope_id":"", 
-                "organizations": get_child_organization(session, current_user["organization"])
+        current_tenant = session.exec(select(Organization).where(Organization.organization_name == tenant)).first()
+        org = {"id":current_tenant.id, 
+                "organizations": get_child_organization(session, current_tenant.id)
                 }
         print(org)
         
         return {"data": org, "html_types": get_html_types("scope_organization")}
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
-    
     
 @ar.post("/add-scope-organization/")
 async def add_organization_to_scope(
@@ -533,7 +601,7 @@ async def add_organization_to_scope(
 ):
     try:
         if not check_permission(
-            session, "Create", "Administration", current_user
+            session, "Create", "Administrative", current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
@@ -573,85 +641,22 @@ async def add_organization_to_scope(
 
         return "Organization in Scope Group updated successfully"
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
     
-
-@ar.get("/get-scope-groups/")
-async def get_scope_groups(
-    session: SessionDep,
-    current_user: UserDep,    
-    tenant: str = Depends(get_tenant),
-
-):
-    try:
-        if not check_permission(
-            session, "Read", "Administration", current_user
-            ):
-            raise HTTPException(
-                status_code=403, detail="You Do not have the required privilege"
-            )
-        scope_groups = session.exec(select(ScopeGroup)).all()
-        if not scope_groups:
-            raise HTTPException(status_code=404, detail="No scope groups found")
-        
-        scope_group_list = []
-        
-        for scope_group in scope_groups:
-            scope_group_list.append({
-                "id": scope_group.id,
-                "scope_name": scope_group.scope_name,
-                "organizations": [org.organization_name for org in scope_group.organizations],
-            })
-            
-        return scope_group_list
-
-        
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    
-@ar.get("/get-scope-group/{id}")
-async def get_scope_group(
-    session: SessionDep,
-    current_user: UserDep,
-    id: int
-):
-    try:
-        if not check_permission(
-            session, "Read", "Administration", current_user
-            ):
-            raise HTTPException(
-                status_code=403, detail="You Do not have the required privilege"
-            )
-            
-        scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == id)).first()
-        if not scope_group:
-            raise HTTPException(status_code=404, detail="Scope Group not found")
-   
-       
-            
-        return {
-                "id": scope_group.id,
-                "name": scope_group.scope_name,
-                "organizations": [org.id for org in scope_group.organizations],
-            }
-
-        
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
 
 @ar.put("/update-scope-group/")
 async def update_scope_group(
     session: SessionDep,
     current_user: UserDep,    
-    tenant: str = Depends(get_tenant),
+    tenant: str,
 
     name: str = Body(...) ,
     id: int = Body(...),
 ):
     try:
         if not check_permission(
-            session, "Update", "Administration", current_user
+            session, "Update", "Administrative", current_user
             ):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -676,46 +681,44 @@ async def update_scope_group(
 
         return scope_group.id
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
     
-
 @ar.delete("/delete-scope-group/{id}")
 async def delete_scope_group(
     session: SessionDep,
     id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: UserDep,
 ):
     try:
-        if not check_permission(
-            session, "Delete", "Administration", current_user
-            ):
-            raise HTTPException(
-                status_code=403, detail="You Do not have the required privilege"
-            )
-            
-        scope_group_links = session.exec(select(ScopeGroupLink).where(ScopeGroupLink.scope_group_id == id)).all()
-        if scope_group_links:
-            for scope_group_link in scope_group_links:
-                session.delete(scope_group_link)
-                session.commit()
-        assigned_users = session.exec(select(User).where(User.scope_group_id == id)).all()
+        # Permission check
+        if not check_permission(session, "Delete", "Administrative", current_user):
+            raise HTTPException(status_code=403, detail="You do not have the required privilege")
 
+        # Ensure scope group exists before proceeding
+        scope_group = session.get(ScopeGroup, id)
+        if not scope_group:
+            raise HTTPException(status_code=404, detail="Scope group not found")
+
+        # Delete links associated with the scope group
+        scope_group_links = session.exec(select(ScopeGroupLink).where(ScopeGroupLink.scope_group_id == id)).all()
+        for link in scope_group_links:
+            session.delete(link)
+
+        # Unassign users from the scope group
+        assigned_users = session.exec(select(User).where(User.scope_group_id == id)).all()
         for user in assigned_users:
             user.scope_group_id = None
             session.add(user)  # mark for update
 
-        session.commit()
-
-
-        scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == id)).first()
-        if not scope_group:
-            raise HTTPException(status_code=404, detail="Scope group not found")
-
+        # Delete the scope group
         session.delete(scope_group)
+
+        # Commit all changes at once
         session.commit()
 
         return {"message": "Scope group deleted successfully"}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
     
-
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=400, detail=str(e))

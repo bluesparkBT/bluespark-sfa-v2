@@ -1,3 +1,4 @@
+from models.Warehouse import WarehouseStoreAdminLink
 from sqlmodel import SQLModel, Field, Relationship
 from enum import Enum
 from datetime import  datetime
@@ -21,10 +22,12 @@ class ScopeGroup(SQLModel, table=True):
     organizations: List["Organization"] = Relationship(back_populates="scope_groups", link_model=ScopeGroupLink)
 
 class OrganizationType(str, Enum):
+    service_provider = "Service Provider"
+    company = "Company"    
     distributor = "Distributor"
     subagent = "SubAgent"
     retailer = "Retailer"
-    company = "Company"
+
 
 class Organization(SQLModel, table=True): 
     __tablename__ = "organization"
@@ -33,13 +36,19 @@ class Organization(SQLModel, table=True):
     organization_name: str = Field(index=True)
     owner_name: Optional[str] = Field(default=None,index=True)
     logo_image: Optional[str] = Field(default=None)
+    tenant_domain: Optional[str] =Field()
     description: Optional[str] = Field(default=None, index=True)
     organization_type: OrganizationType = Field(default=OrganizationType.company)
     parent_id: Optional[int] = Field(default=None,  foreign_key="organization.id")
+    inheritance_group: Optional[int] = Field(default=None, foreign_key='inheritance_group.id')
     scope_groups: List["ScopeGroup"] = Relationship(
         back_populates="organizations",
         link_model=ScopeGroupLink
     )
+    active:Optional[bool] =Field(default= True, index=True)
+    warehouses: Optional[List["Warehouse"]] = Relationship(back_populates="organization")
+
+    
 class Gender(str, Enum):
     """
     Enum Class representing gender options.
@@ -87,40 +96,41 @@ class AccessPolicy(str, Enum):
     manage = "manage"
     
 class ModuleName(str, Enum):
-
+    
+    service_provider = "Service Provider"
+    administrative = "Administrative"
+    adddress = "Address"
     category = "Category"
-    product = "Product"
     dashboard = "Dashboard"
+    deposit = "Deposit"
     finance = "Finance"
-    sales = "Sales"
-    presales = "Presales"
-    trade_marketing = "Trade Marketing"
-    visit = "Visit"
+    product = "Product"
+    penetration = "Penetration"
+    presales = "Presales"    
+    inheritance = "Inheritance"
+    inventory_management = "Inventory Management"
     order = "Order"
+    organization = "Organization"
+    sales = "Sales"
+    stock = "Stock"
+    scope_group = "Scope Group"
+    role = "Role"
     route = "Route"
+    route_schedule = "Route Schedule"
+    trade_marketing = "Trade Marketing"
     territory = "Territory"
     point_of_sale = "Point Of Sale"
-    address = "Address"
     users = "Users"
-    role = "Role"
-    organization = "Organization"
-    inventory_management = "Inventory Management"
-    route_schedule = "Route Schedule"
-    penetration = "Penetration"
-    administration = "Administration"
-
-# class Module(SQLModel, table=True):
-#     __tablename__ = "module"
-
-#     id: int = Field(primary_key=True)
-#     name: str
-#     permissions: List["RoleModulePermission"] = Relationship(back_populates="module")
+    visit = "Visit"
+    vehichle = "Vehicle"
+    warehouse = "Warehouse"
+    warehouse_stop = "Warehouse-stop"
 
 
 class RoleModulePermission(SQLModel, table=True):
     __tablename__ = "role_module_permission"
 
-    id: int = Field(primary_key=True)
+    id: Optional[int] = Field(default=None, primary_key=True)
     role_id: int = Field(foreign_key="role.id")
     module: str 
     access_policy: Optional[AccessPolicy] = Field(default=AccessPolicy.deny)
@@ -151,6 +161,15 @@ class User(SQLModel, table=True):
     id_type: Optional[IdType] = Field(default=None)
     id_number: Optional[str] = Field(default=None)    
     #address_id: Optional[int] = Field(default=None, foreign_key="address.id", index=True)
+    warehouses: Optional[List["Warehouse"]] = Relationship(back_populates="store_admins", link_model=WarehouseStoreAdminLink)
+    requester_warehouse_stops: List["WarehouseStop"] = Relationship(
+        back_populates="requester",
+        sa_relationship_kwargs={"foreign_keys": "[WarehouseStop.requester_id]"}
+    )
+    approver_warehouse_stops: List["WarehouseStop"] = Relationship(
+        back_populates="approver",
+        sa_relationship_kwargs={"foreign_keys": "[WarehouseStop.approver_id]"}
+    )
 
 
 

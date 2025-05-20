@@ -17,40 +17,16 @@ SessionDep = Annotated[Session, Depends(get_session)]
 UserDep = Annotated[dict, Depends(get_current_user)]
 
 
-@rr.get("/roles-form")
-async def form_roles(
-    session: SessionDep,
-    tenant: str = Depends(get_tenant),
-    current_user: User = Depends(get_current_user),
-):
-    try:
-        if not check_permission(
-            session, "Read", "Administration", current_user
-            ):
-            raise HTTPException(
-                status_code=403, detail="You Do not have the required privilege"
-            )
-        policy_type =  {i.value: i.value for i in AccessPolicy}
-        print(policy_type)
-        role = {
-            "id":"",
-            "name":"",
-        }
-        
-        return {"data": role, "html_types": get_html_types("Role")}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    
 @rr.get("/roles")
 async def get_roles(
     session: SessionDep,
-    tenant: str = Depends(get_tenant), 
-    current_user: User = Depends(get_current_user),
+    tenant: str, 
+    current_user: UserDep,
 ):
    
     try:
         if not check_permission(
-            session, "Read", "Administration", current_user
+            session, "Read", "Administrative", current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
@@ -80,105 +56,21 @@ async def get_roles(
  
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
-    
-    
-@rr.get("/role/{id}")
-async def create_role(
-    session: SessionDep,
-    id: int,
-    tenant: str = Depends(get_tenant),
-    current_user: User = Depends(get_current_user),
-):
-    try:
-        if not check_permission(
-            session, "Read", "Administration", current_user
-            ):
-            raise HTTPException(
-                status_code=403, detail="You Do not have the required privilege"
-            )
-        role = session.exec(select(Role).where(Role.id == id)).first()
-        if not role:
-            raise HTTPException(status_code=404, detail="Role not found")
-       
-        return {"id": role.id, "name": role.name}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@rr.get("/modules-form")
-async def form_modules(
-    session: SessionDep,
-    tenant: str = Depends(get_tenant),
-    current_user: User = Depends(get_current_user),
-):
-    try:
-        if not check_permission(
-            session, "Read", "Administration", current_user
-            ):
-            raise HTTPException(
-                status_code=403, detail="You Do not have the required privilege"
-            )
-        policy_type =  {i.value: i.value for i in AccessPolicy}
-        modules_dict =  {i.value: i.value for i in modules}
-        print(policy_type)
-        role = {
-            "role_id":"",
-            "module":modules_dict,
-            "policy":policy_type,
-        }
-        
-        return {"data": role, "html_types": get_html_types("Policy")}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@rr.post("/update-role-module")
-async def update_role(
-    session: SessionDep,
-    tenant: str = Depends(get_tenant),
-    
-    role_id: int = Body(...),
-    module: str = Body(...),
-    policy: str = Body(...),
-    current_user: User = Depends(get_current_user),
-):
-    try:
-        if not check_permission(
-            session, "Update", "Administration", current_user
-            ):
-            raise HTTPException(
-                status_code=403, detail="You Do not have the required privilege"
-            )
-        role_module_permission = session.exec(select(RoleModulePermission)
-                                    .where((RoleModulePermission.role_id == role_id)&
-                                          (RoleModulePermission.module == module))).first()
-        role_module_permission.module = module
-        role_module_permission.access_policy = policy
-
-        session.add(role_module_permission)
-        session.commit()
-        session.refresh(role_module_permission)
-     
-       
-        return "Role permission updated successfully"
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
 
 @rr.get("/my-role")
 async def get_my_role(
     session: SessionDep,
-    tenant: str = Depends(get_tenant),
-    current_user: User = Depends(get_current_user),
+    tenant: str,
+    current_user: UserDep,
 ):
     try:
         if not check_permission(
-            session, "Read", "Role", current_user
+            session, "Read", ["Administrative", "Role", "Service Provider"], current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-        user = session.exec(select(User).where(User.id ==current_user.get("user_id"))).first()
+        user = session.exec(select(User).where(User.id ==current_user.id)).first()
 
         if not user or not user.role_id:
             raise HTTPException(status_code=404, detail="User or assigned role not found")
@@ -201,24 +93,69 @@ async def get_my_role(
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
-
-
-@rr.post("/create-role")
+    
+@rr.get("/role/{id}")
 async def create_role(
     session: SessionDep,
-    tenant: str = Depends(get_tenant),
-    
-    role_data: Dict[str, Any] = Body(...),
-    current_user: User = Depends(get_current_user),
-): 
+    id: int,
+    tenant: str,
+    current_user: UserDep,
+):
     try:
         if not check_permission(
-            session, "Create", "Administration", current_user
+            session, "Read", "Administrative", current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
+        role = session.exec(select(Role).where(Role.id == id)).first()
+        if not role:
+            raise HTTPException(status_code=404, detail="Role not found")
        
+        return {"id": role.id, "name": role.name}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@rr.get("/roles-form")
+async def form_roles(
+    session: SessionDep,
+    tenant: str,
+    current_user: UserDep,
+):
+    try:
+        if not check_permission(
+            session, "Read", "Administrative", current_user
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
+        policy_type =  {i.value: i.value for i in AccessPolicy}
+        print(policy_type)
+        role = {
+            "id":"",
+            "name":"",
+        }
+        
+        return {"data": role, "html_types": get_html_types("role")}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@rr.post("/create-role")
+async def create_role(
+    session: SessionDep,
+    tenant: str,
+    current_user: UserDep,    
+    role_data: Dict[str, Any] = Body(...),
+
+): 
+    try:
+        if not check_permission(
+            session, "Create", "Administrative", current_user
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
+       #check exisiting role
         role_name = role_data.get("name")
 
         if validate_name(role_name) == False:
@@ -230,7 +167,7 @@ async def create_role(
         #create role
         role = Role(
             name=role_name,
-            organization_id = current_user['organization']
+            organization_id = current_user.organization_id
         )
 
 
@@ -241,6 +178,7 @@ async def create_role(
         #create role module permission
         for module in modules:
             role_module_permission= RoleModulePermission(
+                id=None,
                 role_id=role.id,
                 module=module.value,
                 access_policy=AccessPolicy.deny
@@ -253,20 +191,77 @@ async def create_role(
         return role.id
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+           
+@rr.get("/modules-form")
+async def form_modules(
+    session: SessionDep,
+    tenant: str,
+    current_user: UserDep,
+):
+    try:
+        if not check_permission(
+            session, "Read", "Administrative", current_user
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
+        policy_type =  {i.value: i.value for i in AccessPolicy}
+        modules_dict =  {i.value: i.value for i in modules}
+        print(policy_type)
+        role = {
+            "role_id":"",
+            "module":modules_dict,
+            "policy":policy_type,
+        }
         
+        return {"data": role, "html_types": get_html_types("policy")}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@rr.post("/update-role-module")
+async def update_role(
+    session: SessionDep,
+    tenant: str,
+    current_user: UserDep,    
+    role_id: int = Body(...),
+    module: str = Body(...),
+    policy: str = Body(...),
+
+):
+    try:
+        if not check_permission(
+            session, "Update", "Administrative", current_user
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
+        role_module_permission = session.exec(select(RoleModulePermission)
+                                    .where((RoleModulePermission.role_id == role_id)&
+                                          (RoleModulePermission.module == module))).first()
+        role_module_permission.module = module
+        role_module_permission.access_policy = policy
+
+        session.add(role_module_permission)
+        session.commit()
+        session.refresh(role_module_permission)
+     
+       
+        return "Role permission updated successfully"
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @rr.put("/update-role")
 async def update_role(
     session: SessionDep,
-    tenant: str = Depends(get_tenant),
-    
+    tenant: str,
+    current_user: UserDep,
+
     name: str = Body(...) ,
     id: int = Body(...),
-    current_user: User = Depends(get_current_user),
 ):
     try:
         if not check_permission(
-            session, "Update", "Administration", current_user
+            session, "Update", "Administrative", current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
@@ -289,18 +284,17 @@ async def update_role(
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-
 @rr.delete("/delete-role/{id}")
 async def delete_role(
     session: SessionDep,
     id: int,    
-    tenant: str = Depends(get_tenant),
-    current_user: User = Depends(get_current_user),
+    tenant: str,
+    current_user: UserDep,
 ):
 
     try:   
         if not check_permission(
-            session, "Delete", "Administration", current_user
+            session, "Delete", "Administrative", current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
