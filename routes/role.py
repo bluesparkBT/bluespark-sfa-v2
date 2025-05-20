@@ -263,12 +263,21 @@ async def update_role(
         role_module_permission = session.exec(select(RoleModulePermission)
                                     .where((RoleModulePermission.role_id == role_id)&
                                           (RoleModulePermission.module == module))).first()
-        role_module_permission.module = module
-        role_module_permission.access_policy = policy
+        if(role_module_permission):
+            role_module_permission.module = module
+            role_module_permission.access_policy = policy
+        else:
+            role_module_permission= RoleModulePermission(
+                    id=None,
+                    role_id=role_id,
+                    module=module,
+                    access_policy=policy
+                )
 
         session.add(role_module_permission)
         session.commit()
         session.refresh(role_module_permission)
+
      
        
         return "Role permission updated successfully"
