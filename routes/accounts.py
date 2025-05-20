@@ -264,7 +264,7 @@ async def create_user(
                 detail="Phone number is not valid",
         )
             
-        current_tenant = session.exec(select(Organization).where(Organization.tenant_hashed == tenant)).first()
+        current_tenant = session.exec(select(Organization).where(Organization.id == current_user.organization_id)).first() if tenant == "provider" else session.exec(select(Organization).where(Organization.tenant_hashed == tenant)).first()
         print("the organization get from", current_tenant)   
                
         # Generate and hash password
@@ -294,7 +294,7 @@ async def create_user(
 
         return {
             "message": "User registered successfully",
-            "domain" : f"{Domain}/{tenant}/signin",
+            "domain" : f"{Domain}/signin" if tenant == "provider" else f"{Domain}/{tenant}/signin",
             "username": user_name,
             "password": password }
     except Exception as e:
@@ -606,7 +606,7 @@ async def form_scope_organization(
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-        current_tenant = session.exec(select(Organization).where(Organization.organization_name == tenant)).first()
+        current_tenant = session.exec(select(Organization).where(Organization.id == current_user.organization_id)).first() if tenant == "provider" else session.exec(select(Organization).where(Organization.tenant_hashed == tenant)).first()
         print("current tenant",get_child_organization(session, current_user.organization_id) )
         org = {"scope_id":"",
                 "parent_organization":{current_tenant.id: current_tenant.organization_name}, 
