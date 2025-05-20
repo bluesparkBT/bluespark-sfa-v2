@@ -32,7 +32,7 @@ def login(
         user = session.exec(select(User).where(User.username == tenant_users(username, tenant))).first()
         print("tenant sytem admin user:", user)
 
-        if not user or not verify_password(password+user.username, user.hashedPassword):
+        if not user or not verify_password(password+user.username if username == "admin" else password+username, user.hashedPassword):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
         
         access_token_expires = timedelta(minutes=90)
@@ -210,7 +210,7 @@ async def create_user(
     tenant: str,
 
     full_name: str = Body(...),
-    user_name: str = Body(...),
+    username: str = Body(...),
     email: str = Body(...),
     role: int = Body(...),
     scope: str = Body(...),
@@ -228,7 +228,7 @@ async def create_user(
                 status_code=403, detail="You Do not have the required privilege"
             )
             
-        existing_user = session.exec(select(User).where(User.username == user_name)).first()
+        existing_user = session.exec(select(User).where(User.username == username)).first()
         if existing_user:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -252,6 +252,7 @@ async def create_user(
         )
             
         # Generate and hash password
+        user_name = username
 
         password = generate_random_password()
         hashed_password = get_password_hash(password + user_name)
@@ -277,7 +278,7 @@ async def create_user(
 
         return {
             "message": "User registered successfully",
-            "Domain" : f"Domain/{tenant}/signin",
+            "domain" : f"{Domain}/{tenant}/signin",
             "username": user_name,
             "password": password }
     except Exception as e:
@@ -454,10 +455,14 @@ async def get_scope_groups(
         scope_group_list = []
         
         for scope_group in scope_groups:
+            organizations = [org.organization_name for org in scope_group.organizations]
+    
+            if scope_group.parent_organization:
+                organizations.append(scope_group.parent_organization.organization_name)
             scope_group_list.append({
                 "id": scope_group.id,
                 "scope_name": scope_group.scope_name,
-                "organizations": [org.organization_name for org in scope_group.organizations],
+                "organizations": organizations
             })
             
         return scope_group_list
@@ -482,15 +487,19 @@ async def get_scope_group(
                 status_code=403, detail="You Do not have the required privilege"
             )
             
+        tenant_name = []
         scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == id)).first()
         if not scope_group:
             raise HTTPException(status_code=404, detail="Scope Group not found")
+        if scope_group.parent_organization:
+            tenant_name = [scope_group.parent_id]
    
        
             
         return {
                 "id": scope_group.id,
                 "name": scope_group.scope_name,
+                "parent_organization": tenant_name,
                 "organizations": [org.id for org in scope_group.organizations],
             }
 
@@ -516,7 +525,7 @@ async def form_scope(
         
         data = {"id":"", 
                 "name": "",
-                "organization": "",
+          
                 }
         
         return {"data": data, "html_types": get_html_types("scope_group")}
@@ -582,10 +591,13 @@ async def form_scope_organization(
                 status_code=403, detail="You Do not have the required privilege"
             )
         current_tenant = session.exec(select(Organization).where(Organization.organization_name == tenant)).first()
-        org = {"id":current_tenant.id, 
-                "organizations": get_child_organization(session, current_tenant.id)
+        print("current tenant",get_child_organization(session, current_user.organization_id) )
+        org = {"scope_id":"",
+                "parent_organization":{current_tenant.id: current_tenant.organization_name}, 
+                "organizations": get_child_organization(session, current_user.organization_id)
                 }
-        print(org)
+        print("org",org)
+ 
         
         return {"data": org, "html_types": get_html_types("scope_organization")}
     except Exception as e:
@@ -597,6 +609,7 @@ async def add_organization_to_scope(
     session: SessionDep,
     current_user: UserDep,
     scope_id:int = Body(...),
+    parent_organization: List[int] = Body(...),
     organizations: List[int] = Body(...)
 ):
     try:
@@ -615,10 +628,11 @@ async def add_organization_to_scope(
             )
         
         existing_orgs = [organization.id for organization in scope_group.organizations ]
-        print(existing_orgs)
+        print("existing",existing_orgs)
     
         existing_org_ids = set(existing_orgs)
         new_org_ids_set = set(organizations)
+        print("now",new_org_ids_set)
 
         # Add new entries
         to_add = new_org_ids_set - existing_org_ids
@@ -631,12 +645,30 @@ async def add_organization_to_scope(
 
       # Remove obsolete entries
         to_remove = existing_org_ids - new_org_ids_set
+        print("to remove", to_remove)
         if to_remove:
-            scope_group_link_remove = session.exec(select(ScopeGroupLink)
+            links_to_remove = session.exec(
+                select(ScopeGroupLink)
                 .where(ScopeGroupLink.scope_group_id == scope_id)
-                .where(ScopeGroupLink.organization_id.in_(to_remove))).first()
-            session.delete(scope_group_link_remove)
+                .where(ScopeGroupLink.organization_id.in_(to_remove))
+            ).all()
+
+            for link in links_to_remove:
+                session.delete(link)
+
             session.commit()
+
+
+        print("tenant_name", parent_organization)
+        if parent_organization:
+            scope_group.parent_id = parent_organization[0]
+            session.add(scope_group)
+            session.commit()
+        else:
+            scope_group.parent_id = None
+            session.add(scope_group)
+            session.commit()
+
             
 
         return "Organization in Scope Group updated successfully"
