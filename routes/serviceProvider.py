@@ -310,25 +310,24 @@ async def get_tenants(
             raise HTTPException(
                 status_code=403, detail="You do not have the required privilege"
             )
-
-        all_tenants = session.exec(
+        tenant_list = []
+        
+        tenants = session.exec(
             select(Organization).where(
                 (Organization.parent_id == None) &
                 (Organization.organization_type == OrganizationType.company)
             )
         ).all()
-
-        tenant_list = [
-            {
-                "id": tenant.id,
-                "company": tenant.organization_name,
-                "owner": tenant.owner_name,
-                "description": tenant.description,
-                "logo": tenant.logo_image
-
-            }
-            for tenant in all_tenants
-        ]
+        for tenant in  tenants:
+            tenant_list.append({
+                    "id": tenant.id,
+                    "tenant": tenant.organization_name,
+                    "owner": tenant.owner_name,
+                    "description": tenant.description,
+                    "logo": tenant.logo_image,
+                    "domain": tenant.tenant_domain
+                }
+            )
 
         return tenant_list
 
@@ -511,7 +510,7 @@ async def create_tenant(
             "message": "Tenant and system admin created successfully",
             "tenant": tenant_name,
             "domain": f"{Domain}/{hashed_tenant_name}/signin/",
-            "user_name":"admin",
+            "username":"admin",
             "password": password 
         }
 

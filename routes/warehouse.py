@@ -77,13 +77,7 @@ async def create_warehouse(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Warehouse already registered",
         )
-        #Check Validity
         
-        if validate_name(warehouse_name) == False:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Warehouse name is not valid",
-        )
 
         cleaned = location.strip("()")
         lat_str, lon_str = cleaned.split(",")
