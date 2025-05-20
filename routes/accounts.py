@@ -30,6 +30,8 @@ def login(
 ):
     try:
         current_tenant = session.exec(select(Organization).where(Organization.tenant_hashed == tenant)).first()
+        print(tenant)
+        print(current_tenant)
         print("the organization get from", current_tenant)
         user = session.exec(select(User).where(User.username == tenant_users(username, current_tenant.organization_name))).first()
         print("tenant sytem admin user:", user)

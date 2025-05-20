@@ -8,7 +8,7 @@ from models.Product import Product
 from utils.util_functions import validate_name
 from utils.auth_util import get_current_user, check_permission
 from utils.get_hierarchy import get_organization_ids_by_scope_group
-from utils.form_db_fetch import fetch_category_id_and_name
+from utils.form_db_fetch import fetch_category_id_and_name, fetch_organization_id_and_name
 import traceback 
 ProductRouter = pr = APIRouter()
 
@@ -135,6 +135,8 @@ def get_product_form(
             "price": "",
             "unit": "",
             "category": fetch_category_id_and_name(session, current_user) ,
+            "organization": fetch_organization_id_and_name(session, current_user),
+
         }
 
         return {"data": form_structure, "html_types": get_html_types("product")}

@@ -94,11 +94,11 @@ MODEL_HTML_TYPES = {
     "category": {
         "id": "hidden",
         "name": "text",
-        "UNSPC Code": "text",
+        "code": "text",
         "description": "textarea",
         "image": "file",
         "parent_category": "select",
-        "organization_id": "select"
+        "organization": "select"
     },
     "product": {
         "id": "hidden",
@@ -112,7 +112,7 @@ MODEL_HTML_TYPES = {
         "price": "number",
         "unit": "text",
         "category": "select",
-        "organization_id": "hidden"
+        "organization": "select"
     },
     "inheritance": {
         "id": "hidden",
