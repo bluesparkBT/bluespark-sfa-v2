@@ -74,14 +74,6 @@ async def create_superadmin_user(
     password: str = Body(...),
 ):
     try:
-        # existing_service_provider = session.exec(select(Organization).where(Organization.organization_name == "Bluespark"))
-        # if existing_service_provider:
-        #     print("Exisitng service provider: ", existing_service_provider)
-        #     raise HTTPException(
-        #         status_code=status.HTTP_400_BAD_REQUEST,
-        #         detail="Service Provider already registered",
-        #     )
-            
         existing_superadmin = session.exec(select(User).where(User.role_id == Role.id == "Super Admin")).first()
         if existing_superadmin is not None:
             raise HTTPException(
@@ -90,7 +82,7 @@ async def create_superadmin_user(
             )
 
         service_provider = Organization(
-            organization_name= "Bluespark",
+            organization_name= "Blue Spark Business Technology",
             owner_name = "Mekonen",
             organization_type = OrganizationType.service_provider.value
         )
@@ -107,23 +99,14 @@ async def create_superadmin_user(
         if existing_scope_group:
             service_provider_scope_group = existing_scope_group
         else:
-            service_provider_scope_group = ScopeGroup(scope_name="Super Admin Scope")
+            service_provider_scope_group = ScopeGroup(
+                scope_name="Super Admin Scope",
+                parent_id = service_provider.id
+                )
             session.add(service_provider_scope_group)
             session.commit()
             session.refresh(service_provider_scope_group)
 
-        # Check if System Admin Scope group exists
-        # system_admin_scope_group = session.exec(
-        #     select(ScopeGroup).where(ScopeGroup.scope_name == "System Admin Scope")
-        # ).first()
-        
-        # if not system_admin_scope_group:        
-        #     tenant_scope_group = ScopeGroup(
-        #         scope_name="System Admin Scope",
-        #     )
-        #     session.add(tenant_scope_group)
-        #     session.commit()
-        #     session.refresh(tenant_scope_group)
         
         scope_group_link = ScopeGroupLink(
             scope_group_id=service_provider_scope_group.id,
@@ -444,6 +427,7 @@ async def create_tenant(
         if not system_admin_scope_group:
             system_admin_scope_group = ScopeGroup(
                 scope_name=f"{tenant_name} Admin Scope",
+                parent_id = tenant.id
             )
             session.add(system_admin_scope_group)
             session.commit()

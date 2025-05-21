@@ -16,8 +16,7 @@ def capitalize_name(name: str) -> str:
 
 
 def validate_name(name: str) -> bool:
-    
-    name_match = re.match(r"^([A-Za-z \u1200-\u137f]*)$", name)
+    name_match = re.match(r"^([0-9A-Za-z \u1200-\u137f\-&_]*)$", name)
     
     if name_match:
         return True
@@ -31,13 +30,13 @@ def validate_image(image_b64str: str) -> bool:
     else:
         return False
     
-def validate_email(email: str) -> bool:
-    """Validates if the email address is in a valid format using regex."""
-    email_regex = r"^[a-z0-9._]+@[a-z0-9.-]+\.[a-z]{2,}$"
+import re
 
-    if re.match(email_regex, email):
-        return True
-    return False
+def validate_email(email: str) -> bool:
+    """Validates if the email address is in a valid format (RFC 5322 simplified)."""
+    email_regex = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+    return re.match(email_regex, email) is not None
+
 
 
 def validate_phone_number(phone_number) -> bool:
