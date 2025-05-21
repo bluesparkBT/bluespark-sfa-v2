@@ -126,7 +126,7 @@ class ModuleName(str, Enum):
     point_of_sale = "Point Of Sale"
     users = "Users"
     visit = "Visit"
-    vehichle = "Vehicle"
+    vehicle = "Vehicle"
     warehouse = "Warehouse"
     warehouse_stop = "Warehouse-stop"
 
