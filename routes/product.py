@@ -3,6 +3,9 @@ from db import SECRET_KEY, get_session
 from sqlmodel import Session, select
 from fastapi import APIRouter, HTTPException, Body, Depends
 from db import get_session
+
+from models.Account import User, AccessPolicy, Organization, OrganizationType, ScopeGroup, Scope, Role, ScopeGroupLink
+from models.Inheritance import InheritanceGroup
 from utils.model_converter_util import get_html_types
 from models.Product import Product
 from utils.util_functions import validate_name
@@ -28,36 +31,96 @@ def get_products(
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-            
-        organization_ids= get_organization_ids_by_scope_group(session, current_user)
+        inherited_group_id = session.exec(
+            select(Organization.inheritance_group).where(Organization.id == current_user.organization_id)
+        ).first()
 
-        # Fetch categories based on organization IDs
-        db_products = session.exec(
-            select(Product).where(Product.organization_id.in_(organization_ids))
+        inherited_group = session.exec(
+            select(InheritanceGroup).where(InheritanceGroup.id == inherited_group_id)
+        ).first()
+
+        if inherited_group:
+            inherited_product = inherited_group.product
+        else:
+            inherited_product = []
+        
+        scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == current_user.scope_group_id)).first()
+   
+        if scope_group != None:
+            existing_orgs = [organization.id for organization in scope_group.organizations ]
+        if scope_group == None:
+            existing_orgs= []
+
+        organization_product = session.exec(
+            select(Product).where(Product.organization_id.in_(existing_orgs))
         ).all()
 
-        #validate the retrived products
-        if not db_products:
-            raise HTTPException(status_code=404, detail="No products found")
-        
-        Product_list = []
-        for db_product in db_products:
-            Product_temp= {
-                "id": db_product.id,
-                "Product Name": db_product.name,
-                "SKU": db_product.sku,
-                "Description": db_product.description,
-                "Brand": db_product.brand,
-                "Batch Number": db_product.batch_number,
-                "Code": db_product.code,
-                "Price": db_product.price,
-                "Unit": db_product.unit,
+        organization_product.extend(inherited_product)
+
+        product_list = []
+        for product in organization_product:
+            product_temp = {
+                "id": product.id,
+                "Product Name": product.name,
+                "SKU": product.sku,
+                "Description": product.description,
+                "Brand": product.brand,
+                "Batch Number": product.batch_number,
+                "Code": product.code,
+                "Price": product.price,
+                "Unit": product.unit,
             }
-            if Product_temp not in Product_list:
-                Product_list.append(Product_temp)
-        return Product_list
+            if product_temp not in product_list:
+                product_list.append(product_temp)
+
+        return product_list
+
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        traceback.print_exc()
+        raise HTTPException(status_code=400, detail=str(e))    
+            
+# def get_products(
+#     session: SessionDep, 
+#     current_user: UserDep,
+#     tenant: str,
+# ) :
+#     try:
+#         if not check_permission(
+#             session, "Read",  ["Administrative", "Product"], current_user
+#             ):
+#             raise HTTPException(
+#                 status_code=403, detail="You Do not have the required privilege"
+#             )
+            
+#         organization_ids= get_organization_ids_by_scope_group(session, current_user)
+
+#         # Fetch categories based on organization IDs
+#         db_products = session.exec(
+#             select(Product).where(Product.organization_id.in_(organization_ids))
+#         ).all()
+
+#         #validate the retrived products
+#         if not db_products:
+#             raise HTTPException(status_code=404, detail="No products found")
+        
+#         Product_list = []
+#         for db_product in db_products:
+#             Product_temp= {
+#                 "id": db_product.id,
+#                 "Product Name": db_product.name,
+#                 "SKU": db_product.sku,
+#                 "Description": db_product.description,
+#                 "Brand": db_product.brand,
+#                 "Batch Number": db_product.batch_number,
+#                 "Code": db_product.code,
+#                 "Price": db_product.price,
+#                 "Unit": db_product.unit,
+#             }
+#             if Product_temp not in Product_list:
+#                 Product_list.append(Product_temp)
+#         return Product_list
+#     except Exception as e:
+#         raise HTTPException(status_code=400, detail=str(e))
 
 @pr.get("/get-product/{product_id}")            
 def get_product(
@@ -110,7 +173,7 @@ def get_product_form(
     try:
         # Check permission
         if not check_permission(
-            session, "Create",["Administrative", "Product"], current_user
+            session, "Read",["Administrative", "Product"], current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
@@ -162,7 +225,7 @@ def create_product(
 ):
         try:
             if not check_permission(
-                session, "Update",["Administrative", "Product"], current_user
+                session, "Create",["Administrative", "Product"], current_user
                 ):
                 raise HTTPException(
                     status_code=403, detail="You Do not have the required privilege"

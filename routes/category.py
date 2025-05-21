@@ -4,6 +4,8 @@ from sqlmodel import Session, select
 from fastapi import APIRouter, HTTPException, Body, status, Depends
 from db import get_session
 from utils.model_converter_util import get_html_types
+
+from models.Account import User, AccessPolicy, Organization, OrganizationType, ScopeGroup, Scope, Role, ScopeGroupLink
 from models.Product import Product, Category
 from models.Inheritance import InheritanceGroup
 from utils.util_functions import validate_name
@@ -14,7 +16,7 @@ from utils.form_db_fetch import fetch_category_id_and_name, fetch_organization_i
 import traceback
 
 
-CatagoryRouter = c = APIRouter()
+CategoryRouter = c = APIRouter()
 
 SessionDep = Annotated[Session, Depends(get_session)]
 UserDep = Annotated[dict, Depends(get_current_user)]
@@ -29,6 +31,12 @@ def get_category(
 ):
     
     try: 
+        if not check_permission(
+            session, "Read",["Administrative", "Category"], current_user
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )  
         # Fetch the inheritance group from the organization
         inherited_group_id = session.exec(
             select(Organization.inheritance_group).where(Organization.id == current_user.organization_id)
@@ -43,8 +51,18 @@ def get_category(
         else:
             inherited_categories = []
         # Fetch products associated with the inheritance group
+
+        
+        # organization_ids = get_organization_ids_by_scope_group(session, current_user)
+        scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == current_user.scope_group_id)).first()
+   
+        if scope_group != None:
+            existing_orgs = [organization.id for organization in scope_group.organizations ]
+        if scope_group == None:
+            existing_orgs= []
+
         organization_categories = session.exec(
-            select(Category).where(Category.organization_id == current_user.organization_id)
+            select(Category).where(Category.organization_id.in_(existing_orgs))
         ).all()
         # categories = organization_group.categories
 
@@ -68,6 +86,56 @@ def get_category(
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
+
+
+# @c.get("/get-categories")
+# def get_category(
+#     session: SessionDep,
+#     current_user: UserDep,
+#     tenant: str,
+
+# ):
+    
+#     try: 
+#         # Fetch the inheritance group from the organization
+#         inherited_group_id = session.exec(
+#             select(Organization.inheritance_group).where(Organization.id == current_user.organization_id)
+#         ).first()
+
+#         inherited_group = session.exec(
+#             select(InheritanceGroup).where(InheritanceGroup.id == inherited_group_id)
+#         ).first()
+
+#         if inherited_group:
+#             inherited_categories = inherited_group.categories
+#         else:
+#             inherited_categories = []
+#         # Fetch products associated with the inheritance group
+#         organization_categories = session.exec(
+#             select(Category).where(Category.organization_id == current_user.organization_id)
+#         ).all()
+#         # categories = organization_group.categories
+
+#         organization_categories.extend(inherited_categories)
+
+#         category_list = []
+#         for category in organization_categories:
+#             category_temp = {
+#                 "id": category.id,
+#                 "Category Name": category.name,
+#                 "Parent Category id": category.parent_category,
+#                 "Parent Category name": category.parent_category,
+#                 "UNSPC Code": category.code,
+#                 "Description": category.description,
+#             }
+#             if category_temp not in category_list:
+#                 category_list.append(category_temp)
+
+#         return category_list
+
+#     except Exception as e:
+#         traceback.print_exc()
+#         raise HTTPException(status_code=400, detail=str(e))
     
 @c.get("/get-category/{category_id}")
 def get_category(
@@ -112,7 +180,7 @@ def get_category_form(
     try:
         # Check permission
         if not check_permission(
-            session, "Create",["Administrative", "Category"], current_user
+            session, "Read",["Administrative", "Category"], current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
@@ -149,7 +217,7 @@ def create_category(
     try:
         
         if not check_permission(
-            session, "Create",[ "Catagory", "Administrative"], current_user
+            session, "Create",[ "Category", "Administrative"], current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
@@ -209,7 +277,7 @@ def update_category(
     try:
         # Check permission
         if not check_permission(
-            session, "Update",[ "Catagory", "Administrative"], current_user
+            session, "Update",[ "Category", "Administrative"], current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
@@ -262,7 +330,7 @@ def delete_category(
     try:
         # Check permission
         if not check_permission(
-            session, "Delete",[ "Catagory", "Administrative"], current_user
+            session, "Delete",[ "Category", "Administrative"], current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
