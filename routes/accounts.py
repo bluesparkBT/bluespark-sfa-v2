@@ -89,7 +89,7 @@ async def get_my_user(
             "fullname": user.fullname,
             "username": username_display,
             "phone_number": user.phone_number,
-            "organization": user.organization_id,
+            "organization": current_tenant.organization_name,
             "role_id": user.role_id,
             "manager_id": user.manager_id,
             "scope": user.scope,
@@ -200,6 +200,15 @@ async def create_user_form(
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
+            
+        user = session.exec(select(User).where(User.id == current_user.id)).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        current_tenant = session.exec(
+            select(Organization).where(Organization.tenant_hashed == tenant)
+        ).first()
+
         user_data = {
             "id": "", 
             "full_name": "", 
