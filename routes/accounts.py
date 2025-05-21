@@ -29,7 +29,11 @@ def login(
     password: str = Body(...)
 ):
     try:
-        user = session.exec(select(User).where(User.username == tenant_users(username, tenant))).first()
+        current_tenant = session.exec(select(Organization).where(Organization.tenant_hashed == tenant)).first()
+        print(tenant)
+        print(current_tenant)
+        print("the organization get from", current_tenant)
+        user = session.exec(select(User).where(User.username == tenant_users(username, current_tenant.organization_name))).first()
         print("tenant sytem admin user:", user)
 
         if not user or not verify_password(password+user.username if username == "admin" else password+username, user.hashedPassword):
@@ -68,13 +72,24 @@ async def get_my_user(
         user = session.exec(select(User).where(User.id == current_user.id)).first()
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
+        
+        # Determine if it's the service provider (super admin)
+        if not tenant or tenant.lower() == "provider":
+            username_display = user.username
+        else:
+            current_tenant = session.exec(
+                select(Organization).where(Organization.tenant_hashed == tenant)
+            ).first()
+            if not current_tenant:
+                raise HTTPException(status_code=404, detail="Tenant not found")
+            username_display = extract_username(user.username, current_tenant.organization_name)
+
         return {
             "id": user.id,
             "fullname": user.fullname,
-            "username": extract_username(user.username, tenant),
-            "email": user.email,
+            "username": username_display,
             "phone_number": user.phone_number,
-            "organization": user.organization_id,
+            "organization": current_tenant.organization_name,
             "role_id": user.role_id,
             "manager_id": user.manager_id,
             "scope": user.scope,
@@ -185,6 +200,15 @@ async def create_user_form(
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
+            
+        user = session.exec(select(User).where(User.id == current_user.id)).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        current_tenant = session.exec(
+            select(Organization).where(Organization.tenant_hashed == tenant)
+        ).first()
+
         user_data = {
             "id": "", 
             "full_name": "", 
@@ -251,6 +275,9 @@ async def create_user(
                 detail="Phone number is not valid",
         )
             
+        current_tenant = session.exec(select(Organization).where(Organization.id == current_user.organization_id)).first() if tenant == "provider" else session.exec(select(Organization).where(Organization.tenant_hashed == tenant)).first()
+        print("the organization get from", current_tenant)   
+               
         # Generate and hash password
         user_name = username
 
@@ -261,7 +288,7 @@ async def create_user(
         new_user = User(
             id= None,
             fullname=full_name,
-            username= tenant_users(user_name, tenant),
+            username= tenant_users(user_name, current_tenant.organization_name),
             email=email,
             phone_number=phone_number,
             hashedPassword = hashed_password,
@@ -278,7 +305,7 @@ async def create_user(
 
         return {
             "message": "User registered successfully",
-            "domain" : f"{Domain}/{tenant}/signin",
+            "domain" : f"{Domain}/signin" if tenant == "provider" else f"{Domain}/{tenant}/signin",
             "username": user_name,
             "password": password }
     except Exception as e:
@@ -590,7 +617,7 @@ async def form_scope_organization(
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-        current_tenant = session.exec(select(Organization).where(Organization.organization_name == tenant)).first()
+        current_tenant = session.exec(select(Organization).where(Organization.id == current_user.organization_id)).first() if tenant == "provider" else session.exec(select(Organization).where(Organization.tenant_hashed == tenant)).first()
         print("current tenant",get_child_organization(session, current_user.organization_id) )
         org = {"scope_id":"",
                 "parent_organization":{current_tenant.id: current_tenant.organization_name}, 

@@ -1,4 +1,4 @@
-from typing import Annotated, List, Dict, Any, Optional
+from typing import Annotated, List, Dict, Any, Optional, Union
 from fastapi import APIRouter, HTTPException, Body, status, Depends, Path
 from sqlmodel import select, Session
 from sqlalchemy.orm import selectinload
@@ -8,7 +8,7 @@ from utils.auth_util import get_current_user, check_permission
 from utils.model_converter_util import get_html_types
 from utils.util_functions import validate_name, validate_image
 from utils.get_hierarchy import get_organization_ids_by_scope_group
-from utils.form_db_fetch import fetch_organization_id_and_name
+from utils.form_db_fetch import fetch_organization_id_and_name, fetch_inheritance_group_id_and_name
 import traceback
 
 TenantRouter =tr= APIRouter()
@@ -35,7 +35,7 @@ async def get_my_tenant(
     """
     try:
         # Query the organization associated with the logged-in user
-        organization = session.exec(select(Organization).where(Organization.organization_name == tenant)).first()
+        organization = session.exec(select(Organization).where(Organization.tenant_hashed == tenant)).first()
         print("the current tenant is ",organization)
         if not organization:
             raise HTTPException(
@@ -54,7 +54,6 @@ async def get_my_tenant(
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
-
 
 @tr.get("/get-organizations/")
 async def get_organizations(
@@ -204,7 +203,8 @@ async def get_form_fields_organization(
             "description": "",
             "logo_image": "",
             "parent_organization": fetch_organization_id_and_name(session, current_user),
-            "organization_type" : {i.value: i.value for i in OrganizationType}
+            "organization_type" : {i.value: i.value for i in OrganizationType if i.value !="Service Provider"},
+            "inheritance_group": fetch_inheritance_group_id_and_name(session, current_user)
             }
         
 
@@ -223,9 +223,9 @@ async def create_organization(
     description: str = Body(...),
     logo_image: str = Body(...),
     parent_organization : int = Body(...),
-    organization_type: str = Body(...),    
+    organization_type: str = Body(...),
+    inheritance_group: Union[int, str, None] = Body(default=None)
 ):
-
     try:
         if not check_permission(
             session, "Create", "Organization", current_user
@@ -241,6 +241,9 @@ async def create_organization(
                 detail="Company already registered",
         )
         #Check Validity
+        if inheritance_group == "":
+            inheritance_group = None
+
         if validate_name(owner_name) == False:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -251,7 +254,7 @@ async def create_organization(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Logo image is not valid",
         )
-        
+
         organization = Organization(
             id = None,
             organization_name = organization_name,
@@ -259,7 +262,8 @@ async def create_organization(
             description = description,
             logo_image = logo_image,
             parent_id = parent_organization,
-            organization_type = organization_type
+            organization_type = organization_type,
+            inheritance_group = inheritance_group
         )
         
         
@@ -292,9 +296,10 @@ async def create_organization(
     owner_name: str = Body(...),
     description: str = Body(...),
     logo_image: str = Body(...),
-    inheritance_group: int | str = Body(...),
     organization_type: str = Body(...),    
-    parent_organization: int | str = Body(...)
+    parent_organization: int | str = Body(...),
+    inheritance_group: Union[int, str, None] = Body(default=None)
+
 ):
 
     try:

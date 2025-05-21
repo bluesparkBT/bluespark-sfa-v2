@@ -13,7 +13,11 @@ from utils.model_converter_util import get_html_types
 import traceback
 
 # frontend domain
-Domain= "http://172.10.10.203:5000"
+Domain= "http://172.10.10.203:3000"
+#for dev environment localhost
+Domain= "http://127.0.0.1:3000"
+
+
 service_provider_company = "Bluespark"
 
 ServiceProvider =sp= APIRouter()
@@ -277,7 +281,7 @@ async def get_my_tenant(
     """
     try:
         # Query the organization associated with the logged-in user
-        organization = session.exec(select(Organization).where(Organization.organization_name == tenant)).first()
+        organization = session.exec(select(Organization).where(Organization.tenant_hashed == tenant)).first()
         print("the current tenant is ",organization)
         if not organization:
             raise HTTPException(
@@ -419,12 +423,10 @@ async def create_tenant(
         #     select(Organization).where(Organization.organization_name == verify_tenant(tenant_name))
         # ).first()
         
-        # if verify_tenant(tenant_name, hashed_tenant_name):
-        #     raise HTTPException(status_code=400, detail="Tenant already exists")
-        
         hashed_tenant_name = get_tenant_hash(tenant_name) 
         tenant = Organization(
-            organization_name = hashed_tenant_name,
+            organization_name = tenant_name,
+            tenant_hashed = hashed_tenant_name,
             owner_name = owner_name,
             description=description,
             logo_image=logo_image,
@@ -463,37 +465,39 @@ async def create_tenant(
         session.add(role)
         session.commit()
         session.refresh(role)
-
-        # List of modules the tenatn system Admin should have access to
-        # modules_to_grant = [
-        #     modules.organization.value,
-        #     modules.role.value,
-        #     modules.administrative.value,
-        #     modules.users.value,
+        
+        # List of modules the tenant system Admin should have access to
+        modules_to_grant = [
+            modules.administrative.value,
+            modules.role.value,
+            modules.scope_group.value,
+            modules.users.value,
+            modules.inheritance.value,
+            modules.category.value,
+            modules.product.value,
+            modules.warehouse.value,
+            modules.sales.value,
+            modules.organization.value,
+            modules.territory.value,
+            modules.route.value,
+            modules.address.value,
             
-        # ]
-        # for module in modules_to_grant: 
-        #     role_module_permission= RoleModulePermission(
-        #         role_id=role.id,
-        #         module=module,
-        #         access_policy=AccessPolicy.manage
-        #     )
-        #     session.add(role_module_permission)
-        # session.commit()
-
-        for mod in modules:
-            role_module_permission = RoleModulePermission(
+            
+        ]
+        for module in modules_to_grant: 
+            role_module_permission= RoleModulePermission(
                 role_id=role.id,
-                module=mod.value,
+                module=module,
                 access_policy=AccessPolicy.manage
             )
             session.add(role_module_permission)
+        session.commit()
         
         password = generate_random_password()
-        hashed_password = get_password_hash(password + tenant_users("admin", hashed_tenant_name))
+        hashed_password = get_password_hash(password + tenant_users("admin", tenant_name))
 
         tenant_admin = User(
-            username= tenant_users("admin", hashed_tenant_name),
+            username= tenant_users("admin", tenant_name),
             fullname=f"{tenant_name} System Admin",
             email=f"{tenant_name.lower()}_admin@{tenant_name}.com",
             hashedPassword = hashed_password,
@@ -527,7 +531,6 @@ async def update_tenant(
     owner_name: str = Body(...),
     description: str = Body(...),
     logo_image: str = Body(...),
-    # organization_type: str = Body(...),
 ):
     try:
         if not check_permission(session, "Update", "Service Provider", current_user):
@@ -542,21 +545,52 @@ async def update_tenant(
         if not existing_tenant:
             raise HTTPException(status_code=400, detail="Tenant does not exist")
 
+        # Check for conflicting tenant name (optional)
+        if tenant_name != existing_tenant.organization_name:
+            name_conflict = session.exec(
+                select(Organization).where(Organization.organization_name == tenant_name)
+            ).first()
+            if name_conflict:
+                raise HTTPException(status_code=400, detail="Tenant name already exists")
+
+        # Update tenant fields
+        hashed_tenant_name = get_tenant_hash(tenant_name)
         existing_tenant.organization_name = tenant_name
         existing_tenant.owner_name = owner_name
         existing_tenant.description = description
         existing_tenant.logo_image = logo_image
-        # existing_tenant.organization_type = parse_enum(
-        #     OrganizationType, organization_type, "Organization Type"
-        # )
+        existing_tenant.tenant_hashed = hashed_tenant_name
+        existing_tenant.tenant_domain = f"{Domain}/{hashed_tenant_name}"
 
         session.add(existing_tenant)
         session.commit()
         session.refresh(existing_tenant)
-        
+
+        # Update ScopeGroup name (if exists)
+        scope_group_link = session.exec(
+            select(ScopeGroupLink).where(ScopeGroupLink.organization_id == existing_tenant.id)
+        ).first()
+
+        if scope_group_link:
+            scope_group = session.get(ScopeGroup, scope_group_link.scope_group_id)
+            if scope_group:
+                scope_group.scope_name = f"{tenant_name} Admin Scope"
+                session.add(scope_group)
+                session.commit()
+
+        # Update Role name (if exists)
+        role = session.exec(
+            select(Role).where(Role.organization_id == existing_tenant.id)
+        ).first()
+        if role:
+            role.name = f"{tenant_name} System Admin"
+            session.add(role)
+            session.commit()
+
         updated_data = {
             "tenant_name": existing_tenant.organization_name,
-            "tenant owner": existing_tenant.owner_name,
+            "tenant_owner": existing_tenant.owner_name,
+            "domain": existing_tenant.tenant_domain,
         }
 
         return {"message": "Tenant updated successfully", "tenant": updated_data}

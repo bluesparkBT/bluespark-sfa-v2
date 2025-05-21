@@ -8,6 +8,7 @@ from utils.model_converter_util import get_html_types
 from models.Account import User, AccessPolicy, Organization, OrganizationType, ScopeGroup, Scope, Role, ScopeGroupLink
 from models.Product import Product, Category
 from models.Inheritance import InheritanceGroup
+from models.Account import ScopeGroup,ScopeGroupLink 
 from utils.util_functions import validate_name
 from models.Account import Organization
 from utils.auth_util import get_current_user, check_permission
@@ -41,13 +42,18 @@ def get_category(
         inherited_group_id = session.exec(
             select(Organization.inheritance_group).where(Organization.id == current_user.organization_id)
         ).first()
-
+        test= session.exec(select(Organization.inheritance_group))
+        print("test",test)
+        print("inherited_group_id",inherited_group_id)
         inherited_group = session.exec(
             select(InheritanceGroup).where(InheritanceGroup.id == inherited_group_id)
         ).first()
 
+        print("inherited_group",inherited_group)
         if inherited_group:
             inherited_categories = inherited_group.categories
+
+            print("inherited_categories",inherited_categories)
         else:
             inherited_categories = []
         # Fetch products associated with the inheritance group
@@ -55,7 +61,6 @@ def get_category(
         
         # organization_ids = get_organization_ids_by_scope_group(session, current_user)
         scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == current_user.scope_group_id)).first()
-   
         if scope_group != None:
             existing_orgs = [organization.id for organization in scope_group.organizations ]
         if scope_group == None:
@@ -210,9 +215,9 @@ def create_category(
     current_user: UserDep,
     name: str = Body(...),
     code: str = Body(...),
-    description: str = Body(...),
+    description: str | None = Body(...),
     # parent_category: Optional [int] = Body(...),
-    organization: int = Body(...)
+    organization: str = Body(...)
 ):
     try:
         
@@ -243,11 +248,12 @@ def create_category(
             raise HTTPException(status_code=400, detail="Invalid category description format")
         
         # Create a new category entry from validated input
+
         new_category = Category(
             code=code, 
             name=name, 
-#            description=description,
-            organization_id=organization,
+            #description=description,
+            organization_id=int(organization),
             
             )
         session.add(new_category)

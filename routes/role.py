@@ -16,6 +16,37 @@ RoleRouter = rr = APIRouter()
 SessionDep = Annotated[Session, Depends(get_session)]
 UserDep = Annotated[dict, Depends(get_current_user)]
 
+#create role module permission
+modules_to_grant = [
+    modules.administrative.value,
+    modules.address.value,
+    modules.category.value,
+    modules.dashboard.value,
+    modules.deposit.value,
+    modules.finance.value,
+    modules.product.value,
+    modules.penetration.value,
+    modules.presales.value,
+    modules.inheritance.value,
+    modules.inventory_management.value,
+    modules.order.value,
+    modules.organization.value,
+    modules.sales.value,
+    modules.stock.value,
+    modules.scope_group.value,
+    modules.role.value,
+    modules.route.value,
+    modules.route_schedule.value,
+    modules.trade_marketing.value,
+    modules.territory.value,
+    modules.point_of_sale.value,
+    modules.users.value,
+    modules.visit.value,
+    modules.vehicle.value,
+    modules.warehouse.value,
+    modules.warehouse_stop.value,
+    
+]
 
 @rr.get("/roles")
 async def get_roles(
@@ -45,11 +76,11 @@ async def get_roles(
             permissions = ""
             for perm in role.permissions:
                 if(perm.access_policy != "deny"):
-                    permissions += perm.module+"("+perm.access_policy+"),"
+                    permissions += f"<strong>{perm.module}</strong> ({perm.access_policy.value}), "
             filtered_data.append({
                 "id": role.id,
                 "role_name": role.name,
-                "roles": permissions
+                "roles": permissions.rstrip(", ")
             })
      
         return filtered_data
@@ -175,12 +206,12 @@ async def create_role(
         session.commit()
         session.refresh(role)
    
-        #create role module permission
-        for module in modules:
+        # grant module permissions from list of modules defined as modules_togrant
+        for module in modules_to_grant: 
             role_module_permission= RoleModulePermission(
                 id=None,
                 role_id=role.id,
-                module=module.value,
+                module=module,
                 access_policy=AccessPolicy.deny
             )
 
@@ -206,8 +237,16 @@ async def form_modules(
                 status_code=403, detail="You Do not have the required privilege"
             )
         policy_type =  {i.value: i.value for i in AccessPolicy}
-        modules_dict =  {i.value: i.value for i in modules}
-        print(policy_type)
+        # Check if current user is a super admin
+        user_scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == current_user.scope_group_id)).first()
+         
+        # Filter modules, exclude "Service Provider" unless super admin
+        if user_scope_group.scope_name == "Super Admin Scope":
+            modules_dict = {i.value: i.value for i in modules}
+        else:
+            modules_dict = {
+                i.value: i.value for i in modules if i.value != "Service Provider"
+            }
         role = {
             "role_id":"",
             "module":modules_dict,
@@ -238,12 +277,21 @@ async def update_role(
         role_module_permission = session.exec(select(RoleModulePermission)
                                     .where((RoleModulePermission.role_id == role_id)&
                                           (RoleModulePermission.module == module))).first()
-        role_module_permission.module = module
-        role_module_permission.access_policy = policy
+        if(role_module_permission):
+            role_module_permission.module = module
+            role_module_permission.access_policy = policy
+        else:
+            role_module_permission= RoleModulePermission(
+                    id=None,
+                    role_id=role_id,
+                    module=module,
+                    access_policy=policy
+                )
 
         session.add(role_module_permission)
         session.commit()
         session.refresh(role_module_permission)
+
      
        
         return "Role permission updated successfully"

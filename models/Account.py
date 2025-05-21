@@ -41,6 +41,7 @@ class Organization(SQLModel, table=True):
     tenant_domain: Optional[str] =Field()
     description: Optional[str] = Field(default=None, index=True)
     organization_type: OrganizationType = Field(default=OrganizationType.company)
+    tenant_hashed: Optional[str] = Field(index=True)
     parent_id: Optional[int] = Field(default=None,  foreign_key="organization.id")
     inheritance_group: Optional[int] = Field(default=None, foreign_key='inheritance_group.id')
     scope_groups: List["ScopeGroup"] = Relationship(
@@ -102,7 +103,7 @@ class ModuleName(str, Enum):
     
     service_provider = "Service Provider"
     administrative = "Administrative"
-    adddress = "Address"
+    address = "Address"
     category = "Category"
     dashboard = "Dashboard"
     deposit = "Deposit"
@@ -125,7 +126,7 @@ class ModuleName(str, Enum):
     point_of_sale = "Point Of Sale"
     users = "Users"
     visit = "Visit"
-    vehichle = "Vehicle"
+    vehicle = "Vehicle"
     warehouse = "Warehouse"
     warehouse_stop = "Warehouse-stop"
 

@@ -17,7 +17,7 @@ def capitalize_name(name: str) -> str:
 
 def validate_name(name: str) -> bool:
     
-    name_match = re.match(r"^([A-Za-z \u1200-\u137f]+)$", name)
+    name_match = re.match(r"^([A-Za-z \u1200-\u137f]*)$", name)
     
     if name_match:
         return True
