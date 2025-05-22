@@ -1,7 +1,7 @@
+from operator import or_
 from typing import Annotated, List, Dict, Any, Optional, Union
 from fastapi import APIRouter, HTTPException, Body, status, Depends, Path
 from sqlmodel import select, Session
-from sqlalchemy.orm import selectinload
 from db import get_session
 from models.Account import User, Organization, OrganizationType, ScopeGroup, Scope, Role, ScopeGroupLink
 from utils.auth_util import get_current_user, check_permission
@@ -74,10 +74,71 @@ async def get_organizations(
             )
         
         organization_ids = get_organization_ids_by_scope_group(session, current_user)
-        organizations = session.exec(select(Organization).where(Organization.id.in_(organization_ids)))
+        print(organization_ids)
+        organizations = session.exec(
+            select(Organization).where(
+                (Organization.id.in_(organization_ids)) &
+                (
+                    or_(
+                        Organization.parent_id == None,  # include top-level orgs
+                        Organization.parent_id.notin_(organization_ids)
+                    )
+                )
+            )
+        ).all()
 
         if not organizations:
             raise HTTPException(status_code=404, detail="No organizations found")
+
+        organization_list = []
+
+        for org in organizations:
+            print(org)
+            organization_list.append({
+                "id": org.id,
+                "organization": org.organization_name,
+                "owner": org.owner_name,
+                "logo": org.logo_image,
+                "description": org.description,
+                "organization_type": org.organization_type,
+                "inheritance_group": org.inheritance_group,
+                "parent_organization": org.parent_id,
+                "scope_groups": [
+                    {"id": sg.id, "scope_name": sg.scope_name}
+                    for sg in org.scope_groups
+                ]
+            })
+
+        return organization_list
+
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=400, detail=str(e))
+    
+@tr.get("/get-children-organizations/{id}")
+async def get_children_organizations(
+    session: SessionDep,
+    current_user: UserDep,    
+    tenant: str,
+    id: int
+
+):
+    
+    """
+    Retrieve children organizations of the given organization id.
+    """
+    try:
+        if not check_permission(
+            session, "Read", "Organization", current_user
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
+        
+        organizations = session.exec(select(Organization).where(Organization.parent_id == id)).all()
+
+        if not organizations:
+            return []
 
         organization_list = []
 
