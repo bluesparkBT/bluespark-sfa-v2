@@ -40,7 +40,7 @@ class Warehouse(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     warehouse_name: str = Field(index=True)
     organization_id: int = Field(foreign_key="organization.id")
-    location_id: int = Field(foreign_key="location.id")
+    location_id: int = Field(foreign_key="geolocation.id")
     store_admins: List["User"] = Relationship(back_populates="warehouses", link_model=WarehouseStoreAdminLink)
     stocks: Optional[List["Stock"]] = Relationship(back_populates="warehouse")
     organization: Optional["Organization"] = Relationship(back_populates="warehouses")
