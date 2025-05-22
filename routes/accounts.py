@@ -30,9 +30,6 @@ def login(
 ):
     try:
         current_tenant = session.exec(select(Organization).where(Organization.tenant_hashed == tenant)).first()
-        print(tenant)
-        print(current_tenant)
-        print("the organization get from", current_tenant)
         user = session.exec(select(User).where(User.username == tenant_users(username, current_tenant.organization_name))).first()
         print("tenant sytem admin user:", user)
 
@@ -356,7 +353,7 @@ async def update_user_form(
         raise HTTPException(status_code=400, detail=str(e))
     
 @ar.put("/update-user/")
-async def update_uer(
+async def update_user(
     session: SessionDep,
     current_user: UserDep,    
     tenant: str,
@@ -475,17 +472,18 @@ async def get_scope_groups(
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-        scope_groups = session.exec(select(ScopeGroup)).all()
+        scope_groups = session.exec(select(ScopeGroup).where(ScopeGroup.parent_id == current_user.organization_id)).all()
         if not scope_groups:
             raise HTTPException(status_code=404, detail="No scope groups found")
         
         scope_group_list = []
-        
         for scope_group in scope_groups:
             organizations = [org.organization_name for org in scope_group.organizations]
-    
-            if scope_group.parent_organization:
-                organizations.append(scope_group.parent_organization.organization_name)
+
+            # # Include parent organization name if available
+            # if scope_group.parent_organization:
+            #     organizations.append(scope_group.parent_organization.organization_name)
+                
             scope_group_list.append({
                 "id": scope_group.id,
                 "scope_name": scope_group.scope_name,
@@ -521,7 +519,6 @@ async def get_scope_group(
         if scope_group.parent_organization:
             tenant_name = [scope_group.parent_id]
    
-       
             
         return {
                 "id": scope_group.id,

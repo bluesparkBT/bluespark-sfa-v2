@@ -12,7 +12,7 @@ class Address(SQLModel, table=True):
     sub_city: str = Field(index=True)
     woreda: str = Field(index=True)
     landmark: Optional[str] = Field(default=None, index=True)
-    location: Optional["Location"] = Relationship(back_populates="address")
+    geolocation: Optional["Geolocation"] = Relationship(back_populates="address")
 
 
     @model_validator(mode="after")
@@ -22,8 +22,8 @@ class Address(SQLModel, table=True):
         return self
 
 
-class Location(SQLModel, table=True):
-    __tablename__ = "location"
+class Geolocation(SQLModel, table=True):
+    __tablename__ = "geolocation"
 
 
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -32,7 +32,7 @@ class Location(SQLModel, table=True):
     latitude: float
     longitude: float
 
-    address: Optional[Address] = Relationship(back_populates="location")
+    address: Optional[Address] = Relationship(back_populates="geolocation")
    
 
     @model_validator(mode="after")

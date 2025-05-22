@@ -1,22 +1,23 @@
 import traceback
-from fastapi import Depends, HTTPException, Body
-from typing import Annotated
+from fastapi import Depends, HTTPException, Body, APIRouter
+from typing import Annotated, Optional
 from fastapi.routing import APIRouter
 from sqlmodel import and_, select, Session
 from db import get_session
-from models.Location import Address, Location
+from models.Address import Address, Geolocation
 from models.Utils import ErrorLog
 from utils.address_util import check_address
 from utils.auth_util import get_current_user
 from utils.model_converter_util import get_html_types
 from utils.auth_util import check_permission
+
 SessionDep = Annotated[Session, Depends(get_session)]
 UserDep = Annotated[dict, Depends(get_current_user)]
 
 AddressRouter = ar = APIRouter()
 
 
-@ar.get("/addresses")
+@ar.get("/get-addresses")
 async def get_addresses(session: SessionDep, current_user: UserDep, tenant: str) -> list[Address]:
     """
     Retrieve all addresses from the database.
@@ -52,7 +53,7 @@ async def get_addresses(session: SessionDep, current_user: UserDep, tenant: str)
             status_code=400, detail="Internal Server Error, Please Try again"
         )
 
-@ar.get("/address/{id}")
+@ar.get("/get-address/{id}")
 async def get_address_by_id(session: SessionDep, current_user: UserDep, tenant: str, id: int):
     """
     Retrieve a specific address by its ID.
@@ -125,12 +126,12 @@ async def create_address(
         HTTPException: 400 if there is an error during creation.
     """
     try:
-        # if not check_permission(
-        #     session, "Create", ["Address", "Administrative"], current_user
-        #     ):
-        #     raise HTTPException(
-        #         status_code=403, detail="You Do not have the required privilege"
-        #     )
+        if not check_permission(
+            session, "Create", ["Address", "Administrative"], current_user
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
         new_address = Address(
             id = None,
             country = country,
@@ -149,17 +150,12 @@ async def create_address(
         traceback.print_exc()
         raise HTTPException(status_code=400, detail=f"Create address failed: {str(e)}")
 
-from fastapi import APIRouter, HTTPException, Body, Path
-from sqlmodel import select
-from typing import Optional
-
-@ar.put("/update-address/{address_id}")
+@ar.put("/update-address/")
 async def update_address(
     session: SessionDep,
     current_user: UserDep,
     tenant: str,
-    address_id: int,
-
+    id: int = Body(...),
     country: Optional[str] = Body(...),
     city: Optional[str] = Body(...),
     sub_city: Optional[str] = Body(...),
@@ -170,24 +166,21 @@ async def update_address(
     Update an existing address by ID.
     """
     try:
-        address = session.exec(select(Address).where(Address.id == address_id)).first()
-
+        # Check permissions first
         if not check_permission(session, "Update", ["Address", "Administrative"], current_user):
             raise HTTPException(status_code=403, detail="Permission denied")
-        
+
+        # Fetch address
+        address = session.exec(select(Address).where(Address.id == id)).first()
         if not address:
             raise HTTPException(status_code=404, detail="Address not found")
-        # Update only fields that are provided
-        if country is not None:
-            address.country = country
-        if city is not None:
-            address.city = city
-        if sub_city is not None:
-            address.sub_city = sub_city
-        if woreda is not None:
-            address.woreda = woreda
-        if landmark is not None:
-            address.landmark = landmark
+
+        # Update only if values are provided (this is safe since you use Body(...))
+        address.country = country
+        address.city = city
+        address.sub_city = sub_city
+        address.woreda = woreda
+        address.landmark = landmark
 
         session.add(address)
         session.commit()
@@ -196,7 +189,7 @@ async def update_address(
         return address
 
     except Exception as e:
-        traceback.print.exc()
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=f"Update failed: {str(e)}")
 
 @ar.delete("/delete-address/{id}")
@@ -221,140 +214,139 @@ async def delete_address(
     Raises:
         HTTPException: If address is not found or deletion fails.
     """
-    address = session.exec(select(Address).where(Address.id == id)).first()
-    if not address:
-        raise HTTPException(status_code=404, detail="Address not found")
 
-    # Optionally check for permission
-    # if not check_permission(session, "Delete", ["Address", "Administrative"], current_user):
-    #     raise HTTPException(status_code=403, detail="Permission denied")
 
     try:
+        # Check permissions first
+        if not check_permission(session, "Update", ["Address", "Administrative"], current_user):
+            raise HTTPException(status_code=403, detail="Permission denied")
+
+        address = session.exec(select(Address).where(Address.id == id)).first()
+        if not address:
+            raise HTTPException(status_code=404, detail="Address not found")
+        
         session.delete(address)
         session.commit()
         return {"message": "Address deleted successfully"}
+    
     except Exception as e:
         traceback.print.exc()
         raise HTTPException(status_code=400, detail=f"Deletion failed: {str(e)}")
 
-@ar.get("/form-location")
-async def get_form_fields_location(session: SessionDep, current_user: UserDep):
-    location = Location(
-        id="",
-        name="",
-        address="",
-        latitude="",
-        longitude="",
-    )
 
-    return {
-        "data": location,
-        "html_types": get_html_types(Location),
-    }
+# @ar.get("/form-location")
+# async def get_form_fields_location(session: SessionDep, current_user: UserDep):
+#     location = Geolocation(
+#         id="",
+#         name="",
+#         address="",
+#         latitude="",
+#         longitude="",
+#     )
 
+#     return {
+#         "data": location,
+#         "html_types": get_html_types(Geolocation),
+#     }
 
-@ar.get("/locations")
-async def get_locations(session: SessionDep, current_user: UserDep) -> list[Location]:
-    """
-    Retrieve all locations from the database.
+# @ar.get("/locations")
+# async def get_locations(session: SessionDep, current_user: UserDep):
+#     """
+#     Retrieve all locations from the database.
 
-    Args:
-        session (SessionDep): Database session.
+#     Args:
+#         session (SessionDep): Database session.
 
-    Returns:
-        list[Location]: A list of Location objects.
-        If empty it returns an empty list. []
-    """
-    locations = session.exec(select(Location)).all()
-    return locations
+#     Returns:
+#         list[Location]: A list of Location objects.
+#         If empty it returns an empty list. []
+#     """
+#     locations = session.exec(select(Geolocation)).all()
+#     return locations
 
+# @ar.get("/location/{id}")
+# async def get_location(session: SessionDep, current_user: UserDep, id: int):
+#     """
+#     Retrieve a specific location by its ID.
 
-@ar.get("/location/{id}")
-async def get_location(session: SessionDep, current_user: UserDep, id: int):
-    """
-    Retrieve a specific location by its ID.
+#     Args:
+#         session (SessionDep): Database session.
+#         id (int): The ID of the location to retrieve.
 
-    Args:
-        session (SessionDep): Database session.
-        id (int): The ID of the location to retrieve.
+#     Returns:
+#         Location: The Location object if found.
 
-    Returns:
-        Location: The Location object if found.
+#     Raises:
+#         HTTPException: 404 if the location is not found.
+#     """
+#     location = session.exec(select(Geolocation).where(Geolocation.id == id)).first()
+#     if not location:
+#         raise HTTPException(status_code=404, detail="Location not found")
+#     return location
 
-    Raises:
-        HTTPException: 404 if the location is not found.
-    """
-    location = session.exec(select(Location).where(Location.id == id)).first()
-    if not location:
-        raise HTTPException(status_code=404, detail="Location not found")
-    return location
+# @ar.post("/create-location")
+# async def create_location(
+#     session: SessionDep, current_user: UserDep,
+# ):
+#     """
+#     Create a new location in the database.
 
+#     Args:
+#         session (SessionDep): Database session.
+#         location (Location): The Location object to create.
 
-@ar.post("/create-location")
-async def create_location(
-    session: SessionDep, current_user: UserDep, location: Location
-):
-    """
-    Create a new location in the database.
+#     Returns:
+#         Location: The created Location object.
 
-    Args:
-        session (SessionDep): Database session.
-        location (Location): The Location object to create.
+#     Raises:
+#         HTTPException: 400 if there is an error during creation.
+#     """
+#     try:
+#         location.id = None
+#         session.add(location)
+#         session.commit()
+#         session.refresh(location)
+#         return location
+#     except Exception as e:
+#         traceback.print.exc()
+#         raise HTTPException(status_code=400, detail=str(e))
 
-    Returns:
-        Location: The created Location object.
+# @ar.put("/update-location")
+# async def update_location(
+#     session: SessionDep, current_user: UserDep, updatedLocation: Location
+# ):
+#     """
+#     Update an existing location in the database.
 
-    Raises:
-        HTTPException: 400 if there is an error during creation.
-    """
-    try:
-        location.id = None
-        session.add(location)
-        session.commit()
-        session.refresh(location)
-        return location
-    except Exception as e:
-        traceback.print.exc()
-        raise HTTPException(status_code=400, detail=str(e))
+#     Args:
+#         session (SessionDep): Database session.
+#         updatedLocation (Location): The Location object with updated information.
 
+#     Returns:
+#         Location: The updated Location object.
 
-@ar.put("/update-location")
-async def update_location(
-    session: SessionDep, current_user: UserDep, updatedLocation: Location
-):
-    """
-    Update an existing location in the database.
+#     Raises:
+#         HTTPException: 404 if the location is not found.
+#         HTTPException: 400 if there is an error during update.
+#     """
+#     try:
+#         existing_location = session.get(Location, updatedLocation.id)
+#         if not existing_location:
+#             raise HTTPException(status_code=404, detail="Location not found")
+#         existing_location.name = updatedLocation.name
+#         existing_location.address = updatedLocation.address
+#         existing_location.latitude = updatedLocation.latitude
+#         existing_location.longitude = updatedLocation.longitude
+#         session.add(existing_location)
+#         session.commit()
+#         session.refresh(existing_location)
+#         return existing_location
+#     except Exception as e:
+#         traceback.print.exc()
+#         raise HTTPException(status_code=400, detail=str(e))
 
-    Args:
-        session (SessionDep): Database session.
-        updatedLocation (Location): The Location object with updated information.
-
-    Returns:
-        Location: The updated Location object.
-
-    Raises:
-        HTTPException: 404 if the location is not found.
-        HTTPException: 400 if there is an error during update.
-    """
-    try:
-        existing_location = session.get(Location, updatedLocation.id)
-        if not existing_location:
-            raise HTTPException(status_code=404, detail="Location not found")
-        existing_location.name = updatedLocation.name
-        existing_location.address = updatedLocation.address
-        existing_location.latitude = updatedLocation.latitude
-        existing_location.longitude = updatedLocation.longitude
-        session.add(existing_location)
-        session.commit()
-        session.refresh(existing_location)
-        return existing_location
-    except Exception as e:
-        traceback.print.exc()
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@ar.delete("/delete-location/{id}")
-async def delete_location(session: SessionDep, current_user: UserDep, id: int):
+# @ar.delete("/delete-location/{id}")
+# async def delete_location(session: SessionDep, current_user: UserDep, id: int):
     """
     Delete a location from the database.
 

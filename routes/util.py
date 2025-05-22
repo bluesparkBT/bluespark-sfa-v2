@@ -37,10 +37,37 @@ async def get_form_fields_warehouse(current_user: UserDep, endpoint: str) -> lis
             "longitude",
         ]
     elif endpoint == "Walk-in Customer":
-        return ["point_of_sale"]
+        return [
+            "id",
+            "point_of_sale"]
     elif endpoint == "Organization":
-        return ["scope_groups"]
+        return [
+            "id",
+            "scope_groups"]
+    elif endpoint == "User":
+        return ["id"]
+    elif endpoint == "Role":
+        return ["id"]
+    elif endpoint == "Category":
+        return ["id"]
+    elif endpoint == "Product":
+        return ["id"]
+    elif endpoint == "Inheritance":
+        return ["id"]
+    elif endpoint == "Address":
+        return ["id"]
+    elif endpoint == "Scope Group":
+        return ["id"]
+    elif endpoint == "Classification":
+        return ["id"]
+
+    elif endpoint == "Tenant":
+        return ["id"]
+    elif endpoint == "Warehouse":
+        return ["id" ]
     elif endpoint == "Warehouse Stop":
-        return ["confirmed"]
+        return [
+            "id",
+            "confirmed"]
     else:
         return []

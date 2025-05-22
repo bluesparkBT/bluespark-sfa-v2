@@ -34,7 +34,7 @@ class Outlet(SQLModel, table=True):
     tin: str  # Tax Identification Number
     phone: str  # Phone number
     email: str = Field(index=True)  # Email address
-    location_id: int = Field(foreign_key="location.id")  # Reference to Location
+    location_id: int = Field(foreign_key="geolocation.id")  # Reference to geolocation
 
     # Relationship with PointOfSale
     point_of_sale: Optional[PointOfSale] = Relationship(back_populates="outlet")
@@ -47,7 +47,7 @@ class WalkInCustomer(SQLModel, table=True):
     name: str = Field(index=True)  # Walk-in customer name
     email: Optional[str] = Field(default=None)  # Optional email (Alphanumeric type assumed as text)
     landmark: str = Field(index=True)  # Landmark for customer reference
-    location_id: Optional[int] = Field(default=None, foreign_key="location.id")  # Optional Reference to Location
+    location_id: Optional[int] = Field(default=None, foreign_key="geolocation.id")  # Optional Reference to Location
 
     # Relationship with PointOfSale
     point_of_sale: Optional[PointOfSale] = Relationship(back_populates="walk_in_customer")

@@ -1,22 +1,22 @@
 from typing import Annotated, Any, Dict, List
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, Depends, Body, Path, status
-from models import Location
 from sqlmodel import Session, select
-
-
+import traceback
 from db import SECRET_KEY, get_session
 from models.Warehouse import RequestStatus, RequestType, LogType, StockLog, StockType, Warehouse, WarehouseStop, WarehouseStoreAdminLink, Stock, Vehicle
-from models.Account import User
+from models.Address import Geolocation
 from utils.auth_util import get_current_user, check_permission
 from utils.model_converter_util import get_html_types
 from utils.util_functions import validate_name, parse_enum, parse_datetime_field, format_date_for_input
 from utils.form_db_fetch import fetch_organization_id_and_name, fetch_user_id_and_name, fetch_product_id_and_name,fetch_category_id_and_name, fetch_warehouse_id_and_name, fetch_vehicle_id_and_name, fetch_stocks_id_and_name
 
 
-WarehouseRouter = wr = APIRouter()
+WarehouseRouter = wr = APIRouter()\
+    
 SessionDep = Annotated[Session, Depends(get_session)]
 UserDep = Annotated[dict, Depends(get_current_user)]
+
 request_to_log_type_map = {
     RequestType.stock_out: LogType.stock_out,
     RequestType.transfer: LogType.transfer,
@@ -39,7 +39,6 @@ async def form_warehouse(
                 status_code=403, detail="You Do not have the required privilege"
             )
         
-        
         warehouse_data = {
                 "id": "",
                 "warehouse_name": "",
@@ -47,9 +46,10 @@ async def form_warehouse(
                 "location": ""
             }
             
-
         return {"data": warehouse_data, "html_types": get_html_types("warehouse")}
+    
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
     
 @wr.post("/create-warehouse/")
@@ -62,7 +62,6 @@ async def create_warehouse(
     location: str = Body(...),
   
 ):
-
     try:
         if not check_permission(
             session, "Create", "Warehouse", current_user
@@ -78,20 +77,17 @@ async def create_warehouse(
                 detail="Warehouse already registered",
         )
         
-
         cleaned = location.strip("()")
         lat_str, lon_str = cleaned.split(",")
 
-        location_db = Location(
+        location_db = Geolocation(
             id = None,
             latitude = float(lat_str),
             longitude= float(lon_str)
         )
-
         session.add(location_db)
         session.commit()
         session.refresh(location_db)
-        
         
         warehouse = Warehouse(
             id = None,
@@ -100,14 +96,13 @@ async def create_warehouse(
             location_id = location_db.id,
         )
         
-        
         session.add(warehouse)
         session.commit()
         session.refresh(warehouse)
         
         return warehouse.id
     except Exception as e:
-        
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))   
     
 @wr.get("/warehouse-storeadmin-form/")
@@ -129,6 +124,7 @@ async def form_warehouse_storeadmin(
      
         return {"data": data, "html_types": get_html_types("warehouse_storeadmin")}
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
     
 @wr.post("/assign-storeadmin")
@@ -192,12 +188,11 @@ async def assign_store_admin(
             ):
                 session.delete(link)
         print("stpe3")
-
         session.commit()
 
-
-        return "Warehouse store admin added successfully"
+        return {"Warehouse store admin added successfully"}
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
 
 @wr.get("/get-warehouses/")
@@ -237,6 +232,7 @@ async def get_warehouses(
         return warehouse_list
 
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))   
     
 @wr.get("/get-warehouse/{id}")
@@ -257,7 +253,7 @@ async def get_warehouse(
         if not warehouse:
             raise HTTPException(status_code=404, detail="Warehouse not found")
         
-        location_db = session.exec(select(Location).where(Location.id == warehouse.location_id)).first()
+        location_db = session.exec(select(Geolocation).where(Geolocation.id == warehouse.location_id)).first()
         location_str = f"({location_db.latitude},{location_db.longitude})"
   
         return {
@@ -268,6 +264,7 @@ async def get_warehouse(
             "location":location_str
         }
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
     
 
@@ -308,7 +305,7 @@ async def update_warehouse(
         cleaned = location.strip("()")
         lat_str, lon_str = cleaned.split(",")
 
-        location_db = Location(
+        location_db = Geolocation(
             id = None,
             latitude = float(lat_str),
             longitude= float(lon_str)
@@ -395,6 +392,7 @@ async def delete_warehouse(
         return {"message": "Warehouse deleted successfully"}
     
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e)) 
     
 @wr.get("/stock-form")
@@ -425,6 +423,7 @@ async def form_stock(
 
         return {"data": stock_data, "html_types": get_html_types("stock")}
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
     
 
@@ -489,6 +488,7 @@ async def add_stock(
         
         return {"message": "Stock added successfully"}
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
     
 @wr.get("/get-stocks/")
@@ -531,6 +531,7 @@ async def get_stocks(
         return stock_list
 
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e)) 
     
 
@@ -562,6 +563,7 @@ async def get_stock(
             "stock_type": stock.stock_type,
         }
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
     
 @wr.put("/update-stock/")
@@ -609,6 +611,7 @@ async def update_stock(
 
         return {"message": "Stock updated successfully"}
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
     
 
@@ -659,6 +662,7 @@ async def delete_stock(
         return {"message": "Stock deleted successfully"}
     
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e)) 
     
 @wr.get("/get-stock-logs/{id}")
@@ -695,6 +699,7 @@ async def get_stock_logs(
             })
         return stock_log_list
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
     
 @wr.get("/warehouse-stop-form")
@@ -723,6 +728,7 @@ async def form_warehouse_stop(
             
         return {"data": data, "html_types": get_html_types("warehouse_stop")}
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
     
 @wr.post("/create-warehouse-stop/")
@@ -770,6 +776,7 @@ async def create_warehouse_stop(
         
         return {"message": "Warehouse stop created successfully"}
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
     
 @wr.get("/get-warehouse-stops/")
@@ -821,6 +828,7 @@ async def get_warehouse_stops(
         return warehouse_stop_list
 
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e)) 
     
 @wr.get("/get-warehouse-stop/{id}")
@@ -858,6 +866,7 @@ async def get_warehouse_stop(
             }  
 
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e)) 
     
 
@@ -912,6 +921,7 @@ async def get_warehouse_stops_by_status(
         return warehouse_stop_list
 
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e)) 
     
 @wr.get("/get-warehouse-stops/request/")
@@ -956,6 +966,7 @@ async def get_my_warehouse_stop_requests(
         return warehouse_stop_list
 
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e)) 
     
 
@@ -993,6 +1004,7 @@ async def approve_warehouse_stops(
 
         return "Warehouse stop approved successfully"
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e)) 
     
 @wr.put("/warehouse-stops/reject/{id}")
@@ -1028,6 +1040,7 @@ async def approve_warehouse_stops(
 
         return "Warehouse stop approved successfully"
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e)) 
     
 @wr.put("/warehouse-stops/confirm/{id}")
@@ -1086,6 +1099,7 @@ async def confirm_warehouse_stops(
 
         return "Warehouse stop confirmed successfully"
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e)) 
     
 @wr.put("/update-warehouse-stop/")
@@ -1133,6 +1147,7 @@ async def update_warehouse_stop(
         
         return {"message": "Warehouse stop updated successfully"}
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
     
 @wr.delete("/delete-warehouse_stop/{id}")
@@ -1165,6 +1180,7 @@ async def delete_warehouse_stop(
         return {"message": "Warehouse stop deleted successfully"}
     
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e)) 
     
 

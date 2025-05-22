@@ -30,13 +30,11 @@ def validate_image(image_b64str: str) -> bool:
     else:
         return False
     
-import re
 
 def validate_email(email: str) -> bool:
     """Validates if the email address is in a valid format (RFC 5322 simplified)."""
     email_regex = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
     return re.match(email_regex, email) is not None
-
 
 
 def validate_phone_number(phone_number) -> bool:

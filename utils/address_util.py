@@ -12,7 +12,7 @@ from fastapi import Depends, HTTPException
 from sqlmodel import Session, and_, select
 
 from db import get_session
-from models.Location import Address
+from models.Address import Address
 
 
 SessionDep = Annotated[Session, Depends(get_session)]
