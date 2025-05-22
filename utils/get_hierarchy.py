@@ -48,24 +48,31 @@ def get_organization_ids_by_scope_group(session, current_user) -> List[int]:
     return organization_ids
 
 
-def get_child_organization(session: SessionDep, organization_id: int):
+def get_child_organization(session: SessionDep, organization_id: int, is_root=True):
     """
     Fetch all child organizations (descendants) from the database.
     """
-    if organization_id is None:
-        heirarchy = {'tenants': []}
-    else:
-        heirarchy = []
-        
-    children = session.exec(select(Organization).where(Organization.parent_id == organization_id)).all()
-    
-    for a_child in children:
-        if organization_id is None:
-            heirarchy['tenants'].append({'id': a_child.id, 'name': a_child.organization_name, 'children': get_child_organization(session, a_child.id)})
-        else:        
-            heirarchy.append({'id': a_child.id, 'name': a_child.organization_name, 'children': get_child_organization(session, a_child.id)})
-               
-    return heirarchy
+    children = session.exec(
+        select(Organization).where(Organization.parent_id == organization_id)
+    ).all()
+
+    child_hierarchy = []
+    for child in children:
+        child_hierarchy.append({
+            'id': child.id,
+            'name': child.organization_name,
+            'children': get_child_organization(session, child.id, is_root=False)
+        })
+
+    if is_root:
+        parent_org = session.get(Organization, organization_id)
+        if parent_org:
+            return [{
+                'id': parent_org.id,
+                'name': 'All',
+                'children': child_hierarchy
+            }]
+    return child_hierarchy
 
 def get_parent_organizations(session: SessionDep, organization_id: int) -> List[int]:
     """
