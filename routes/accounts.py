@@ -14,6 +14,7 @@ from utils.form_db_fetch import fetch_organization_id_and_name, fetch_role_id_an
 import traceback
 
 Domain= "http://172.10.10.203:5000"
+ACCESS_TOKEN_EXPIRE_DAYS = 2
 
 AuthenticationRouter =ar= APIRouter()
 SessionDep = Annotated[Session, Depends(get_session)]
@@ -30,13 +31,17 @@ def login(
 ):
     try:
         current_tenant = session.exec(select(Organization).where(Organization.tenant_hashed == tenant)).first()
-        user = session.exec(select(User).where(User.username == tenant_users(username, current_tenant.organization_name))).first()
-        print("tenant sytem admin user:", user)
-
-        if not user or not verify_password(password+user.username if username == "admin" else password+username, user.hashedPassword):
+        if not current_tenant:
+            raise HTTPException(status_code=404, detail="Tenant not found")
+        
+        db_username = tenant_users(username, current_tenant.organization_name)
+        user = session.exec(
+            select(User).where(User.username == db_username)
+        ).first()
+        if not user or not verify_password(password + db_username, user.hashedPassword):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
         
-        access_token_expires = timedelta(minutes=90)
+        access_token_expires = timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS)
         token = create_access_token(
             data={
                 "sub": user.username,
@@ -56,45 +61,45 @@ def login(
 async def get_my_user(
     session: SessionDep,
     current_user: UserDep,
-    tenant: str,
-
+    tenant: Optional[str] = None,  # Make tenant optional
 ):
     try:
-        if not check_permission(
-            session, "Read", ["Users", "Administrative"], current_user
-            ):
-            raise HTTPException(
-                status_code=403, detail="You Do not have the required privilege"
-            )
+        if not check_permission(session, "Read", ["Users", "Administrative"], current_user):
+            raise HTTPException(status_code=403, detail="You do not have the required privilege")
+
         user = session.exec(select(User).where(User.id == current_user.id)).first()
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
-        
-        # Determine if it's the service provider (super admin)
+
         if not tenant or tenant.lower() == "provider":
             username_display = user.username
+            organization_name = "Service Provider"  # or None, depending on your use case
         else:
             current_tenant = session.exec(
                 select(Organization).where(Organization.tenant_hashed == tenant)
             ).first()
             if not current_tenant:
                 raise HTTPException(status_code=404, detail="Tenant not found")
-            username_display = extract_username(user.username, current_tenant.organization_name)
+
+            organization_name = current_tenant.organization_name
+            username_display = extract_username(user.username, organization_name)
 
         return {
             "id": user.id,
             "fullname": user.fullname,
             "username": username_display,
             "phone_number": user.phone_number,
-            "organization": current_tenant.organization_name,
+            "organization": organization_name,
             "role_id": user.role_id,
             "manager_id": user.manager_id,
             "scope": user.scope,
             "scope_group_id": user.scope_group_id,
         }
+
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
+
 
 @ar.get("/get-users/")
 async def get_users(
@@ -275,17 +280,16 @@ async def create_user(
         current_tenant = session.exec(select(Organization).where(Organization.id == current_user.organization_id)).first() if tenant == "provider" else session.exec(select(Organization).where(Organization.tenant_hashed == tenant)).first()
         print("the organization get from", current_tenant)   
                
-        # Generate and hash password
         user_name = username
+        stored_username = tenant_users(user_name, current_tenant.organization_name)
 
         password = generate_random_password()
-        hashed_password = get_password_hash(password + user_name)
-
+        hashed_password = get_password_hash(password + stored_username)
         
         new_user = User(
             id= None,
             fullname=full_name,
-            username= tenant_users(user_name, current_tenant.organization_name),
+            username= stored_username,
             email=email,
             phone_number=phone_number,
             hashedPassword = hashed_password,

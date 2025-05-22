@@ -16,6 +16,7 @@ import hashlib
 import traceback
 import string
 import random
+import re
 
 security = HTTPBearer()
 SECRET_KEY = "secret_here"
@@ -36,10 +37,12 @@ def get_tenant(
     return tenant
 
 def tenant_users(username: str, tenant_name: str) -> str:
-    return f"{tenant_name.lower()}_{username}"
+    clean_tenant = re.sub(r"\s+", "_", tenant_name.strip().lower())
+    return f"{clean_tenant}_{username}"
 
 def extract_username(username: str, tenant_name: str) -> str:
-    prefix = f"{tenant_name.lower()}_"
+    prefix = re.sub(r"\s+", "_", tenant_name.strip().lower())
+    # prefix = f"{tenant_name.lower()}_"
     if username.startswith(prefix):
         return username[len(prefix):]
     raise ValueError("Username does not match the given tenant prefix.")

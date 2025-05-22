@@ -8,19 +8,20 @@ from models.Account import User, ScopeGroup, ScopeGroupLink, Organization, Organ
 from models.Account import ModuleName as modules
 from utils.auth_util import verify_password, create_access_token, get_password_hash
 from utils.util_functions import validate_name, validate_email, validate_phone_number, parse_enum
-from utils.auth_util import get_current_user, check_permission, generate_random_password, get_tenant_hash, verify_tenant, tenant_users
+from utils.auth_util import get_current_user, check_permission, generate_random_password, get_tenant_hash, extract_username, tenant_users
 from utils.model_converter_util import get_html_types
 import traceback
 
 # frontend domain
-Domain= "http://172.10.10.203:3000"
+# Domain= "http://172.10.10.203:3000"
+
 #for dev environment localhost
 Domain= "http://127.0.0.1:3000"
-
-
 service_provider_company = "Bluespark"
+ACCESS_TOKEN_EXPIRE_DAYS = 2
 
 ServiceProvider =sp= APIRouter()
+
 SessionDep = Annotated[Session, Depends(get_session)]
 UserDep = Annotated[dict, Depends(get_current_user)]
 
@@ -44,13 +45,14 @@ def login(
     password: str = Body(...)
 ):
     try:
-        user = session.exec(select(User).where(User.username == username)).first()
-        print("superadmin user is: ", user)
-        
-        if not user or not verify_password(password+user.username, user.hashedPassword):
+        service_provider = session.exec(select(Organization).where(Organization.organization_type == "Service Provider")).first()
+        db_username = tenant_users(username, service_provider.organization_name)
+
+        user = session.exec(select(User).where(User.username == db_username)).first()
+        if not user or not verify_password(password+db_username, user.hashedPassword):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
         
-        access_token_expires = timedelta(minutes=90)
+        access_token_expires = timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS)
         token = create_access_token(
             data={
                 "sub": user.username,
@@ -143,14 +145,15 @@ async def create_superadmin_user(
             session.add(role_module_permission)
         session.commit()
         
-        
+        stored_username = tenant_users(username, service_provider.organization_name)
         super_admin_user = User(
-            username=username,
+            username= stored_username,
             email=email,
-            hashedPassword=get_password_hash(password + username),
+            hashedPassword=get_password_hash(password + stored_username),
             organization_id=service_provider.id,
             scope_group_id=service_provider_scope_group.id,
-            role_id = role.id
+            role_id = role.id,
+            scope = Scope.managerial_scope.value
         )
         session.add(super_admin_user)
         session.commit()
