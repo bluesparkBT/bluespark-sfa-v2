@@ -61,22 +61,6 @@ def fetch_scope_group_id_and_name(session: SessionDep, current_user: UserDep):
     scope_groups = {row[0]: row[1] for row in scope_group_row}
     return scope_groups
 
-def fetch_scope_group_id_and_name(session, current_user):
-    # Get the user's tenant
-    tenant_org = session.exec(
-        select(Organization).where(Organization.id == current_user.organization_id)
-    ).first()
-
-    if not tenant_org:
-        return {}
-
-    # Fetch scope groups for this tenant
-    scope_groups = session.exec(
-        select(ScopeGroup).where(ScopeGroup.parent_id == tenant_org.id)
-    ).all()
-
-    return {sg.id: sg.scope_name for sg in scope_groups}
-
 
 def fetch_product_id_and_name(session: SessionDep, current_user: UserDep):
     organization_ids = get_organization_ids_by_scope_group(session, current_user)

@@ -472,22 +472,17 @@ async def get_scope_groups(
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-        scope_groups = session.exec(select(ScopeGroup).where(ScopeGroup.parent_id == current_user.organization_id)).all()
+        scope_groups = session.exec(select(ScopeGroup)).all()
         if not scope_groups:
             raise HTTPException(status_code=404, detail="No scope groups found")
         
         scope_group_list = []
+        
         for scope_group in scope_groups:
-            organizations = [org.organization_name for org in scope_group.organizations]
-
-            # # Include parent organization name if available
-            # if scope_group.parent_organization:
-            #     organizations.append(scope_group.parent_organization.organization_name)
-                
             scope_group_list.append({
                 "id": scope_group.id,
                 "scope_name": scope_group.scope_name,
-                "organizations": organizations
+                "organizations": [org.organization_name for org in scope_group.organizations],
             })
             
         return scope_group_list
@@ -512,21 +507,17 @@ async def get_scope_group(
                 status_code=403, detail="You Do not have the required privilege"
             )
             
-        tenant_name = []
         scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == id)).first()
         if not scope_group:
             raise HTTPException(status_code=404, detail="Scope Group not found")
-        if scope_group.parent_organization:
-            tenant_name = [scope_group.parent_id]
    
+       
             
         return {
                 "id": scope_group.id,
                 "name": scope_group.scope_name,
-                "parent_organization": tenant_name,
                 "organizations": [org.id for org in scope_group.organizations],
             }
-
         
     except Exception as e:
         traceback.print_exc()
@@ -616,12 +607,10 @@ async def form_scope_organization(
             )
         current_tenant = session.exec(select(Organization).where(Organization.id == current_user.organization_id)).first() if tenant == "provider" else session.exec(select(Organization).where(Organization.tenant_hashed == tenant)).first()
         print("current tenant",get_child_organization(session, current_user.organization_id) )
-        org = {"scope_id":"",
-                "parent_organization":{current_tenant.id: current_tenant.organization_name}, 
-                "organizations": get_child_organization(session, current_user.organization_id)
+        org = {"scope_id":"", 
+                "organizations": get_child_organization(session, current_tenant.id)
                 }
-        print("org",org)
- 
+        print(org)
         
         return {"data": org, "html_types": get_html_types("scope_organization")}
     except Exception as e:
@@ -633,7 +622,6 @@ async def add_organization_to_scope(
     session: SessionDep,
     current_user: UserDep,
     scope_id:int = Body(...),
-    parent_organization: List[int] = Body(...),
     organizations: List[int] = Body(...)
 ):
     try:
@@ -652,11 +640,10 @@ async def add_organization_to_scope(
             )
         
         existing_orgs = [organization.id for organization in scope_group.organizations ]
-        print("existing",existing_orgs)
+        print(existing_orgs)
     
         existing_org_ids = set(existing_orgs)
         new_org_ids_set = set(organizations)
-        print("now",new_org_ids_set)
 
         # Add new entries
         to_add = new_org_ids_set - existing_org_ids
@@ -669,7 +656,6 @@ async def add_organization_to_scope(
 
       # Remove obsolete entries
         to_remove = existing_org_ids - new_org_ids_set
-        print("to remove", to_remove)
         if to_remove:
             links_to_remove = session.exec(
                 select(ScopeGroupLink)
@@ -679,20 +665,7 @@ async def add_organization_to_scope(
 
             for link in links_to_remove:
                 session.delete(link)
-
-            session.commit()
-
-
-        print("tenant_name", parent_organization)
-        if parent_organization:
-            scope_group.parent_id = parent_organization[0]
-            session.add(scope_group)
-            session.commit()
-        else:
-            scope_group.parent_id = None
-            session.add(scope_group)
-            session.commit()
-
+                session.commit()
             
 
         return "Organization in Scope Group updated successfully"
@@ -716,7 +689,7 @@ async def update_scope_group(
             ):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Role name is not valid",
+                detail="You Do not have the required privilege",
         )
 
         scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == id)).first()
@@ -726,7 +699,7 @@ async def update_scope_group(
         if validate_name(name) == False:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Role name is not valid",
+                detail="Scope group name is not valid",
         )
 
         scope_group.scope_name = name
