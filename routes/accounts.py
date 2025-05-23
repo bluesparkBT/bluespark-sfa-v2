@@ -563,7 +563,7 @@ async def add_organization_to_scope(
     tenant: str,
     current_user: UserDep,
     scope_name: str = Body(...),
-    organizations: List[int] = Body(...)
+    hidden: List[int] = Body(...)
 ):
     try:
         if not check_permission(
@@ -618,7 +618,7 @@ async def update_scope_group(
 
     name: str = Body(...) ,
     scope_id: int = Body(...),
-    organizations: List[int] = Body(...)
+    hidden: List[int] = Body(...)
 ):
     try:
         if not check_permission(
