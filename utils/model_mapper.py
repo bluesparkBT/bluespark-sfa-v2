@@ -20,12 +20,10 @@ MODEL_HTML_TYPES = {
         "module":"select",
         "policy":"radio"
     },
+
     "scope_group":{
-        "id":"hidden",
-        "name":"text",
-    },
-    "scope_organization":{
         "scope_id":"hidden",
+        "name": "text",
         "organizations": "hierarchical-checkbox"
 
     },

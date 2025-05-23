@@ -527,30 +527,6 @@ async def get_scope_group(
         traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
 
-
-@ar.get("/scope-group-form/")
-async def form_scope(
-    session: SessionDep,
-    current_user: UserDep,    
-    tenant: str,
-):
-    try:
-        if not check_permission(
-            session, "Read", "Administrative", current_user
-            ):
-            raise HTTPException(
-                status_code=403, detail="You Do not have the required privilege"
-            )
-        
-        data = {"id":"", 
-                "name": "",
-          
-                }
-        
-        return {"data": data, "html_types": get_html_types("scope_group")}
-    except Exception as e:
-        traceback.print_exc()
-        raise HTTPException(status_code=400, detail=str(e))
     
 @ar.post("/create-scope-group/")
 async def create_scope_group(
@@ -610,22 +586,27 @@ async def form_scope_organization(
                 status_code=403, detail="You Do not have the required privilege"
             )
         current_tenant = session.exec(select(Organization).where(Organization.id == current_user.organization_id)).first() if tenant == "provider" else session.exec(select(Organization).where(Organization.tenant_hashed == tenant)).first()
+        
         print("current tenant",get_child_organization(session, current_user.organization_id) )
+        
         org = {"scope_id":"", 
-                "organizations": get_child_organization(session, current_tenant.id)
-                }
+               "name": "",
+               "hidden": [get_child_organization(session, current_user.organization_id)]
+            }
+            
         print(org)
         
-        return {"data": org, "html_types": get_html_types("scope_organization")}
+        return {"data": org, "html_types": get_html_types("scope_group")}
+        
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
     
-@ar.post("/add-scope-organization/")
+@ar.post("/create-scope-group/")
 async def add_organization_to_scope(
     session: SessionDep,
     current_user: UserDep,
-    scope_id:int = Body(...),
+    scope_name: str = Body(...),
     organizations: List[int] = Body(...)
 ):
     try:
@@ -636,16 +617,79 @@ async def add_organization_to_scope(
                 status_code=403, detail="You Do not have the required privilege"
             )
 
-        scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == scope_id)).first()
-        if not scope_group:
+        if validate_name(scope_name) == False:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Scope group not found",
+                detail="Scope name is not valid",
+        )
+
+        existing_scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.scope_name == scope_name)).first()
+        
+        if existing_scope_group:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Scope group already exists",
             )
+      
+        scope_group = ScopeGroup(
+            scope_name=scope_name,
+        )
+        
+        session.add(scope_group)
+        session.commit()
+        session.refresh(scope_group)
+     
+        #Add new entries
+        to_add = set(organizations)
+        for org_id in to_add:
+            scope_group_link_add = ScopeGroupLink(scope_group_id=scope_group.id, organization_id=org_id)
+            session.add(scope_group_link_add)
+            session.commit()
+            session.refresh(scope_group_link_add)
+           
+
+        return "Organization in Scope Group updated successfully"
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=400, detail=str(e))
+    
+
+@ar.put("/update-scope-group/")
+async def update_scope_group(
+    session: SessionDep,
+    current_user: UserDep,    
+    tenant: str,
+
+    name: str = Body(...) ,
+    scope_id: int = Body(...),
+    organizations: List[int] = Body(...)
+):
+    try:
+        if not check_permission(
+            session, "Update", "Administrative", current_user
+            ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="You Do not have the required privilege",
+        )
+
+        scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == scope_id)).first()
+        if not scope_group:
+            raise HTTPException(status_code=404, detail="Role not found")
+        
+      
+        if validate_name(name) == False:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Scope group name is not valid",
+        )
+        
+        scope_group.scope_name = name
+        session.add(scope_group)
+        session.commit()
+        session.refresh(scope_group)
         
         existing_orgs = [organization.id for organization in scope_group.organizations ]
-        print(existing_orgs)
-    
         existing_org_ids = set(existing_orgs)
         new_org_ids_set = set(organizations)
 
@@ -670,49 +714,9 @@ async def add_organization_to_scope(
             for link in links_to_remove:
                 session.delete(link)
                 session.commit()
-            
-
-        return "Organization in Scope Group updated successfully"
-    except Exception as e:
-        traceback.print_exc()
-        raise HTTPException(status_code=400, detail=str(e))
-    
-
-@ar.put("/update-scope-group/")
-async def update_scope_group(
-    session: SessionDep,
-    current_user: UserDep,    
-    tenant: str,
-
-    name: str = Body(...) ,
-    id: int = Body(...),
-):
-    try:
-        if not check_permission(
-            session, "Update", "Administrative", current_user
-            ):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="You Do not have the required privilege",
-        )
-
-        scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == id)).first()
-        if not scope_group:
-            raise HTTPException(status_code=404, detail="Role not found")
-      
-        if validate_name(name) == False:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Scope group name is not valid",
-        )
-
-        scope_group.scope_name = name
-        session.add(scope_group)
-        session.commit()
-        session.refresh(scope_group)
-
 
         return scope_group.id
+        
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))

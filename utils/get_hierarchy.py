@@ -48,31 +48,22 @@ def get_organization_ids_by_scope_group(session, current_user) -> List[int]:
     return organization_ids
 
 
-def get_child_organization(session: SessionDep, organization_id: int, is_root=True):
+def get_child_organization(session: SessionDep, organization_id: int , max_depth = None):
     """
     Fetch all child organizations (descendants) from the database.
     """
     children = session.exec(
         select(Organization).where(Organization.parent_id == organization_id)
     ).all()
-
-    child_hierarchy = []
-    for child in children:
-        child_hierarchy.append({
-            'id': child.id,
-            'name': child.organization_name,
-            'children': get_child_organization(session, child.id, is_root=False)
-        })
-
-    if is_root:
-        parent_org = session.get(Organization, organization_id)
-        if parent_org:
-            return [{
-                'id': parent_org.id,
-                'name': 'All',
-                'children': child_hierarchy
-            }]
-    return child_hierarchy
+    
+    organization = session.exec(select(Organization).where(Organization.id == organization_id)).first()
+    
+        
+    return {
+            'id': organization_id,
+            'name': "All" if organization.parent_id is None else organization.organization_name, 
+            'children': [get_child_organization(session, child.id, max_depth-1 if max_depth is not None else max_depth) for child in children if max_depth is None or max_depth > 0]            
+        }
 
 def get_parent_organizations(session: SessionDep, organization_id: int) -> List[int]:
     """
