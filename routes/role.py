@@ -4,7 +4,7 @@ from sqlmodel import Session, select
 
 
 from db import SECRET_KEY, get_session
-from models.Account import AccessPolicy, Role, RoleModulePermission, User, ScopeGroup, ScopeGroupLink
+from models.Account import AccessPolicy, Role, RoleModulePermission, User, ScopeGroup, ScopeGroupLink, UserRoleLink
 from models.Account import ModuleName as modules
 from utils.auth_util import get_tenant, get_current_user, check_permission
 from utils.model_converter_util import get_html_types
@@ -103,25 +103,25 @@ async def get_my_role(
             )
         user = session.exec(select(User).where(User.id ==current_user.id)).first()
 
-        if not user or not user.role_id:
+        if not user or not user.roles:
             raise HTTPException(status_code=404, detail="User or assigned role not found")
-        
-        role = session.exec(select(Role).where(Role.id == user.role_id)).first()
-        if not role:
-            raise HTTPException(status_code=404, detail="Role not found")
+        roles = [];
 
-        permissions = [
-            perm for perm in role.permissions if perm.module is not None
-        ]
+        for role in user.roles:
 
-        return {
-            "id": role.id,
-            "role_name": role.name,
-            **{  
-                perm.module: perm.access_policy
-                for perm in permissions
-            }     
-        }
+            permissions = [
+                perm for perm in role.permissions if perm.module is not None
+            ]
+
+            roles.append({
+                "id": role.id,
+                "role_name": role.name,
+                **{  
+                    perm.module: perm.access_policy
+                    for perm in permissions
+                }     
+            })
+        return roles
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
     
@@ -350,11 +350,11 @@ async def delete_role(
         role = session.exec(select(Role).where(Role.id == id)).first()
         if not role:
             raise HTTPException(status_code=404, detail="Role not found")
-        assigned_users = session.exec(select(User).where(User.role_id == id)).all()
+        role_links = session.exec(select(UserRoleLink).where(UserRoleLink.role_id == id)).all()
 
-        for user in assigned_users:
-            user.role_id = None
-            session.add(user)  # mark for update
+        for link in role_links:
+            session.delete(link) 
+            session.commit() 
 
         session.commit()
 

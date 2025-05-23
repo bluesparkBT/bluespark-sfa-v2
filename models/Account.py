@@ -81,6 +81,13 @@ class Scope(str, Enum):
     managerial_scope = "managerial_scope"
     personal_scope = "personal_scope"
 
+class UserRoleLink(SQLModel, table=True):
+    __tablename__ = "role_link"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    role_id: int = Field(foreign_key="role.id", index=True)
+    user_id: int = Field(foreign_key="users.id", index=True)
+
 class Role(SQLModel, table=True):
     __tablename__ = "role"
 
@@ -88,6 +95,7 @@ class Role(SQLModel, table=True):
     name: str
     organization_id: int = Field(foreign_key="organization.id")
     permissions: List["RoleModulePermission"] = Relationship(back_populates="role")
+    users: List["User"] = Relationship(back_populates="roles", link_model=UserRoleLink)
 
 class AccessPolicy(str, Enum):
     deny = "deny"
@@ -137,7 +145,7 @@ class RoleModulePermission(SQLModel, table=True):
     access_policy: Optional[AccessPolicy] = Field(default=AccessPolicy.deny)
 
     role: Optional[Role] = Relationship(back_populates="permissions")
-    
+
 class User(SQLModel, table=True):
     __tablename__ = "users"
     
@@ -149,7 +157,6 @@ class User(SQLModel, table=True):
     email: Optional[str] = Field(index=True)
     phone_number: Optional[str] = Field(default=None,index=True)
     organization_id: Optional[int] = Field(default=None, foreign_key="organization.id", index=True)
-    role_id: Optional[int] = Field(default=None, foreign_key="role.id")
     scope: Scope = Field(default=Scope.personal_scope)
     scope_group_id: Optional[int] = Field(default=None, foreign_key="scope_group.id")
     gender: Optional[Gender]
@@ -171,6 +178,7 @@ class User(SQLModel, table=True):
         back_populates="approver",
         sa_relationship_kwargs={"foreign_keys": "[WarehouseStop.approver_id]"}
     )
+    roles: List["Role"] = Relationship(back_populates="users", link_model=UserRoleLink)
 
 
 

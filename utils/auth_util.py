@@ -135,21 +135,14 @@ def check_permission(
     try:
         print(f"Checking permission for user_id={user.id}, username={user.username}, modules={endpoint_groups}, policy={policy_type}")
 
-        # Make sure it's a list
         if isinstance(endpoint_groups, str):
             endpoint_groups = [endpoint_groups]
 
         user = session.exec(select(User).where(User.id == user.id)).first()
-        if not user or not user.role_id:
-            print("User not found or has no role")
+        if not user or not user.roles:
+            print("User not found or has no roles")
             return False
 
-        role = session.exec(select(Role).where(Role.id == user.role_id)).first()
-        if not role:
-            print("Role not found")
-            return False
-
-        # Prepare access levels and policy map
         access_levels = {
             "deny": 0,
             "view": 2,
@@ -167,29 +160,28 @@ def check_permission(
 
         required_access_level = 1 << crud_digit[policy_type]
 
-        # Check permission for each module
         for endpoint_group in endpoint_groups:
             if endpoint_group not in [moduleName.value for moduleName in ModuleName]:
                 print(f"Module '{endpoint_group}' not found in enums")
                 continue
 
-            permission = session.exec(
-                select(RoleModulePermission)
-                .where(RoleModulePermission.role_id == role.id)
-                .where(RoleModulePermission.module == endpoint_group)
-            ).first()
+            for role in user.roles:
+                permission = session.exec(
+                    select(RoleModulePermission)
+                    .where(RoleModulePermission.role_id == role.id)
+                    .where(RoleModulePermission.module == endpoint_group)
+                ).first()
 
-            if not permission:
-                print(f"No permission record found for module '{endpoint_group}'")
-                continue
+                if not permission:
+                    print(f"No permission record found for role '{role.name}' on module '{endpoint_group}'")
+                    continue
 
-            user_access_level = access_levels[permission.access_policy]
-            print(f"User Access Level for {endpoint_group}: {user_access_level}, Required: {required_access_level}")
+                user_access_level = access_levels.get(permission.access_policy, 0)
+                print(f"Role '{role.name}' access level for '{endpoint_group}': {user_access_level}, Required: {required_access_level}")
 
-            if user_access_level & required_access_level:
-                return True
+                if user_access_level & required_access_level:
+                    return True
 
-        # If none of the modules matched
         return False
 
     except Exception as e:

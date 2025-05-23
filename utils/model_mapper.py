@@ -22,7 +22,6 @@ MODEL_HTML_TYPES = {
     },
 
     "scope_group":{
-        "scope_id":"hidden",
         "name": "text",
         "hidden": "hierarchical-checkbox"
 
@@ -34,7 +33,7 @@ MODEL_HTML_TYPES = {
         "phone_number": "text",
         "email": "text",
         "organization": "select",
-        "role": "select",
+        "role": "select multiple",
         "scope": "select",
         "scope_group": "select",
         "date_of_birth": "date",
