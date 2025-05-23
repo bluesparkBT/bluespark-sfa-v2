@@ -420,6 +420,8 @@ async def create_tenant(
         #     select(Organization).where(Organization.organization_name == verify_tenant(tenant_name))
         # ).first()
         print("current user of provide is:", current_user)
+        superadmin_id = session.exec(select(User.organization_id).where(User.role_id == Role.id == "Super Admin")).first()
+        
         hashed_tenant_name = get_tenant_hash(tenant_name) 
         tenant = Organization(
             organization_name = tenant_name,
@@ -429,7 +431,7 @@ async def create_tenant(
             logo_image=logo_image,
             organization_type=OrganizationType.company.value,
             tenant_domain = f"{Domain}/{hashed_tenant_name}",
-            parent_id = current_user.organization_id
+            parent_id = superadmin_id
         )
         session.add(tenant)
         session.commit()
