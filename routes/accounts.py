@@ -7,7 +7,7 @@ from db import get_session
 from models.Account import User, ScopeGroup, ScopeGroupLink, Organization, Gender, Scope, Role, AccessPolicy, IdType
 from utils.auth_util import verify_password, create_access_token, get_password_hash
 from utils.util_functions import validate_name, validate_email, validate_phone_number, parse_datetime_field, format_date_for_input, parse_enum
-from utils.auth_util import get_current_user, check_permission, generate_random_password, tenant_users, extract_username
+from utils.auth_util import get_current_user, check_permission, generate_random_password, add_organization_path, extract_username
 from utils.model_converter_util import get_html_types
 from utils.get_hierarchy import get_child_organization, get_organization_ids_by_scope_group
 from utils.form_db_fetch import fetch_organization_id_and_name, fetch_role_id_and_name, fetch_scope_group_id_and_name
@@ -34,7 +34,7 @@ def login(
         if not current_tenant:
             raise HTTPException(status_code=404, detail="Tenant not found")
         
-        db_username = tenant_users(username, current_tenant.organization_name)
+        db_username = add_organization_path(username, current_tenant.organization_name)
         user = session.exec(
             select(User).where(User.username == db_username)
         ).first()
@@ -72,8 +72,12 @@ async def get_my_user(
             raise HTTPException(status_code=404, detail="User not found")
 
         if not tenant or tenant.lower() == "provider":
-            username_display = user.username
-            organization_name = "Service Provider"  # or None, depending on your use case
+            service_provider = session.exec(select(Organization).where(Organization.organization_type == "Service Provider")).first()
+            superadmin_user = session.exec(select(User).where(User.id == current_user.id)).first()
+            print("super admin user:", superadmin_user)
+
+            username_display = extract_username(superadmin_user.username, service_provider.organization_name)
+            organization_name = service_provider.organization_name
         else:
             current_tenant = session.exec(
                 select(Organization).where(Organization.tenant_hashed == tenant)
@@ -100,7 +104,6 @@ async def get_my_user(
         traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
 
-
 @ar.get("/get-users/")
 async def get_users(
     session: SessionDep,
@@ -110,39 +113,49 @@ async def get_users(
     try:  
         if not check_permission(
             session, "Read", ["Administrative", "Users"], current_user
-            ):
+        ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
+
         organization_ids = get_organization_ids_by_scope_group(session, current_user)
+
         users = session.exec(
             select(User).where(User.organization_id.in_(organization_ids))
         ).all()
 
-        if not users:
-            raise HTTPException(status_code=404, detail="No users found")
-        
         user_list = []
         for user in users:
+            # Fetch the organization for each user
+            user_org = session.exec(
+                select(Organization).where(Organization.id == user.organization_id)
+            ).first()
+
+            if not user_org:
+                continue  # Or handle as needed
+
+            # Extract username without tenant prefix
+            username_display = extract_username(user.username, user_org.organization_name)
+
             user_list.append({
                 "id": user.id,
                 "fullname": user.fullname,
-                "username": user.username,
+                "username": username_display,
                 "email": user.email,
                 "phone_number": user.phone_number,
-                "organization": user.organization_id,
+                "organization": user_org.organization_name,
                 "role_id": user.role_id,
                 "manager_id": user.manager_id,
                 "scope": user.scope,
                 "scope_group_id": user.scope_group_id,
             })
-            
+
         return user_list
 
-        
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
+
     
 @ar.get("/get-user/{id}")
 async def get_user(
@@ -207,9 +220,9 @@ async def create_user_form(
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
 
-        current_tenant = session.exec(
-            select(Organization).where(Organization.tenant_hashed == tenant)
-        ).first()
+        # current_tenant = session.exec(
+        #     select(Organization).where(Organization.tenant_hashed == tenant)
+        # ).first()
 
         user_data = {
             "id": "", 
@@ -242,8 +255,8 @@ async def create_user(
     scope: str = Body(...),
     scope_group: int = Body(...),
     organization: int = Body(...),
-    phone_number: str = Body(...),
-    gender: str = Body(...),
+    phone_number:Optional [str] = Body(None),
+    gender: Optional[str] = Body(None),
             
 ):
     try: 
@@ -281,7 +294,7 @@ async def create_user(
         print("the organization get from", current_tenant)   
                
         user_name = username
-        stored_username = tenant_users(user_name, current_tenant.organization_name)
+        stored_username = add_organization_path(user_name, current_tenant.organization_name)
 
         password = generate_random_password()
         hashed_password = get_password_hash(password + stored_username)
@@ -369,8 +382,8 @@ async def update_user(
     scope: str = Body(...),
     scope_group: int = Body(...),
     organization: int = Body(...),
-    phone_number: str = Body(...),
-    gender: str = Body(...),
+    phone_number: Optional[str] = Body(None),
+    gender: Optional[str] = Body(None),
     salary: float = Body(...),
     position: str = Body(...),
     date_of_birth:  Optional[str]  = Body(...),
@@ -393,22 +406,25 @@ async def update_user(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="User does not exist",
             )
-        #check input validity
-        if validate_name(full_name) == False:
+        # Check input validity
+        if not validate_name(full_name):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Fullname is not valid",
-        )
-        elif validate_email(email) == False:
+            )
+
+        elif not validate_email(email):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Email is not valid",
-        )
-        elif validate_phone_number(phone_number) == False:
+            )
+
+        elif phone_number not in (None, "") and not validate_phone_number(phone_number):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Phone number is not valid",
-        )
+            )
+
        
         existing_user.fullname = full_name
         existing_user.username = username
@@ -610,11 +626,10 @@ async def form_scope_organization(
                 status_code=403, detail="You Do not have the required privilege"
             )
         current_tenant = session.exec(select(Organization).where(Organization.id == current_user.organization_id)).first() if tenant == "provider" else session.exec(select(Organization).where(Organization.tenant_hashed == tenant)).first()
-        print("current tenant",get_child_organization(session, current_user.organization_id) )
+
         org = {"scope_id":"", 
-                "organizations": get_child_organization(session, current_tenant.id)
-                }
-        print(org)
+               "hidden": [get_child_organization(session, current_user.organization_id)]
+            }
         
         return {"data": org, "html_types": get_html_types("scope_organization")}
     except Exception as e:

@@ -36,12 +36,12 @@ def get_tenant(
      
     return tenant
 
-def tenant_users(username: str, tenant_name: str) -> str:
+def add_organization_path(username: str, tenant_name: str) -> str:
     clean_tenant = re.sub(r"\s+", "_", tenant_name.strip().lower())
     return f"{clean_tenant}_{username}"
 
 def extract_username(username: str, tenant_name: str) -> str:
-    prefix = re.sub(r"\s+", "_", tenant_name.strip().lower())
+    prefix = re.sub(r"\s+", "_", tenant_name.strip().lower()) + "_"
     # prefix = f"{tenant_name.lower()}_"
     if username.startswith(prefix):
         return username[len(prefix):]
