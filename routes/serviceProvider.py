@@ -8,15 +8,17 @@ from models.Account import User, ScopeGroup, ScopeGroupLink, Organization, Organ
 from models.Account import ModuleName as modules
 from utils.auth_util import verify_password, create_access_token, get_password_hash
 from utils.util_functions import validate_name, validate_email, validate_phone_number, parse_enum
-from utils.auth_util import get_current_user, check_permission, generate_random_password, get_tenant_hash, extract_username, tenant_users
+from utils.auth_util import get_current_user, check_permission, generate_random_password, get_tenant_hash, extract_username, add_organization_path
 from utils.model_converter_util import get_html_types
+from utils.get_hierarchy import get_child_organization
 import traceback
 
 # frontend domain
-# Domain= "http://172.10.10.203:3000"
+Domain= "http://172.10.10.203:3000"
 
 #for dev environment localhost
-Domain= "http://127.0.0.1:3000"
+# Domain= "http://127.0.0.1:3000"
+
 service_provider_company = "Bluespark"
 ACCESS_TOKEN_EXPIRE_DAYS = 2
 
@@ -46,7 +48,7 @@ def login(
 ):
     try:
         service_provider = session.exec(select(Organization).where(Organization.organization_type == "Service Provider")).first()
-        db_username = tenant_users(username, service_provider.organization_name)
+        db_username = add_organization_path(username, service_provider.organization_name)
 
         user = session.exec(select(User).where(User.username == db_username)).first()
         print(user, db_username)
@@ -72,6 +74,7 @@ def login(
 @sp.post("/create-superadmin/")
 async def create_superadmin_user(
     session: SessionDep,
+    fullname: str = Body(...),
     username: str = Body(...),
     email: str = Body(...),
     password: str = Body(...),
@@ -146,8 +149,9 @@ async def create_superadmin_user(
             session.add(role_module_permission)
         session.commit()
         
-        stored_username = tenant_users(username, service_provider.organization_name)
+        stored_username = add_organization_path(username, service_provider.organization_name)
         super_admin_user = User(
+            fullname = fullname,
             username= stored_username,
             email=email,
             hashedPassword=get_password_hash(password + stored_username),
@@ -305,10 +309,10 @@ async def get_tenants(
         
         tenants = session.exec(
             select(Organization).where(
-                (Organization.parent_id == None) &
                 (Organization.organization_type == OrganizationType.company)
-            )
-        ).all()
+            )).all()
+        # tenants = get_child_organization(session, None, 1 )
+        # print(tenants)
         for tenant in  tenants:
             tenant_list.append({
                     "id": tenant.id,
@@ -409,7 +413,7 @@ async def create_tenant(
         # existing_tenant = session.exec(
         #     select(Organization).where(Organization.organization_name == verify_tenant(tenant_name))
         # ).first()
-        
+        print("current user of provide is:", current_user)
         hashed_tenant_name = get_tenant_hash(tenant_name) 
         tenant = Organization(
             organization_name = tenant_name,
@@ -418,7 +422,8 @@ async def create_tenant(
             description=description,
             logo_image=logo_image,
             organization_type=OrganizationType.company.value,
-            tenant_domain = f"{Domain}/{hashed_tenant_name}"
+            tenant_domain = f"{Domain}/{hashed_tenant_name}",
+            parent_id = current_user.organization_id
         )
         session.add(tenant)
         session.commit()
@@ -454,6 +459,11 @@ async def create_tenant(
         session.commit()
         session.refresh(role)
         
+        service_provider_scope_group = ScopeGroup(
+            scope_name="Super Admin Scope",
+            parent_id = service_provider.id
+            )
+        
         # List of modules the tenant system Admin should have access to
         modules_to_grant = [
             modules.administrative.value,
@@ -482,10 +492,10 @@ async def create_tenant(
         session.commit()
         
         password = generate_random_password()
-        hashed_password = get_password_hash(password + tenant_users("admin", tenant_name))
+        hashed_password = get_password_hash(password + add_organization_path("admin", tenant_name))
 
         tenant_admin = User(
-            username= tenant_users("admin", tenant_name),
+            username= add_organization_path("admin", tenant_name),
             fullname=f"{tenant_name} System Admin",
             email=f"{tenant_name.lower()}_admin@{tenant_name}.com",
             hashedPassword = hashed_password,
