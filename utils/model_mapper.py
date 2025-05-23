@@ -14,11 +14,12 @@ MODEL_HTML_TYPES = {
     "role":{
         "id":"hidden",
         "name":"text",
+        "module":"select",
+        "policy":"radio"
     },
     "policy":{
         "role_id":"hidden",
-        "module":"select",
-        "policy":"radio"
+       
     },
 
     "scope_group":{
