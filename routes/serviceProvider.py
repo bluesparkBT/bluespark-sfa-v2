@@ -11,6 +11,7 @@ from utils.util_functions import validate_name, validate_email, validate_phone_n
 from utils.auth_util import get_current_user, check_permission, generate_random_password, get_tenant_hash, extract_username, add_organization_path
 from utils.model_converter_util import get_html_types
 from utils.get_hierarchy import get_child_organization
+from utils.domain_util import getPath
 import traceback
 
 # frontend domain
@@ -325,7 +326,7 @@ async def get_tenants(
                     "owner": tenant.owner_name,
                     "description": tenant.description,
                     "logo": tenant.logo_image,
-                    "domain": tenant.tenant_domain
+                    "domain": getPath() + "/" + tenant.tenant_hashed
                 }
             )
 
