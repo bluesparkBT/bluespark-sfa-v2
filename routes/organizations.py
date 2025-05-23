@@ -81,26 +81,8 @@ async def get_organizations(
         if not organizations:
             raise HTTPException(status_code=404, detail="No organizations found")
 
-        organization_list = []
-
-        for org in organizations:
-            organization_list.append({
-                "id": org.id,
-                "organization": org.organization_name,
-                "owner": org.owner_name,
-                "logo": org.logo_image,
-                "description": org.description,
-                "organization_type": org.organization_type,
-                "inheritance_group": org.inheritance_group,
-                "parent_organization": org.parent_id,
-                "scope_groups": [
-                    {"id": sg.id, "scope_name": sg.scope_name}
-                    for sg in org.scope_groups
-                ]
-            })
-
-        return organization_list
-
+        return organizations
+        
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
