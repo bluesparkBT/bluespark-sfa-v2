@@ -526,53 +526,8 @@ async def get_scope_group(
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
-
     
-@ar.post("/create-scope-group/")
-async def create_scope_group(
-    session: SessionDep,
-    current_user: UserDep,    
-    tenant: str,
-    scope_data: Dict[str, Any] = Body(...),
-):
-    try:
-        if not check_permission(
-            session, "Create", "Administrative", current_user
-            ):
-            raise HTTPException(
-                status_code=403, detail="You Do not have the required privilege"
-            )
-        scope_name = scope_data.get("name")
-
-        if validate_name(scope_name) == False:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Scope name is not valid",
-        )
-
-        
-
-        existing_scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.scope_name == scope_name)).first()
-        if existing_scope_group:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Scope group already exists",
-            )
-      
-        scope_group = ScopeGroup(
-            scope_name=scope_name,
-        )
-        
-        session.add(scope_group)
-        session.commit()
-        session.refresh(scope_group)
-
-        return scope_group.id
-    except Exception as e:
-        traceback.print_exc()
-        raise HTTPException(status_code=400, detail=str(e))
-    
-@ar.get("/scope-organization-form/")
+@ar.get("/scope-group-form/")
 async def form_scope_organization(
     session: SessionDep,
     current_user: UserDep,
