@@ -6,7 +6,7 @@ port = ""
 def reloadPath():
     global domain
     global port
-    with open("../domain.conf","r") as f:
+    with open("domain.conf","r") as f:
         data = f.readlines()
         for line in data:
             if line.strip().startswith("domain:"):
