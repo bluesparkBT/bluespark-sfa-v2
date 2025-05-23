@@ -73,7 +73,7 @@ async def get_organizations(
                 status_code=403, detail="You Do not have the required privilege"
             )
             
-        current_tenant_id = session.exec(select(Organization.id).where(Organization.id == current_user.organization_id)).first() if tenant == "provider" else session.exec(select(Organization).where(Organization.tenant_hashed == tenant)).first()
+        current_tenant_id = session.exec(select(Organization.id).where(Organization.id == current_user.organization_id)).first() if tenant == "provider" else session.exec(select(Organization.id).where(Organization.tenant_hashed == tenant)).first()
        
         
         organizations = get_heirarchy(session, current_tenant_id, None, current_user)
