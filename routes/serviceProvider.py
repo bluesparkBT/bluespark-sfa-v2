@@ -32,6 +32,7 @@ def has_superadmin_created(
     session: SessionDep
 ) ->bool:
     existing_superadmin = session.exec(select(User).where(User.role_id == Role.id == "Super Admin")).first()
+
     if existing_superadmin:
         print("Super admin and tenant already exisits")
         return True
@@ -156,13 +157,17 @@ async def create_superadmin_user(
             email=email,
             hashedPassword=get_password_hash(password + stored_username),
             organization_id=service_provider.id,
+            role_id=role.id,
             scope_group_id=service_provider_scope_group.id,
-            role_id = role.id,
             scope = Scope.managerial_scope.value
         )
         session.add(super_admin_user)
         session.commit()
         session.refresh(super_admin_user)
+
+        
+
+
 
         return {"message": "Superadmin created successfully"}
     except Exception as e:
@@ -495,13 +500,15 @@ async def create_tenant(
             email=f"{tenant_name.lower()}_admin@{tenant_name}.com",
             hashedPassword = hashed_password,
             organization_id=tenant.id,
-            role_id=role.id,
             scope=Scope.managerial_scope,
+            role_id=role.id,
             scope_group_id=system_admin_scope_group.id,
         )
         session.add(tenant_admin)
         session.commit()
         session.refresh(tenant_admin)
+
+        
         
         return {
             "message": "Tenant and system admin created successfully",

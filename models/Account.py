@@ -81,6 +81,7 @@ class Scope(str, Enum):
     managerial_scope = "managerial_scope"
     personal_scope = "personal_scope"
 
+
 class Role(SQLModel, table=True):
     __tablename__ = "role"
 
@@ -137,7 +138,7 @@ class RoleModulePermission(SQLModel, table=True):
     access_policy: Optional[AccessPolicy] = Field(default=AccessPolicy.deny)
 
     role: Optional[Role] = Relationship(back_populates="permissions")
-    
+
 class User(SQLModel, table=True):
     __tablename__ = "users"
     

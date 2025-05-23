@@ -22,7 +22,6 @@ MODEL_HTML_TYPES = {
     },
 
     "scope_group":{
-        "scope_id":"hidden",
         "name": "text",
         "hidden": "hierarchical-checkbox"
 
