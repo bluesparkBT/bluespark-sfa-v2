@@ -70,7 +70,6 @@ async def get_my_user(
         user = session.exec(select(User).where(User.id == current_user.id)).first()
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
-
         if not tenant or tenant.lower() == "provider":
             service_provider = session.exec(select(Organization).where(Organization.organization_type == "Service Provider")).first()
             superadmin_user = session.exec(select(User).where(User.id == current_user.id)).first()
@@ -306,8 +305,8 @@ async def create_user(
             email=email,
             phone_number=phone_number,
             hashedPassword = hashed_password,
-            organization_id= organization,
-            role_id=role,           
+            organization_id= organization,   
+            role_id= role,       
             gender=parse_enum(Gender,gender, "Gender"),
             scope=parse_enum(Scope,scope, "Scope"),
             scope_group_id=scope_group,
@@ -316,6 +315,7 @@ async def create_user(
         session.add(new_user)
         session.commit()
         session.refresh(new_user)
+
 
         return {
             "message": "User registered successfully",
@@ -432,7 +432,6 @@ async def update_user(
         existing_user.phone_number = phone_number
         # existing_user.hashedPassword = get_password_hash(password + username) if password != "" else existing_user.hashedPassword
         existing_user.organization_id = organization
-        existing_user.role_id = role
         existing_user.gender = parse_enum(Gender,gender, "Gender")
         existing_user.salary = float(salary)
         existing_user.position = position
@@ -443,10 +442,12 @@ async def update_user(
         existing_user.scope = parse_enum(Scope,scope, "Scope")
         existing_user.scope_group_id = scope_group
         existing_user.image = image
+        existing_user.role_id = role
 
         session.add(existing_user)
         session.commit()
         session.refresh(existing_user)
+
 
         return {
             "message": "User: {existing_user} updated successfully"}
@@ -536,83 +537,14 @@ async def get_scope_group(
         return {
                 "id": scope_group.id,
                 "name": scope_group.scope_name,
-                "organizations": [org.id for org in scope_group.organizations],
+                "hidden": [org.id for org in scope_group.organizations],
             }
         
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
-
-
+    
 @ar.get("/scope-group-form/")
-async def form_scope(
-    session: SessionDep,
-    current_user: UserDep,    
-    tenant: str,
-):
-    try:
-        if not check_permission(
-            session, "Read", "Administrative", current_user
-            ):
-            raise HTTPException(
-                status_code=403, detail="You Do not have the required privilege"
-            )
-        
-        data = {"id":"", 
-                "name": "",
-          
-                }
-        
-        return {"data": data, "html_types": get_html_types("scope_group")}
-    except Exception as e:
-        traceback.print_exc()
-        raise HTTPException(status_code=400, detail=str(e))
-    
-@ar.post("/create-scope-group/")
-async def create_scope_group(
-    session: SessionDep,
-    current_user: UserDep,    
-    tenant: str,
-    scope_data: Dict[str, Any] = Body(...),
-):
-    try:
-        if not check_permission(
-            session, "Create", "Administrative", current_user
-            ):
-            raise HTTPException(
-                status_code=403, detail="You Do not have the required privilege"
-            )
-        scope_name = scope_data.get("name")
-
-        if validate_name(scope_name) == False:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Scope name is not valid",
-        )
-
-        
-
-        existing_scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.scope_name == scope_name)).first()
-        if existing_scope_group:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Scope group already exists",
-            )
-      
-        scope_group = ScopeGroup(
-            scope_name=scope_name,
-        )
-        
-        session.add(scope_group)
-        session.commit()
-        session.refresh(scope_group)
-
-        return scope_group.id
-    except Exception as e:
-        traceback.print_exc()
-        raise HTTPException(status_code=400, detail=str(e))
-    
-@ar.get("/scope-organization-form/")
 async def form_scope_organization(
     session: SessionDep,
     current_user: UserDep,
@@ -626,22 +558,30 @@ async def form_scope_organization(
                 status_code=403, detail="You Do not have the required privilege"
             )
         current_tenant = session.exec(select(Organization).where(Organization.id == current_user.organization_id)).first() if tenant == "provider" else session.exec(select(Organization).where(Organization.tenant_hashed == tenant)).first()
-
-        org = {"scope_id":"", 
+       
+        print("current tenant",get_child_organization(session, current_user.organization_id) )
+        
+        org = {
+               "id": "",
+               "name":"", 
                "hidden": [get_child_organization(session, current_user.organization_id)]
             }
+            
+        print(org)
         
-        return {"data": org, "html_types": get_html_types("scope_organization")}
+        return {"data": org, "html_types": get_html_types("scope_group")}
+        
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
     
-@ar.post("/add-scope-organization/")
+@ar.post("/create-scope-group/")
 async def add_organization_to_scope(
     session: SessionDep,
+    tenant: str,
     current_user: UserDep,
-    scope_id:int = Body(...),
-    organizations: List[int] = Body(...)
+    name: str = Body(...),
+    hidden: List[int] = Body(...)
 ):
     try:
         if not check_permission(
@@ -651,41 +591,36 @@ async def add_organization_to_scope(
                 status_code=403, detail="You Do not have the required privilege"
             )
 
-        scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == scope_id)).first()
-        if not scope_group:
+        if validate_name(name) == False:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Scope group not found",
-            )
-        
-        existing_orgs = [organization.id for organization in scope_group.organizations ]
-        print(existing_orgs)
-    
-        existing_org_ids = set(existing_orgs)
-        new_org_ids_set = set(organizations)
+                detail="Scope name is not valid",
+        )
 
-        # Add new entries
-        to_add = new_org_ids_set - existing_org_ids
+        existing_scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.scope_name == name)).first()
+        
+        if existing_scope_group:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Scope group already exists",
+            )
+      
+        scope_group = ScopeGroup(
+            scope_name=name,
+        )
+        
+        session.add(scope_group)
+        session.commit()
+        session.refresh(scope_group)
+     
+        #Add new entries
+        to_add = set(hidden)
         for org_id in to_add:
-            scope_group_link_add = ScopeGroupLink(scope_group_id=scope_id, organization_id=org_id)
+            scope_group_link_add = ScopeGroupLink(scope_group_id=scope_group.id, organization_id=org_id)
             session.add(scope_group_link_add)
             session.commit()
             session.refresh(scope_group_link_add)
-
-
-      # Remove obsolete entries
-        to_remove = existing_org_ids - new_org_ids_set
-        if to_remove:
-            links_to_remove = session.exec(
-                select(ScopeGroupLink)
-                .where(ScopeGroupLink.scope_group_id == scope_id)
-                .where(ScopeGroupLink.organization_id.in_(to_remove))
-            ).all()
-
-            for link in links_to_remove:
-                session.delete(link)
-                session.commit()
-            
+           
 
         return "Organization in Scope Group updated successfully"
     except Exception as e:
@@ -698,9 +633,9 @@ async def update_scope_group(
     session: SessionDep,
     current_user: UserDep,    
     tenant: str,
-
-    name: str = Body(...) ,
     id: int = Body(...),
+    name: str = Body(...) ,
+    hidden: List[int] = Body(...)
 ):
     try:
         if not check_permission(
@@ -714,20 +649,48 @@ async def update_scope_group(
         scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == id)).first()
         if not scope_group:
             raise HTTPException(status_code=404, detail="Role not found")
+        
       
         if validate_name(name) == False:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Scope group name is not valid",
         )
-
+        
         scope_group.scope_name = name
         session.add(scope_group)
         session.commit()
         session.refresh(scope_group)
+        
+        existing_orgs = [organization.id for organization in scope_group.organizations ]
+        existing_org_ids = set(existing_orgs)
+        new_org_ids_set = set(hidden)
+        print("existing", existing_org_ids)
+        print("new", new_org_ids_set)
+        # Add new entries
+        to_add = new_org_ids_set - existing_org_ids
+        for org_id in to_add:
+            scope_group_link_add = ScopeGroupLink(scope_group_id=id, organization_id=org_id)
+            session.add(scope_group_link_add)
+            session.commit()
+            session.refresh(scope_group_link_add)
 
+
+      # Remove obsolete entries
+        to_remove = existing_org_ids - new_org_ids_set
+        if to_remove:
+            links_to_remove = session.exec(
+                select(ScopeGroupLink)
+                .where(ScopeGroupLink.scope_group_id == id)
+                .where(ScopeGroupLink.organization_id.in_(to_remove))
+            ).all()
+
+            for link in links_to_remove:
+                session.delete(link)
+                session.commit()
 
         return scope_group.id
+        
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
