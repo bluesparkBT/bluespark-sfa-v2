@@ -459,11 +459,6 @@ async def create_tenant(
         session.commit()
         session.refresh(role)
         
-        service_provider_scope_group = ScopeGroup(
-            scope_name="Super Admin Scope",
-            parent_id = service_provider.id
-            )
-        
         # List of modules the tenant system Admin should have access to
         modules_to_grant = [
             modules.administrative.value,
