@@ -7,7 +7,7 @@ from models.Account import User, Organization, OrganizationType, ScopeGroup, Sco
 from utils.auth_util import get_current_user, check_permission
 from utils.model_converter_util import get_html_types
 from utils.util_functions import validate_name, validate_image
-from utils.get_hierarchy import get_organization_ids_by_scope_group
+from utils.get_hierarchy import get_organization_ids_by_scope_group, get_child_organization, get_heirarchy
 from utils.form_db_fetch import fetch_organization_id_and_name, fetch_inheritance_group_id_and_name
 import traceback
 
@@ -72,9 +72,12 @@ async def get_organizations(
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
+            
+         current_tenant_id = session.exec(select(Organization.id).where(Organization.id == current_user.organization_id)).first() if tenant == "provider" else session.exec(select(Organization).where(Organization.tenant_hashed == tenant)).first()
+       
         
-        organization_ids = get_organization_ids_by_scope_group(session, current_user)
-        print(organization_ids)
+        scope_organization_ids = get_heirarchy(session, current_tenant_id, None, current_user)
+
         organizations = session.exec(
             select(Organization).where(
                 (Organization.id.in_(organization_ids)) &
@@ -91,9 +94,10 @@ async def get_organizations(
             raise HTTPException(status_code=404, detail="No organizations found")
 
         organization_list = []
+        
+        get_heirarchy(
 
         for org in organizations:
-            print(org)
             organization_list.append({
                 "id": org.id,
                 "organization": org.organization_name,

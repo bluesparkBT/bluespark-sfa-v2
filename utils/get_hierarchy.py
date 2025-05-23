@@ -48,7 +48,7 @@ def get_organization_ids_by_scope_group(session, current_user) -> List[int]:
     return organization_ids
 
 
-def get_child_organization(session: SessionDep, organization_id: int , max_depth = None):
+def get_child_organization(session: SessionDep, organization_id: int , max_depth = None, organization_ids_in_scope = []):
     """
     Fetch all child organizations (descendants) from the database.
     """
@@ -57,13 +57,43 @@ def get_child_organization(session: SessionDep, organization_id: int , max_depth
     ).all()
     
     organization = session.exec(select(Organization).where(Organization.id == organization_id)).first()  
-        
+    
     return {
             'id': organization_id,
+             "id": org.id,
+             "organization": org.organization_name,
+             "owner": org.owner_name,
+             "logo": org.logo_image,
+             "description": org.description,
+             "organization_type": org.organization_type,
+             "inheritance_group": org.inheritance_group,
+             "parent_organization": org.parent_id,
+             "scope_groups": [
+                    {"id": sg.id, "scope_name": sg.scope_name}
+                    for sg in org.scope_groups
+             ]
             'name': "All" if organization.parent_id is None else organization.organization_name, 
-            'children': [get_child_organization(session, child.id, max_depth-1 if max_depth is not None else max_depth) for child in children if max_depth is None or max_depth > 0]            
+            'children': [get_child_organization(session, child.id, max_depth-1 if max_depth is not None else max_depth, organization_ids_in_scope) for child in children if (max_depth is None or max_depth > 0) and child.id in organization_ids_in_scope]           
         }
+    
+def get_heirarchy(session: SessionDep, organization_id: int , max_depth, current_user):
+    user_scope_group = session.exec(
+        select(ScopeGroup).where(ScopeGroup.id == current_user.scope_group_id)
+    ).first()
 
+    if not user_scope_group:
+        raise HTTPException(
+            status_code=404, detail="ScopeGroup not found for the current user"
+        )
+
+    # Get organization IDs associated with this scope group
+    organization_ids = [org.id for org in user_scope_group.organizations]
+    
+    heirarchy = get_child_organizations(session, organization_id, max_depth, organization_ids)
+    
+    return heirarchy
+    
+    
 def get_parent_organizations(session: SessionDep, organization_id: int) -> List[int]:
     """
     Fetch all parent organizations recursively (up to the top-level root).
