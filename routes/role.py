@@ -47,6 +47,7 @@ modules_to_grant = [
     modules.warehouse_stop.value,
     
 ]
+mod = modules
 
 @rr.get("/roles")
 async def get_roles(
@@ -215,6 +216,13 @@ async def create_role(
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
+        if(parse_enum(AccessPolicy,policy,"Policy") == None or parse_enum(mod,module,"Module") == None):
+             raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Required field missing",
+                )
+
+
         #check exisiting role
         print("id", id)
         role_id: int
@@ -395,7 +403,7 @@ async def update_role(
         session.commit()
         session.refresh(role)
         print("module",module,"policy")
-        if (parse_enum(AccessPolicy,policy, "policy") != None):
+        if (parse_enum(AccessPolicy,policy, "policy") != None and parse_enum(mod,module,"Module") != None):
             print("in here")
             role_module_permission = session.exec(select(RoleModulePermission)
                                     .where((RoleModulePermission.role_id == id)&
