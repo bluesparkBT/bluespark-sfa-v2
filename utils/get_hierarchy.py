@@ -62,7 +62,6 @@ def get_child_organization(session: SessionDep, organization_id: int , max_depth
             'id': organization_id,
             "organization": org.organization_name,
             "owner": org.owner_name,
-            "logo": org.logo_image,
             "description": org.description,
             "organization_type": org.organization_type,
             "inheritance_group": org.inheritance_group,
