@@ -33,7 +33,7 @@ MODEL_HTML_TYPES = {
         "phone_number": "text",
         "email": "text",
         "organization": "select",
-        "role": "select multiple",
+        "role": "select",
         "scope": "select",
         "scope_group": "select",
         "date_of_birth": "date",

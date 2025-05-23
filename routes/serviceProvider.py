@@ -4,7 +4,7 @@ from datetime import timedelta, date, datetime
 from fastapi import APIRouter, HTTPException, Body, status, Depends, Path
 from sqlmodel import select, Session
 from db import get_session
-from models.Account import User, ScopeGroup, ScopeGroupLink, Organization, OrganizationType, RoleModulePermission, Scope, Role, AccessPolicy, UserRoleLink
+from models.Account import User, ScopeGroup, ScopeGroupLink, Organization, OrganizationType, RoleModulePermission, Scope, Role, AccessPolicy
 from models.Account import ModuleName as modules
 from utils.auth_util import verify_password, create_access_token, get_password_hash
 from utils.util_functions import validate_name, validate_email, validate_phone_number, parse_enum
@@ -29,11 +29,7 @@ UserDep = Annotated[dict, Depends(get_current_user)]
 def has_superadmin_created(
     session: SessionDep
 ) ->bool:
-    existing_superadmin = session.exec(
-        select(User)
-        .join(User.roles)
-        .where(Role.name == "Super Admin")
-    ).first()
+    existing_superadmin = session.exec(select(User).where(User.role_id == Role.id == "Super Admin")).first()
 
     if existing_superadmin:
         print("Super admin and tenant already exisits")
@@ -81,11 +77,7 @@ async def create_superadmin_user(
     password: str = Body(...),
 ):
     try:
-        existing_superadmin = session.exec(
-        select(User)
-            .join(User.roles)
-            .where(Role.name == "Super Admin")
-        ).first()
+        existing_superadmin = session.exec(select(User).where(User.role_id == Role.id == "Super Admin")).first()
         if existing_superadmin is not None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -160,6 +152,7 @@ async def create_superadmin_user(
             email=email,
             hashedPassword=get_password_hash(password + stored_username),
             organization_id=service_provider.id,
+            role_id=role.id,
             scope_group_id=service_provider_scope_group.id,
             scope = Scope.managerial_scope.value
         )
@@ -167,15 +160,7 @@ async def create_superadmin_user(
         session.commit()
         session.refresh(super_admin_user)
 
-        user_role_link = UserRoleLink(
-            id=None,
-            role_id=role.id,
-            user_id=super_admin_user.id
-        )
-
-        session.add(user_role_link)
-        session.commit()
-        session.refresh(user_role_link)
+        
 
 
 
@@ -510,21 +495,14 @@ async def create_tenant(
             hashedPassword = hashed_password,
             organization_id=tenant.id,
             scope=Scope.managerial_scope,
+            role_id=role.id,
             scope_group_id=system_admin_scope_group.id,
         )
         session.add(tenant_admin)
         session.commit()
         session.refresh(tenant_admin)
 
-        user_role_link = UserRoleLink(
-            id=None,
-            role_id=role.id,
-            user_id=tenant_admin.id
-        )
-
-        session.add(user_role_link)
-        session.commit()
-        session.refresh(user_role_link)
+        
         
         return {
             "message": "Tenant and system admin created successfully",

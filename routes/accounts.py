@@ -4,7 +4,7 @@ from datetime import timedelta, date, datetime
 from fastapi import APIRouter, HTTPException, Body, status, Depends, Path
 from sqlmodel import select, Session
 from db import get_session
-from models.Account import User, ScopeGroup, ScopeGroupLink, Organization, Gender, Scope, Role, AccessPolicy, IdType, UserRoleLink
+from models.Account import User, ScopeGroup, ScopeGroupLink, Organization, Gender, Scope, Role, AccessPolicy, IdType
 from utils.auth_util import verify_password, create_access_token, get_password_hash
 from utils.util_functions import validate_name, validate_email, validate_phone_number, parse_datetime_field, format_date_for_input, parse_enum
 from utils.auth_util import get_current_user, check_permission, generate_random_password, tenant_users, extract_username
@@ -89,7 +89,7 @@ async def get_my_user(
             "username": username_display,
             "phone_number": user.phone_number,
             "organization": organization_name,
-            "roles": user.roles,
+            "role_id": user.role_id,
             "manager_id": user.manager_id,
             "scope": user.scope,
             "scope_group_id": user.scope_group_id,
@@ -130,7 +130,7 @@ async def get_users(
                 "email": user.email,
                 "phone_number": user.phone_number,
                 "organization": user.organization_id,
-                "roles": [role.name for role in user.roles],
+                "role_id": user.role_id,
                 "manager_id": user.manager_id,
                 "scope": user.scope,
                 "scope_group_id": user.scope_group_id,
@@ -168,7 +168,7 @@ async def get_user(
             "email": user.email,
             "phone_number": user.phone_number,
             "organization": user.organization_id,
-            "role": [role.id for role in user.roles],
+            "role": user.role_id,
             "scope": user.scope,
             "scope_group": user.scope_group_id,
             "gender": user.gender,
@@ -237,7 +237,7 @@ async def create_user(
     full_name: str = Body(...),
     username: str = Body(...),
     email: str = Body(...),
-    role: List[int] = Body(...),
+    role: int = Body(...),
     scope: str = Body(...),
     scope_group: int = Body(...),
     organization: int = Body(...),
@@ -292,7 +292,8 @@ async def create_user(
             email=email,
             phone_number=phone_number,
             hashedPassword = hashed_password,
-            organization_id= organization,          
+            organization_id= organization,   
+            role_id= role,       
             gender=parse_enum(Gender,gender, "Gender"),
             scope=parse_enum(Scope,scope, "Scope"),
             scope_group_id=scope_group,
@@ -302,15 +303,6 @@ async def create_user(
         session.commit()
         session.refresh(new_user)
 
-        for user_role in role:
-            user_role_link = UserRoleLink(
-                id=None,
-                user_id=new_user.id,
-                role_id=user_role
-            )
-            session.add(user_role_link)
-            session.commit()
-            session.refresh(user_role_link)
 
         return {
             "message": "User registered successfully",
@@ -373,7 +365,7 @@ async def update_user(
     full_name: str = Body(...),
     username: str = Body(...),
     email: str = Body(...),
-    role: List[int] = Body(...),
+    role: int = Body(...),
     scope: str = Body(...),
     scope_group: int = Body(...),
     organization: int = Body(...),
@@ -434,43 +426,12 @@ async def update_user(
         existing_user.scope = parse_enum(Scope,scope, "Scope")
         existing_user.scope_group_id = scope_group
         existing_user.image = image
+        existing_user.role_id = role
 
         session.add(existing_user)
         session.commit()
         session.refresh(existing_user)
 
-        # Step 1: Get current role links for this user
-        existing_links = session.exec(
-            select(UserRoleLink).where(UserRoleLink.user_id == id)
-        ).all()
-        
-        existing_role_ids = {link.role_id for link in existing_links}
-        print("existing role", existing_role_ids)
-        new_role_ids_set = set(role)
-        print("new role", new_role_ids_set)
-
-        # Step 2: Add missing role links
-        roles_to_add = new_role_ids_set - existing_role_ids
-        print("combined", roles_to_add)
-        for role_id in roles_to_add:
-            new_link = UserRoleLink(id=None, user_id=id, role_id=role_id)
-            session.add(new_link)
-            session.commit()
-
-        # Step 3: Remove obsolete role links
-        roles_to_remove = existing_role_ids - new_role_ids_set
-        print("to remove", roles_to_remove)
-        if roles_to_remove:
-            print("here okay")
-            role_links = session.exec(
-            select(UserRoleLink).where(
-                (UserRoleLink.user_id == id) & 
-                (UserRoleLink.role_id.in_(roles_to_remove))
-            ) ).all()
-        
-            for link in role_links:
-                session.delete(link)
-                session.commit()
 
         return {
             "message": "User: {existing_user} updated successfully"}
