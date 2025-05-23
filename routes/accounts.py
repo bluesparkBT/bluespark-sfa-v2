@@ -557,8 +557,7 @@ async def form_scope_organization(
                 status_code=403, detail="You Do not have the required privilege"
             )
         current_tenant = session.exec(select(Organization).where(Organization.id == current_user.organization_id)).first() if tenant == "provider" else session.exec(select(Organization).where(Organization.tenant_hashed == tenant)).first()
-<<<<<<< HEAD
-        
+       
         print("current tenant",get_child_organization(session, current_user.organization_id) )
         
         org = {"scope_id":"", 
@@ -567,12 +566,6 @@ async def form_scope_organization(
             }
             
         print(org)
-=======
-
-        org = {"scope_id":"", 
-               "hidden": [get_child_organization(session, current_user.organization_id)]
-            }
->>>>>>> origin/temesgen_may23
         
         return {"data": org, "html_types": get_html_types("scope_group")}
         
