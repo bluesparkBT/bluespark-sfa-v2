@@ -85,7 +85,7 @@ def get_heirarchy(session: SessionDep, organization_id: int , max_depth, current
     # Get organization IDs associated with this scope group
     organization_ids = [org.id for org in user_scope_group.organizations]
     
-    heirarchy = get_child_organizations(session, organization_id, max_depth, organization_ids)
+    heirarchy = get_child_organization(session, organization_id, max_depth, organization_ids)
     
     return heirarchy
     
