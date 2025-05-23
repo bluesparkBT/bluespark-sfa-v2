@@ -76,19 +76,7 @@ async def get_organizations(
          current_tenant_id = session.exec(select(Organization.id).where(Organization.id == current_user.organization_id)).first() if tenant == "provider" else session.exec(select(Organization).where(Organization.tenant_hashed == tenant)).first()
        
         
-        scope_organization_ids = get_heirarchy(session, current_tenant_id, None, current_user)
-
-        organizations = session.exec(
-            select(Organization).where(
-                (Organization.id.in_(organization_ids)) &
-                (
-                    or_(
-                        Organization.parent_id == None,  # include top-level orgs
-                        Organization.parent_id.notin_(organization_ids)
-                    )
-                )
-            )
-        ).all()
+        organizations = get_heirarchy(session, current_tenant_id, None, current_user)
 
         if not organizations:
             raise HTTPException(status_code=404, detail="No organizations found")
