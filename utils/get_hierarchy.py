@@ -60,13 +60,7 @@ def get_child_organization(session: SessionDep, organization_id: int , max_depth
     
     return {
             'id': organization_id,
-            "organization": org.organization_name,
-            "owner": org.owner_name,
-            "description": org.description,
-            "organization_type": org.organization_type,
-            "inheritance_group": org.inheritance_group,
-            "parent_organization": org.parent_id,
-            "scope_groups": [{"id": sg.id, "scope_name": sg.scope_name} for sg in org.scope_groups],
+           
             'name': "All" if organization.parent_id is None else org.organization_name, 
             'children': [get_child_organization(session, child.id, max_depth-1 if max_depth is not None else max_depth, organization_ids_in_scope) for child in children if (max_depth is None or max_depth > 0) and child.id in organization_ids_in_scope]           
         }
