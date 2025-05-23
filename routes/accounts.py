@@ -596,7 +596,7 @@ async def add_organization_to_scope(
         session.refresh(scope_group)
      
         #Add new entries
-        to_add = set(organizations)
+        to_add = set(hidden)
         for org_id in to_add:
             scope_group_link_add = ScopeGroupLink(scope_group_id=scope_group.id, organization_id=org_id)
             session.add(scope_group_link_add)
@@ -647,7 +647,7 @@ async def update_scope_group(
         
         existing_orgs = [organization.id for organization in scope_group.organizations ]
         existing_org_ids = set(existing_orgs)
-        new_org_ids_set = set(organizations)
+        new_org_ids_set = set(hidden)
 
         # Add new entries
         to_add = new_org_ids_set - existing_org_ids
