@@ -59,7 +59,7 @@ def get_child_organization(session: SessionDep, organization_id: int , max_depth
     organization = session.exec(select(Organization).where(Organization.id == organization_id)).first()
     
     print("HERE")
-    print(childern)
+    print(children)
     print(organization)
     
         
