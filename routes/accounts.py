@@ -560,6 +560,7 @@ async def form_scope_organization(
 @ar.post("/create-scope-group/")
 async def add_organization_to_scope(
     session: SessionDep,
+    tenant: str,
     current_user: UserDep,
     scope_name: str = Body(...),
     organizations: List[int] = Body(...)
