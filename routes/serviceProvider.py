@@ -49,7 +49,7 @@ def login(
         db_username = tenant_users(username, service_provider.organization_name)
 
         user = session.exec(select(User).where(User.username == db_username)).first()
-        print(user, verify_password(password+db_username, user.hashedPassword))
+        print(user, db_username)
         if not user or not verify_password(password+db_username, user.hashedPassword):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
         
