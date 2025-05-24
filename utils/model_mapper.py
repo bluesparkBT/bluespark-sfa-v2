@@ -14,6 +14,7 @@ MODEL_HTML_TYPES = {
         "landmark": "text",
         "latitude": "text",
         "longitude": "text",
+        "hidden": "text"
     },
     "role":{
         "id":"hidden",
