@@ -9,7 +9,11 @@ MODEL_HTML_TYPES = {
         "logo_image": "file",
         "parent_organization": "select",
         "organization_type": "select",
-        "inheritance_group": "select"
+        "inheritance_group": "select",
+        "address": "select",
+        "landmark": "text",
+        "latitude": "text",
+        "longitude": "text"
     },
     "role":{
         "id":"hidden",
@@ -47,7 +51,8 @@ MODEL_HTML_TYPES = {
         "id_type": "select",
         "id_number": "text",
         "gender": "select",
-        "password": "text"
+        "password": "text",
+        "address" : "select"
     },
     "address": {
         "id": "hidden",
@@ -55,7 +60,6 @@ MODEL_HTML_TYPES = {
         "city": "text",
         "sub_city": "text",
         "woreda": "text",
-        "landmark": "text",
     },
     "location": {
         "id": "hidden",
@@ -107,7 +111,6 @@ MODEL_HTML_TYPES = {
         "description": "textarea",
         "image": "file",
         "brand": "text",
-        "batch_number": "text",
         "code": "text",
         "price": "number",
         "unit": "text",

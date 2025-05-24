@@ -8,6 +8,7 @@ from models.Account import (
     Role,
     ScopeGroup
 )
+from models.Address import Address, Geolocation
 from models.Product import Category, Product
 from models.Inheritance import InheritanceGroup, ProductLink, CategoryLink
 from models.Warehouse import Stock, StockType, Warehouse, Vehicle
@@ -53,10 +54,11 @@ def fetch_role_id_and_name(session: SessionDep, current_user: UserDep):
 
 def fetch_scope_group_id_and_name(session: SessionDep, current_user: UserDep):
     organization_ids = get_organization_ids_by_scope_group(session, current_user)
+    print("fetched organizations", organization_ids)
 
     scope_group_row = session.exec(
         select(ScopeGroup.id, ScopeGroup.scope_name)
-        .where(Role.organization_id.in_(organization_ids))
+        .where(ScopeGroup.parent_id.in_(organization_ids))
         ).all()
     scope_groups = {row[0]: row[1] for row in scope_group_row}
     return scope_groups
@@ -104,6 +106,24 @@ def fetch_inheritance_group_id_and_name(session: SessionDep, current_user: UserD
 
     return {row[0]: row[1] for row in inheritance_groups}
 
+def fetch_address_id_and_name(session: SessionDep, current_user: UserDep):
+    organization_ids = get_organization_ids_by_scope_group(session, current_user)
+
+    address_ids = session.exec(
+        select(Organization.address_id)
+        .where(Organization.id.in_(organization_ids))
+    ).all()
+    
+    address_ids = [aid[0] for aid in address_ids if aid[0] is not None]
+    if not address_ids:
+        return {}
+
+    address_row = session.exec(
+        select(Address.id, Address.name)
+        .where(Address.id.in_(address_ids))
+    ).all()
+
+    return {row[0]: row[1] for row in address_row}
 
 
 def fetch_warehouse_id_and_name(session: SessionDep, current_user: UserDep):
