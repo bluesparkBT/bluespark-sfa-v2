@@ -14,7 +14,7 @@ class PointOfSale(SQLModel, table=True):
     status: POSStatus  # Enum status
     registered_on: str = Field(index=True)  # Registration date in text format
     organization_id: int = Field(foreign_key="organization.id")  # Reference to Organization
-    # default_credit_group_id: int = Field(foreign_key="credit_group.id")  # Reference to Default Credit Group
+    credit_group_id: int = Field(foreign_key="credit_limit_group.id")  # Reference to Credit Group
 
     # Optional references
     outlet_id: Optional[int] = Field(default=None, foreign_key="outlet.id")
@@ -31,7 +31,7 @@ class Outlet(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True)  # Outlet name
     channel: str  # Enum channel (assuming it's a predefined list)
-    tin: str  # Tax Identification Number
+    tin: str  # TIN
     phone: str  # Phone number
     email: str = Field(index=True)  # Email address
     location_id: int = Field(foreign_key="location.id")  # Reference to Location

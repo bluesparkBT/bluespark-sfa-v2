@@ -51,6 +51,7 @@ class Organization(SQLModel, table=True):
     active:Optional[bool] =Field(default= True, index=True)
     warehouses: Optional[List["Warehouse"]] = Relationship(back_populates="organization")
     parent_scope_groups: Optional[List["ScopeGroup"]] = Relationship(back_populates="parent_organization")
+    
 
     
 class Gender(str, Enum):

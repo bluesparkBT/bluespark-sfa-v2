@@ -6,8 +6,8 @@ from db import get_session
 from utils.model_converter_util import get_html_types
 
 from models.Account import User, AccessPolicy, Organization, OrganizationType, ScopeGroup, Scope, Role, ScopeGroupLink
-from models.Product import Product, Category
-from models.Inheritance import InheritanceGroup
+from models.Product_Category import Product, Category
+from models.Product_Category import InheritanceGroup
 from models.Account import ScopeGroup,ScopeGroupLink 
 from utils.util_functions import validate_name
 from models.Account import Organization
@@ -42,6 +42,7 @@ def get_category(
         inherited_group_id = session.exec(
             select(Organization.inheritance_group).where(Organization.id == current_user.organization_id)
         ).first()
+        
         test= session.exec(select(Organization.inheritance_group))
         print("test",test)
         print("inherited_group_id",inherited_group_id)
@@ -89,58 +90,8 @@ def get_category(
         return category_list
 
     except Exception as e:
-        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
 
-
-# @c.get("/get-categories")
-# def get_category(
-#     session: SessionDep,
-#     current_user: UserDep,
-#     tenant: str,
-
-# ):
-    
-#     try: 
-#         # Fetch the inheritance group from the organization
-#         inherited_group_id = session.exec(
-#             select(Organization.inheritance_group).where(Organization.id == current_user.organization_id)
-#         ).first()
-
-#         inherited_group = session.exec(
-#             select(InheritanceGroup).where(InheritanceGroup.id == inherited_group_id)
-#         ).first()
-
-#         if inherited_group:
-#             inherited_categories = inherited_group.categories
-#         else:
-#             inherited_categories = []
-#         # Fetch products associated with the inheritance group
-#         organization_categories = session.exec(
-#             select(Category).where(Category.organization_id == current_user.organization_id)
-#         ).all()
-#         # categories = organization_group.categories
-
-#         organization_categories.extend(inherited_categories)
-
-#         category_list = []
-#         for category in organization_categories:
-#             category_temp = {
-#                 "id": category.id,
-#                 "Category Name": category.name,
-#                 "Parent Category id": category.parent_category,
-#                 "Parent Category name": category.parent_category,
-#                 "UNSPC Code": category.code,
-#                 "Description": category.description,
-#             }
-#             if category_temp not in category_list:
-#                 category_list.append(category_temp)
-
-#         return category_list
-
-#     except Exception as e:
-#         traceback.print_exc()
-#         raise HTTPException(status_code=400, detail=str(e))
     
 @c.get("/get-category/{category_id}")
 def get_category(
@@ -252,8 +203,8 @@ def create_category(
         new_category = Category(
             code=code, 
             name=name, 
-            #description=description,
-            organization_id=int(organization),
+#            description=description,
+            organization_id=organization,
             
             )
         session.add(new_category)

@@ -5,9 +5,9 @@ from fastapi import APIRouter, HTTPException, Body, Depends
 from db import get_session
 
 from models.Account import User, AccessPolicy, Organization, OrganizationType, ScopeGroup, Scope, Role, ScopeGroupLink
-from models.Inheritance import InheritanceGroup
+from models.Product_Category import InheritanceGroup
 from utils.model_converter_util import get_html_types
-from models.Product import Product
+from models.Product_Category import Product
 from utils.util_functions import validate_name
 from utils.auth_util import get_current_user, check_permission
 from utils.get_hierarchy import get_organization_ids_by_scope_group

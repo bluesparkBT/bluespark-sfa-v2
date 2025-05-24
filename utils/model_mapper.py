@@ -111,13 +111,17 @@ MODEL_HTML_TYPES = {
         "batch_number": "text",
         "code": "text",
         "price": "number",
-        "unit": "text",
+        "unit": "select",
         "category": "select",
         "organization": "select"
     },
     "inheritance": {
         "id": "hidden",
-        "name": "text"
-    }
+        "inheritance_name": "text",
+        "category": "select",
+        "product": "select"
+   
+    },
+ 
 
 }

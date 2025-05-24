@@ -2,18 +2,20 @@ from typing import Optional
 from sqlmodel import SQLModel, Field, Relationship
 from datetime import date
 
+
+
 class ClassificationGroup(SQLModel, table=True):
     __tablename__ = "classification_group"
 
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True)
     description: str
-    organization_id: int = Field(foreign_key="organization.id")  # Reference to Organization
+    # organizations: list["Organization"] = Relationship(back_populates="organization")#  Reference to Organization
 
     # Optional references
-    #point_of_sale_id: Optional[int] = Field(default=None, foreign_key="point_of_sale.id")
+    # point_of_sale_id: Optional[int] = Field(default=None, foreign_key="point_of_sale.id")
     territory_id: Optional[int] = Field(default=None, foreign_key="territory.id")
-    # route_id: Optional[int] = Field(default=None, foreign_key="route.id")
+    route_id: Optional[int] = Field(default=None, foreign_key="route.id")
 
     # Relationship with CustomerDiscount
     customer_discounts: list["CustomerDiscount"] = Relationship(back_populates="classification_group")

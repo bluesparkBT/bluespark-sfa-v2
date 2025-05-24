@@ -8,8 +8,10 @@ from models.Account import (
     Role,
     ScopeGroup
 )
-from models.Product import Category, Product
-from models.Inheritance import InheritanceGroup, ProductLink, CategoryLink
+from models.PointOfSale import PointOfSale
+from models.Territory import Territory
+from models.Product_Category import Category, Product
+from models.Product_Category import InheritanceGroup, ProductLink, CategoryLink
 from models.Warehouse import Stock, StockType, Warehouse, Vehicle
 from utils.get_hierarchy import get_organization_ids_by_scope_group
 from utils.auth_util import get_current_user
@@ -215,3 +217,25 @@ def add_product_link(session: SessionDep, inheritance_group_id: int, product_id:
     session.refresh(new_link)
 
     return {"message": "product linked successfully", "link": new_link}
+
+def fetch_point_of_sale_id_and_name(session: SessionDep, current_user: UserDep):
+    organization_ids = get_organization_ids_by_scope_group(session, current_user)
+
+    role_rows = session.exec(
+        select(PointOfSale.id, PointOfSale.name)
+        .where(PointOfSale.organization_id.in_(organization_ids))
+    ).all()
+
+    roles = {row[0]: row[1] for row in role_rows}
+    return roles
+
+def fetch_territory_id_and_name(session: SessionDep, current_user: UserDep):
+    organization_ids = get_organization_ids_by_scope_group(session, current_user)
+
+    role_rows = session.exec(
+        select(Territory.id, Territory.name)
+        .where(Territory.organization_id.in_(organization_ids))
+    ).all()
+
+    roles = {row[0]: row[1] for row in role_rows}
+    return roles
