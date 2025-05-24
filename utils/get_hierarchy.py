@@ -55,6 +55,7 @@ def get_child_organization(session: SessionDep, organization_id: int , max_depth
     children = session.exec(
         select(Organization).where(Organization.parent_id == organization_id)
     ).all()
+
     
     org = session.exec(select(Organization).where(Organization.id == organization_id)).first()  
     
@@ -84,7 +85,6 @@ def get_heirarchy(session: SessionDep, organization_id: int , max_depth, current
         raise HTTPException(
             status_code=404, detail="ScopeGroup not found for the current user"
         )
-
     # Get organization IDs associated with this scope group
     
     organization_ids = [org.id for org in user_scope_group.organizations]
