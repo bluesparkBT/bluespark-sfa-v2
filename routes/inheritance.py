@@ -9,6 +9,7 @@ from utils.model_converter_util import get_html_types
 from utils.form_db_fetch import fetch_category_id_and_name, fetch_product_id_and_name
 from utils.form_db_fetch import get_organization_ids_by_scope_group
 import traceback
+from sqlmodel import delete
 
 from sqlmodel import select, Session
 from models import InheritanceGroup
@@ -219,6 +220,28 @@ async def update_inheritance_group(
         raise HTTPException(status_code=400, detail=str(e))
     
     
+# @In.delete("/delete-inheritance/{inheritance_id}")
+# async def delete_inheritance_group(
+#     session: SessionDep,
+#     current_user: UserDep,
+#     inheritance_id: int, 
+# ):
+#     if not check_permission(
+#             session, "Read",[ "Inheritance", "Administrative"], current_user
+#             ):
+#             raise HTTPException(
+#                 status_code=403, detail="You Do not have the required privilege"
+#             )   
+#     db_inheritance = session.exec(
+#             select(InheritanceGroup).where(InheritanceGroup.id == inheritance_id)
+#         ).first()
+#     if not db_inheritance:
+#         raise HTTPException(status_code=404, detail="Inheritance group not found")
+
+#     session.delete(db_inheritance)
+#     session.commit()
+#     return {"message": "Inheritance group deleted"}
+
 @In.delete("/delete-inheritance/{inheritance_id}")
 async def delete_inheritance_group(
     session: SessionDep,
@@ -226,17 +249,31 @@ async def delete_inheritance_group(
     inheritance_id: int, 
 ):
     if not check_permission(
-            session, "Read",[ "Inheritance", "Administrative"], current_user
-            ):
-            raise HTTPException(
-                status_code=403, detail="You Do not have the required privilege"
-            )   
+        session, "Read", ["Inheritance", "Administrative"], current_user
+    ):
+        raise HTTPException(
+            status_code=403, detail="You do not have the required privilege"
+        )   
+
     db_inheritance = session.exec(
-            select(InheritanceGroup).where(InheritanceGroup.id == inheritance_id)
-        ).first()
+        select(InheritanceGroup).where(InheritanceGroup.id == inheritance_id)
+    ).first()
+
     if not db_inheritance:
         raise HTTPException(status_code=404, detail="Inheritance group not found")
 
+    # Delete associated category links
+    session.exec(
+        delete(CategoryLink).where(CategoryLink.inheritance_group_id == inheritance_id)
+    )
+
+    # Delete associated product links
+    session.exec(
+        delete(ProductLink).where(ProductLink.inheritance_group_id == inheritance_id)
+    )
+
+    # Delete the inheritance group itself
     session.delete(db_inheritance)
     session.commit()
-    return {"message": "Inheritance group deleted"}
+
+    return {"message": "Inheritance group and related links deleted successfully"}
