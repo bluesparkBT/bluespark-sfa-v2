@@ -48,7 +48,7 @@ def get_organization_ids_by_scope_group(session, current_user) -> List[int]:
     return organization_ids
 
 
-def get_child_organization(session: SessionDep, organization_id: int , max_depth = None, organization_ids_in_scope = []):
+def get_child_organization(session: SessionDep, organization_id: int , max_depth = None, children_key="children"):
     """
     Fetch all child organizations (descendants) from the database.
     """
@@ -68,7 +68,7 @@ def get_child_organization(session: SessionDep, organization_id: int , max_depth
             "parent_organization": org.parent_id,
             "scope_groups": [{"id": sg.id, "scope_name": sg.scope_name} for sg in org.scope_groups],
             'name': "All" if org.parent_id is None else org.organization_name, 
-            'children': [get_child_organization(session, child.id, max_depth-1 if max_depth is not None else max_depth, organization_ids_in_scope) for child in children if (max_depth is None or max_depth > 0) and child.id in organization_ids_in_scope]           
+            children_key: [get_child_organization(session, child.id, max_depth-1 if max_depth is not None else max_depth) for child in children if (max_depth is None or max_depth > 0]           
         }
     
 def get_heirarchy(session: SessionDep, organization_id: int , max_depth, current_user):
@@ -87,7 +87,7 @@ def get_heirarchy(session: SessionDep, organization_id: int , max_depth, current
     
     organization_ids = [org.id for org in user_scope_group.organizations]
     
-    heirarchy = get_child_organization(session, organization_id, max_depth, organization_ids)
+    heirarchy = get_child_organization(session, organization_id, max_depth, "hidden")
     
     return heirarchy
     
