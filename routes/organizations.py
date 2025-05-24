@@ -4,11 +4,12 @@ from fastapi import APIRouter, HTTPException, Body, status, Depends, Path
 from sqlmodel import select, Session
 from db import get_session
 from models.Account import User, Organization, OrganizationType, ScopeGroup, Scope, Role, ScopeGroupLink
+from models.Address import Address, Geolocation
 from utils.auth_util import get_current_user, check_permission
 from utils.model_converter_util import get_html_types
 from utils.util_functions import validate_name, validate_image
 from utils.get_hierarchy import get_organization_ids_by_scope_group, get_child_organization, get_heirarchy
-from utils.form_db_fetch import fetch_organization_id_and_name, fetch_inheritance_group_id_and_name
+from utils.form_db_fetch import fetch_organization_id_and_name, fetch_inheritance_group_id_and_name, fetch_address_id_and_name
 import traceback
 
 TenantRouter =tr= APIRouter()
@@ -77,7 +78,7 @@ async def get_organizations(
        
         
         organizations = get_heirarchy(session, current_tenant_id, None, current_user)
-
+        
         if not organizations:
             raise HTTPException(status_code=404, detail="No organizations found")
 
@@ -237,7 +238,11 @@ async def get_form_fields_organization(
             "logo_image": "",
             "parent_organization": fetch_organization_id_and_name(session, current_user),
             "organization_type" : {i.value: i.value for i in OrganizationType if i.value !="Service Provider"},
-            "inheritance_group": fetch_inheritance_group_id_and_name(session, current_user)
+            "inheritance_group": fetch_inheritance_group_id_and_name(session, current_user),
+            "address" : fetch_address_id_and_name(session, current_user),
+            "landmark" : "",
+            "latitude" : "",
+            "longitude" : ""
             }
         
 
@@ -257,7 +262,11 @@ async def create_organization(
     logo_image: str = Body(...),
     parent_organization : int = Body(...),
     organization_type: str = Body(...),
-    inheritance_group: Union[int, str, None] = Body(default=None)
+    inheritance_group: Union[int, str, None] = Body(default=None),
+    address : Optional[int] = Body(...),
+    landmark : Optional[str] = Body(None),
+    latitude : Optional[str] = Body(None),
+    longitude: Optional[str] =Body(None)
 ):
     try:
         if not check_permission(
@@ -287,6 +296,15 @@ async def create_organization(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Logo image is not valid",
         )
+            
+        org_geolocation = Geolocation(
+            name = f"{organization_name} location",
+            address_id = address,
+            latitude = latitude,
+            longitude = longitude
+        )
+        session.add(org_geolocation)
+        session.commit()
 
         organization = Organization(
             id = None,
@@ -296,9 +314,12 @@ async def create_organization(
             logo_image = logo_image,
             parent_id = parent_organization,
             organization_type = organization_type,
-            inheritance_group = inheritance_group
+            inheritance_group = inheritance_group,
+            address_id = address,
+            landmark= landmark,
+            location_id = org_geolocation.id
+
         )
-        
         
         session.add(organization)
         session.commit()
@@ -331,8 +352,11 @@ async def create_organization(
     logo_image: str = Body(...),
     organization_type: str = Body(...),    
     parent_organization: int | str = Body(...),
-    inheritance_group: Union[int, str, None] = Body(default=None)
-
+    inheritance_group: Union[int, str, None] = Body(default=None),
+    address: Optional[str] = Body(None),
+    landmark : Optional[str] = Body(None),
+    latitude : Optional[str] = Body(None),
+    longitude: Optional[str] =Body(None)
 ):
 
     try:
@@ -343,8 +367,8 @@ async def create_organization(
                 status_code=403, detail="You Do not have the required privilege"
             )
             
-        existing_tenant = session.exec(select(Organization).where(Organization.id == id)).first()
-        if existing_tenant is None:
+        existing_organization = session.exec(select(Organization).where(Organization.id == id)).first()
+        if existing_organization is None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Organization not found",
@@ -361,20 +385,41 @@ async def create_organization(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Logo image is not valid",
         )
+        exisitng_org_geolocation = session.exec(select(Geolocation).where(Geolocation.id == existing_organization.address_id))    
+        if exisitng_org_geolocation:
+            if address:
+                exisitng_org_geolocation.address_id = address
+            if latitude:
+                exisitng_org_geolocation.latitude = latitude,
+            if longitude:
+                exisitng_org_geolocation.longitude = longitude
+                
+            session.add(exisitng_org_geolocation)
+            session.commit()            
+        else:
+            org_geolocation = Geolocation(
+                name = f"{organization_name} location",
+                address_id = address,
+                latitude = latitude,
+                longitude = longitude
+            )
+            session.add(org_geolocation)
+            session.commit()
 
-        existing_tenant.organization_name = organization_name
-        existing_tenant.owner_name = owner_name
-        existing_tenant.description = description
+        
+        existing_organization.organization_name = organization_name
+        existing_organization.owner_name = owner_name
+        existing_organization.description = description
         if inheritance_group:
-            existing_tenant.inheritance_group= inheritance_group
-        existing_tenant.logo_image = logo_image
-        existing_tenant.organization_type = organization_type
+            existing_organization.inheritance_group= inheritance_group
+        existing_organization.logo_image = logo_image
+        existing_organization.organization_type = organization_type
         if parent_organization:
-            existing_tenant.parent_id = parent_organization
+            existing_organization.parent_id = parent_organization
             
-        session.add(existing_tenant)
+        session.add(existing_organization)
         session.commit()
-        session.refresh(existing_tenant)
+        session.refresh(existing_organization)
         
         return {"message": "Organization updated successfully", "organization": organization_name}
     

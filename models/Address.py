@@ -11,7 +11,6 @@ class Address(SQLModel, table=True):
     city: str = Field(index=True)
     sub_city: str = Field(index=True)
     woreda: str = Field(index=True)
-    landmark: Optional[str] = Field(default=None, index=True)
     geolocation: Optional["Geolocation"] = Relationship(back_populates="address")
 
 

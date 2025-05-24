@@ -10,7 +10,7 @@ from utils.util_functions import validate_name, validate_email, validate_phone_n
 from utils.auth_util import get_current_user, check_permission, generate_random_password, add_organization_path, extract_username
 from utils.model_converter_util import get_html_types
 from utils.get_hierarchy import get_child_organization, get_organization_ids_by_scope_group
-from utils.form_db_fetch import fetch_organization_id_and_name, fetch_role_id_and_name, fetch_scope_group_id_and_name
+from utils.form_db_fetch import fetch_organization_id_and_name, fetch_role_id_and_name, fetch_scope_group_id_and_name, fetch_address_id_and_name
 import traceback
 
 Domain= "http://172.10.10.203:5000"
@@ -131,11 +131,13 @@ async def get_users(
             ).first()
 
             if not user_org:
-                continue  # Or handle as needed
+                continue  
 
             # Extract username without tenant prefix
             username_display = extract_username(user.username, user_org.organization_name)
-
+            user_scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == user.scope_group_id)).first()
+            user_role = session.exec(select(Role).where(Role.id == user.role_id)).first()
+            manager = session.exec(select(User).where(User.id == user.manager_id)).first()
             user_list.append({
                 "id": user.id,
                 "fullname": user.fullname,
@@ -143,10 +145,10 @@ async def get_users(
                 "email": user.email,
                 "phone_number": user.phone_number,
                 "organization": user_org.organization_name,
-                "role_id": user.role_id,
-                "manager_id": user.manager_id,
+                "role": user_role.name,
+                "manager": manager,
                 "scope": user.scope,
-                "scope_group_id": user.scope_group_id,
+                "scope_group": user_scope_group.scope_name,
             })
 
         return user_list
@@ -234,6 +236,7 @@ async def create_user_form(
             "scope": {scope.value: scope.value for scope in Scope},
             "scope_group": fetch_scope_group_id_and_name(session, current_user),
             "gender": {gender.value: gender.value for gender in Gender},
+            "address": fetch_address_id_and_name(session, current_user)
         }
 
         return {"data": user_data, "html_types": get_html_types("user")}
@@ -256,6 +259,7 @@ async def create_user(
     organization: int = Body(...),
     phone_number:Optional [str] = Body(None),
     gender: Optional[str] = Body(None),
+    address: Optional[int] = Body(None)
             
 ):
     try: 
@@ -310,6 +314,7 @@ async def create_user(
             gender=parse_enum(Gender,gender, "Gender"),
             scope=parse_enum(Scope,scope, "Scope"),
             scope_group_id=scope_group,
+            address_id = address
 
         )
         session.add(new_user)
@@ -361,6 +366,8 @@ async def update_user_form(
             "id_type": {i.value: i.value for i in IdType},
             "id_number": "",
             "password": "",
+            "address": fetch_address_id_and_name(session, current_user)
+
 
         }
 
@@ -390,7 +397,8 @@ async def update_user(
     date_of_joining:  Optional[str]  = Body(...),
     id_type: str = Body(...),
     id_number: str = Body(...),
-    image: str = Body(...)           
+    image: str = Body(...),    
+    address: Optional[int] = Body(...)      
             
 ):
     try: 
@@ -443,6 +451,7 @@ async def update_user(
         existing_user.scope_group_id = scope_group
         existing_user.image = image
         existing_user.role_id = role
+        existing_user.address_id = address
 
         session.add(existing_user)
         session.commit()
@@ -493,19 +502,29 @@ async def get_scope_groups(
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-        scope_groups = session.exec(select(ScopeGroup)).all()
+            
+        # current_org_id = current_user.organization_id
+        # if not current_org_id:
+        #     raise HTTPException(status_code=400, detail="User has no organization assigned")
+        organization_ids = get_organization_ids_by_scope_group(session, current_user)
+        scope_groups = session.exec(
+            select(ScopeGroup).distinct()
+            .where(ScopeGroup.parent_id.in_(organization_ids))
+            # .join(ScopeGroupLink)
+            # .where(ScopeGroupLink.organization_id.in_(organization_ids))
+        ).all()
+
         if not scope_groups:
-            raise HTTPException(status_code=404, detail="No scope groups found")
+            raise HTTPException(status_code=404, detail="No scope groups found for your organization")
         
         scope_group_list = []
-        
         for scope_group in scope_groups:
             scope_group_list.append({
                 "id": scope_group.id,
                 "scope_name": scope_group.scope_name,
                 "organizations": [org.organization_name for org in scope_group.organizations],
             })
-            
+
         return scope_group_list
 
         

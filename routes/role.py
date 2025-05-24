@@ -106,7 +106,7 @@ async def get_my_role(
 
         if not user or not user.role_id:
             raise HTTPException(status_code=404, detail="User or assigned role not found")
-
+        
         role = session.exec(select(Role).where(Role.id == user.role_id)).first()
         if not role:
             raise HTTPException(status_code=404, detail="Role not found")

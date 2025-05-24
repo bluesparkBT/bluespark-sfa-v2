@@ -15,7 +15,7 @@ from utils.domain_util import getPath
 import traceback
 
 # frontend domain
-Domain= "http://172.10.10.203:3000"
+Domain= getPath()
 
 #for dev environment localhost
 # Domain= "http://127.0.0.1:3000"
@@ -33,7 +33,6 @@ def has_superadmin_created(
     session: SessionDep
 ) ->bool:
     existing_superadmin = session.exec(select(User).where(User.role_id == Role.id == "Super Admin")).first()
-
     if existing_superadmin:
         print("Super admin and tenant already exisits")
         return True
@@ -53,7 +52,6 @@ def login(
         db_username = add_organization_path(username, service_provider.organization_name)
 
         user = session.exec(select(User).where(User.username == db_username)).first()
-        print(user, db_username)
         if not user or not verify_password(password+db_username, user.hashedPassword):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
         
@@ -158,17 +156,13 @@ async def create_superadmin_user(
             email=email,
             hashedPassword=get_password_hash(password + stored_username),
             organization_id=service_provider.id,
-            role_id=role.id,
             scope_group_id=service_provider_scope_group.id,
+            role_id = role.id,
             scope = Scope.managerial_scope.value
         )
         session.add(super_admin_user)
         session.commit()
         session.refresh(super_admin_user)
-
-        
-
-
 
         return {"message": "Superadmin created successfully"}
     except Exception as e:
@@ -326,8 +320,7 @@ async def get_tenants(
                     "owner": tenant.owner_name,
                     "description": tenant.description,
                     "logo": tenant.logo_image,
-                    "domain": getPath() + "/" + tenant.tenant_hashed
-                }
+                    "domain": f"{Domain}/{tenant.tenant_hashed}"                }
             )
 
         return tenant_list
@@ -362,7 +355,9 @@ async def get_tenant(
                 "owner_name": tenant.owner_name,
                 "description": tenant.description,
                 "logo_image": tenant.logo_image,
-                "organization_type": tenant.organization_type
+                "organization_type": tenant.organization_type,
+                "domain": f"{Domain}/{tenant.tenant_hashed}"
+
                 
             }
        
@@ -419,6 +414,7 @@ async def create_tenant(
         # existing_tenant = session.exec(
         #     select(Organization).where(Organization.organization_name == verify_tenant(tenant_name))
         # ).first()
+
         print("current user of provide is:", current_user)
         superadmin_id = session.exec(select(User.organization_id).where(User.role_id == Role.id == "Super Admin")).first()
         
@@ -441,6 +437,7 @@ async def create_tenant(
         system_admin_scope_group = session.exec(
             select(ScopeGroup).where(ScopeGroup.scope_name == f"{tenant_name} Admin Scope")
         ).first()
+
         if not system_admin_scope_group:
             system_admin_scope_group = ScopeGroup(
                 scope_name=f"{tenant_name} Admin Scope",
@@ -458,7 +455,28 @@ async def create_tenant(
         )
         session.add(scope_group_link)
         session.commit()
+        
+        super_admin_scope_group = session.exec(
+            select(ScopeGroup).where(ScopeGroup.scope_name == "Super Admin Scope")
+        ).first()
 
+        existing_link = session.exec(
+            select(ScopeGroupLink).where(
+                ScopeGroupLink.scope_group_id == super_admin_scope_group.id,
+                ScopeGroupLink.organization_id == tenant.id
+            )
+        ).first()
+        print("exisintg link", existing_link)
+        if not existing_link:
+            super_admin_scope_link = ScopeGroupLink(
+                scope_group_id=super_admin_scope_group.id,
+                organization_id= tenant.id
+            )
+            session.add(super_admin_scope_link)
+            session.commit()
+            print("superadmin link updated", super_admin_scope_group)
+            
+            
         role = Role(
             name=f"{tenant_name} System Admin",
             organization_id=tenant.id,
@@ -466,6 +484,7 @@ async def create_tenant(
         session.add(role)
         session.commit()
         session.refresh(role)
+        
         
         # List of modules the tenant system Admin should have access to
         modules_to_grant = [
@@ -499,19 +518,17 @@ async def create_tenant(
 
         tenant_admin = User(
             username= add_organization_path("admin", tenant_name),
-            fullname=f"{tenant_name} System Admin",
+            fullname= "System Admin",
             email=f"{tenant_name.lower()}_admin@{tenant_name}.com",
             hashedPassword = hashed_password,
             organization_id=tenant.id,
-            scope=Scope.managerial_scope,
             role_id=role.id,
+            scope=Scope.managerial_scope,
             scope_group_id=system_admin_scope_group.id,
         )
         session.add(tenant_admin)
         session.commit()
         session.refresh(tenant_admin)
-
-        
         
         return {
             "message": "Tenant and system admin created successfully",
@@ -563,7 +580,6 @@ async def update_tenant(
         existing_tenant.description = description
         existing_tenant.logo_image = logo_image
         existing_tenant.tenant_hashed = hashed_tenant_name
-        existing_tenant.tenant_domain = f"{Domain}/{hashed_tenant_name}"
 
         session.add(existing_tenant)
         session.commit()
@@ -593,7 +609,7 @@ async def update_tenant(
         updated_data = {
             "tenant_name": existing_tenant.organization_name,
             "tenant_owner": existing_tenant.owner_name,
-            "domain": existing_tenant.tenant_domain,
+            "domain": f"{Domain}/{existing_tenant.tenant_hashed}",
         }
 
         return {"message": "Tenant updated successfully", "tenant": updated_data}
@@ -603,15 +619,15 @@ async def update_tenant(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-# @sp.delete("/delete-tenant/{id}") 
-# async def delete_tenant(
+# @sp.delete("/archive-tenant/{id}")
+# async def archive_tenant(
 #     session: SessionDep,
 #     current_user: UserDep,
 #     tenant: str,
 #     id: int
 # ):
 #     """
-#     Delete an organization by ID.
+#     Soft delete (archive) a tenant organization and all its related records.
 #     """
 #     try:
 #         if not check_permission(session, "Delete", "Service Provider", current_user):
@@ -627,18 +643,46 @@ async def update_tenant(
 #                 detail="Organization not found",
 #             )
 
-#         # Delete all roles linked to this organization
+#         # Soft-delete the organization
+#         tenant.active = False
+
+#         # Soft-delete all related child organizations
+#         child_orgs = session.exec(
+#             select(Organization).where(Organization.parent_id == tenant.id)
+#         ).all()
+#         for child in child_orgs:
+#             child.active = False
+
+#         # Soft-delete all users
+#         users = session.exec(
+#             select(User).where(User.organization_id == tenant.id)
+#         ).all()
+#         for user in users:
+#             user.active = False
+
+#         # Soft-delete roles
 #         roles = session.exec(
 #             select(Role).where(Role.organization_id == tenant.id)
 #         ).all()
 #         for role in roles:
-#             session.delete(role)
+#             role.active = False
 
-#         # Now delete the tenant
-#         session.delete(tenant)
+#         # Soft-delete products (if applicable)
+#         products = session.exec(
+#             select(Product).where(Product.organization_id == tenant.id)
+#         ).all()
+#         for product in products:
+#             product.active = False
+
+#         # Soft-delete warehouses (if applicable)
+#         warehouses = session.exec(
+#             select(Warehouse).where(Warehouse.organization_id == tenant.id)
+#         ).all()
+#         for wh in warehouses:
+#             wh.active = False
+
 #         session.commit()
-
-#         return {"message": "Organization and related roles deleted successfully"}
+#         return {"message": "Tenant organization archived successfully"}
 
 #     except Exception as e:
 #         traceback.print_exc()

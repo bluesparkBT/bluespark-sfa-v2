@@ -43,15 +43,26 @@ async def get_form_fields_warehouse(current_user: UserDep, endpoint: str) -> lis
     elif endpoint == "Organization":
         return [
             "id",
+            "description",
+            "organization_type",
+            "inheritance_group",
             "scope_groups"]
     elif endpoint == "Users":
-        return ["id"]
+        return ["id",
+                "scope_group_id",
+                "manager",
+                "phone_number",
+                "scope",
+                "scope_group"
+                ]
     elif endpoint == "Role":
         return ["id"]
     elif endpoint == "Category":
-        return ["id"]
+        return ["id",
+                "description"]
     elif endpoint == "Product":
-        return ["id"]
+        return ["id",
+                "description"]
     elif endpoint == "Inheritance":
         return ["id"]
     elif endpoint == "Address":
@@ -59,9 +70,11 @@ async def get_form_fields_warehouse(current_user: UserDep, endpoint: str) -> lis
     elif endpoint == "Scope Group":
         return ["id"]
     elif endpoint == "Route":
-        return ["id"]
+        return ["id",
+                "description"]
     elif endpoint == "Route Schedule":
-        return ["id"]
+        return ["id",
+                "description"]
     elif endpoint == "Sales":
         return ["id"]
     elif endpoint == "Penetration":
@@ -69,13 +82,16 @@ async def get_form_fields_warehouse(current_user: UserDep, endpoint: str) -> lis
     elif endpoint == "Sales Activation":
         return ["id"]
     elif endpoint == "Classification":
-        return ["id"]
+        return ["id",
+                "description"]
     elif endpoint == "Stock":
         return ["id"]
     elif endpoint == "Tenant":
-        return ["id"]
+        return ["id",
+                "description"]
     elif endpoint == "Territory":
-        return ["id"]
+        return ["id",
+                "description"]
     elif endpoint == "Travel":
         return ["id"]
     elif endpoint == "Vehicle":

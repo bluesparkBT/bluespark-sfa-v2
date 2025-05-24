@@ -19,6 +19,7 @@ class ScopeGroup(SQLModel, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     scope_name: str = Field(index=True, unique=True)
+    parent_id: Optional[int] = Field(default=None, foreign_key="organization.id") 
     organizations: List["Organization"] = Relationship(back_populates="scope_groups", link_model=ScopeGroupLink)
 
 class OrganizationType(str, Enum):
@@ -36,7 +37,6 @@ class Organization(SQLModel, table=True):
     organization_name: str = Field(index=True)
     owner_name: Optional[str] = Field(default=None,index=True)
     logo_image: Optional[str] = Field(default=None)
-    tenant_domain: Optional[str] =Field()
     description: Optional[str] = Field(default=None, index=True)
     organization_type: OrganizationType = Field(default=OrganizationType.company)
     tenant_hashed: Optional[str] = Field(index=True)
@@ -46,6 +46,9 @@ class Organization(SQLModel, table=True):
         back_populates="organizations",
         link_model=ScopeGroupLink
     )
+    address_id: int = Field(default=None, foreign_key="address.id")
+    landmark: Optional[str] = Field(default=None, index=True)
+    location_id: int = Field(foreign_key="geolocation.id")
     active:Optional[bool] =Field(default= True, index=True)
     warehouses: Optional[List["Warehouse"]] = Relationship(back_populates="organization")
 
@@ -80,7 +83,6 @@ class IdType(str, Enum):
 class Scope(str, Enum):
     managerial_scope = "managerial_scope"
     personal_scope = "personal_scope"
-
 
 class Role(SQLModel, table=True):
     __tablename__ = "role"
@@ -138,7 +140,7 @@ class RoleModulePermission(SQLModel, table=True):
     access_policy: Optional[AccessPolicy] = Field(default=AccessPolicy.deny)
 
     role: Optional[Role] = Relationship(back_populates="permissions")
-
+    
 class User(SQLModel, table=True):
     __tablename__ = "users"
     
@@ -162,7 +164,7 @@ class User(SQLModel, table=True):
     manager_id: Optional[int] = Field(default=None, foreign_key="users.id", index=True)
     id_type: Optional[IdType] = Field(default=None)
     id_number: Optional[str] = Field(default=None)    
-    #address_id: Optional[int] = Field(default=None, foreign_key="address.id", index=True)
+    address_id: Optional[int] = Field(default=None, foreign_key="address.id", index=True)
     warehouses: Optional[List["Warehouse"]] = Relationship(back_populates="store_admins", link_model=WarehouseStoreAdminLink)
     requester_warehouse_stops: List["WarehouseStop"] = Relationship(
         back_populates="requester",
