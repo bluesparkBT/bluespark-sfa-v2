@@ -114,7 +114,9 @@ def fetch_address_id_and_name(session: SessionDep, current_user: UserDep):
         .where(Organization.id.in_(organization_ids))
     ).all()
     
-    address_ids = [aid[0] for aid in address_ids if aid[0] is not None]
+    address_ids = [
+        aid[0] for aid in address_ids if aid is not None and aid[0] is not None
+    ] 
     if not address_ids:
         return {}
 
