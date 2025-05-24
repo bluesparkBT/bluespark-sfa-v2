@@ -320,8 +320,7 @@ async def get_tenants(
                     "owner": tenant.owner_name,
                     "description": tenant.description,
                     "logo": tenant.logo_image,
-                    "domain": f"{Domain}/{tenant.tenant_hashed}"
-                }
+                    "domain": f"{Domain}/{tenant.tenant_hashed}"                }
             )
 
         return tenant_list
@@ -415,6 +414,10 @@ async def create_tenant(
         # existing_tenant = session.exec(
         #     select(Organization).where(Organization.organization_name == verify_tenant(tenant_name))
         # ).first()
+
+        print("current user of provide is:", current_user)
+        superadmin_id = session.exec(select(User.organization_id).where(User.role_id == Role.id == "Super Admin")).first()
+        
         hashed_tenant_name = get_tenant_hash(tenant_name) 
         tenant = Organization(
             organization_name = tenant_name,
@@ -423,7 +426,8 @@ async def create_tenant(
             description=description,
             logo_image=logo_image,
             organization_type=OrganizationType.company.value,
-            parent_id = current_user.organization_id
+            tenant_domain = f"{Domain}/{hashed_tenant_name}",
+            parent_id = superadmin_id
         )
         session.add(tenant)
         session.commit()

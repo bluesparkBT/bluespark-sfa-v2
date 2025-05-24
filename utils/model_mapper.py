@@ -14,15 +14,17 @@ MODEL_HTML_TYPES = {
         "landmark": "text",
         "latitude": "text",
         "longitude": "text"
+        "hidden": "text"
     },
     "role":{
         "id":"hidden",
         "name":"text",
+        "module":"select",
+        "policy":"radio"
     },
     "policy":{
         "role_id":"hidden",
-        "module":"select",
-        "policy":"radio"
+       
     },
     "scope_group":{
         "id":"hidden",

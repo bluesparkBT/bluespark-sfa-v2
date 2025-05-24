@@ -8,7 +8,7 @@ from models.Account import AccessPolicy, Role, RoleModulePermission, User, Scope
 from models.Account import ModuleName as modules
 from utils.auth_util import get_tenant, get_current_user, check_permission
 from utils.model_converter_util import get_html_types
-from utils.util_functions import validate_name
+from utils.util_functions import validate_name, parse_enum
 from utils.get_hierarchy import get_organization_ids_by_scope_group
 
 
@@ -47,6 +47,7 @@ modules_to_grant = [
     modules.warehouse_stop.value,
     
 ]
+mod = modules
 
 @rr.get("/roles")
 async def get_roles(
@@ -140,10 +141,24 @@ async def create_role(
                 status_code=403, detail="You Do not have the required privilege"
             )
         role = session.exec(select(Role).where(Role.id == id)).first()
+        
         if not role:
             raise HTTPException(status_code=404, detail="Role not found")
+        role_module_permissions = session.exec(
+            select(RoleModulePermission.module, RoleModulePermission.access_policy).where(
+                RoleModulePermission.role_id == id
+            )
+        ).all()
+
+        formatted_permissions = {
+            module: access_policy.value
+            for module, access_policy in role_module_permissions
+        }
+
+        
+        print("role module perm", formatted_permissions)
        
-        return {"id": role.id, "name": role.name}
+        return {"id": role.id, "name": role.name, "permissions": formatted_permissions}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -161,10 +176,21 @@ async def form_roles(
                 status_code=403, detail="You Do not have the required privilege"
             )
         policy_type =  {i.value: i.value for i in AccessPolicy}
-        print(policy_type)
+        # Check if current user is a super admin
+        user_scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == current_user.scope_group_id)).first()
+         
+        # Filter modules, exclude "Service Provider" unless super admin
+        if user_scope_group.scope_name == "Super Admin Scope":
+            modules_dict = {i.value: i.value for i in modules}
+        else:
+            modules_dict = {
+                i.value: i.value for i in modules if i.value != "Service Provider"
+            }
         role = {
-            "id":"",
+            "id":None,
             "name":"",
+            "module":modules_dict,
+            "policy":policy_type,
         }
         
         return {"data": role, "html_types": get_html_types("role")}
@@ -176,7 +202,11 @@ async def create_role(
     session: SessionDep,
     tenant: str,
     current_user: UserDep,    
-    role_data: Dict[str, Any] = Body(...),
+    id:str|int  = Body(...),
+    name: str = Body(...),
+    module: str = Body(...),
+    policy: str = Body(...),
+
 
 ): 
     try:
@@ -186,39 +216,81 @@ async def create_role(
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-       #check exisiting role
-        role_name = role_data.get("name")
-
-        if validate_name(role_name) == False:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Role name is not valid",
-        )
-        
-        #create role
-        role = Role(
-            name=role_name,
-            organization_id = current_user.organization_id
-        )
+        if(parse_enum(AccessPolicy,policy,"Policy") == None or parse_enum(mod,module,"Module") == None):
+             raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Required field missing",
+                )
 
 
-        session.add(role)
-        session.commit()
-        session.refresh(role)
-   
-        # grant module permissions from list of modules defined as modules_togrant
-        for module in modules_to_grant: 
-            role_module_permission= RoleModulePermission(
-                id=None,
-                role_id=role.id,
-                module=module,
-                access_policy=AccessPolicy.deny
+        #check exisiting role
+        print("id", id)
+        role_id: int
+        if(id !=""):
+            role = session.query(Role).where(Role.id==id).first()
+
+            
+            if not role:
+                if validate_name(name) == False:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Role name is not valid",
+                )
+                
+                #create role
+                role = Role(
+                    name=name,
+                    organization_id = current_user.organization_id
+                )
+
+
+                session.add(role)
+                session.commit()
+                session.refresh(role)
+                role_id = role.id
+            else:
+                role_id = role.id
+        else:
+            #create role
+            if validate_name(name) == False:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Role name is not valid",
+            )
+            role = Role(
+                name=name,
+                organization_id = current_user.organization_id
             )
 
-            session.add(role_module_permission)
+
+            session.add(role)
             session.commit()
-            session.refresh(role_module_permission)
- 
+            session.refresh(role)
+            role_id = role.id
+
+        
+
+        
+   
+        # grant module permissions from list of modules defined as modules_togrant
+       
+        role_module_permission = session.exec(select(RoleModulePermission)
+                                    .where((RoleModulePermission.role_id == role_id)&
+                                          (RoleModulePermission.module == module))).first()
+        if(role_module_permission):
+            role_module_permission.module = module
+            role_module_permission.access_policy = policy
+        else:
+            role_module_permission= RoleModulePermission(
+                    id=None,
+                    role_id=role_id,
+                    module=module,
+                    access_policy=policy
+                )
+
+        session.add(role_module_permission)
+        session.commit()
+        session.refresh(role_module_permission)
         return role.id
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -304,8 +376,10 @@ async def update_role(
     tenant: str,
     current_user: UserDep,
 
-    name: str = Body(...) ,
-    id: int = Body(...),
+    id:str|int  = Body(...),
+    name: str = Body(...),
+    module: str = Body(...),
+    policy: str = Body(...),
 ):
     try:
         if not check_permission(
@@ -328,6 +402,28 @@ async def update_role(
         session.add(role)
         session.commit()
         session.refresh(role)
+        print("module",module,"policy")
+        if (parse_enum(AccessPolicy,policy, "policy") != None and parse_enum(mod,module,"Module") != None):
+            print("in here")
+            role_module_permission = session.exec(select(RoleModulePermission)
+                                    .where((RoleModulePermission.role_id == id)&
+                                          (RoleModulePermission.module == module))).first()
+            if(role_module_permission):
+                role_module_permission.module = module
+                role_module_permission.access_policy = policy
+            else:
+                role_module_permission= RoleModulePermission(
+                        id=None,
+                        role_id=id,
+                        module=module,
+                        access_policy=policy
+                    )
+
+            session.add(role_module_permission)
+            session.commit()
+            session.refresh(role_module_permission)
+
+    
         return role.id
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
