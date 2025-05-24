@@ -68,7 +68,7 @@ def get_child_organization(session: SessionDep, organization_id: int , max_depth
             "parent_organization": org.parent_id,
             "scope_groups": [{"id": sg.id, "scope_name": sg.scope_name} for sg in org.scope_groups],
             'name': "All" if org.parent_id is None else org.organization_name, 
-            children_key: [get_child_organization(session, child.id, max_depth-1 if max_depth is not None else max_depth) for child in children if (max_depth is None or max_depth > 0]           
+            children_key: [get_child_organization(session, child.id, max_depth-1 if max_depth is not None else max_depth, children_key) for child in children if (max_depth is None or max_depth > 0)]           
         }
     
 def get_heirarchy(session: SessionDep, organization_id: int , max_depth, current_user):
