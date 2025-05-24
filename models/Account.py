@@ -46,9 +46,9 @@ class Organization(SQLModel, table=True):
         back_populates="organizations",
         link_model=ScopeGroupLink
     )
-    address_id: int = Field(default=None, foreign_key="address.id")
+    address_id: Optional[int] = Field(default=None, foreign_key="address.id")
     landmark: Optional[str] = Field(default=None, index=True)
-    location_id: int = Field(foreign_key="geolocation.id")
+    location_id: Optional[int] = Field(foreign_key="geolocation.id")
     active:Optional[bool] =Field(default= True, index=True)
     warehouses: Optional[List["Warehouse"]] = Relationship(back_populates="organization")
 
