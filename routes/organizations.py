@@ -263,10 +263,10 @@ async def create_organization(
     parent_organization : int = Body(...),
     organization_type: str = Body(...),
     inheritance_group: Union[int, str, None] = Body(default=None),
-    address : Optional[int] = Body(...),
+    address : Optional[Union[int, str, None]] = Body(default=None),
     landmark : Optional[str] = Body(None),
-    latitude : Optional[str] = Body(None),
-    longitude: Optional[str] =Body(None)
+    latitude : Optional[Union[float, str, None]] = Body(default=None),
+    longitude: Optional[Union[float, str, None]] =Body(default=None)
 ):
     try:
         if not check_permission(
@@ -297,14 +297,31 @@ async def create_organization(
                 detail="Logo image is not valid",
         )
             
-        org_geolocation = Geolocation(
-            name = f"{organization_name} location",
-            address_id = address,
-            latitude = latitude,
-            longitude = longitude
-        )
-        session.add(org_geolocation)
-        session.commit()
+        if address == "" or address is None:
+            address = None
+            
+        if latitude in ("", None):
+            latitude = None
+        else:
+            latitude = float(latitude)
+
+        if longitude in ("", None):
+            longitude = None
+        else:
+            longitude = float(longitude)
+
+        org_geolocation = None
+        if latitude is not None and longitude is not None:
+            org_geolocation = Geolocation(
+                name=f"{organization_name} location",
+                address_id=address,
+                latitude=latitude,
+                longitude=longitude
+            )
+            session.add(org_geolocation)
+            session.commit()
+            session.refresh(org_geolocation)
+
 
         organization = Organization(
             id = None,
@@ -317,7 +334,7 @@ async def create_organization(
             inheritance_group = inheritance_group,
             address_id = address,
             landmark= landmark,
-            location_id = org_geolocation.id
+            location_id=org_geolocation.id if org_geolocation else None
 
         )
         
@@ -336,7 +353,6 @@ async def create_organization(
     
     except Exception as e:
         traceback.print_exc()
-        
         raise HTTPException(status_code=400, detail=str(e))           
 
 @tr.put("/update-organization/")
@@ -353,7 +369,7 @@ async def create_organization(
     organization_type: str = Body(...),    
     parent_organization: int | str = Body(...),
     inheritance_group: Union[int, str, None] = Body(default=None),
-    address: Optional[str] = Body(None),
+    address: Optional[str] = Body(default=None),
     landmark : Optional[str] = Body(None),
     latitude : Optional[str] = Body(None),
     longitude: Optional[str] =Body(None)
@@ -385,10 +401,8 @@ async def create_organization(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Logo image is not valid",
         )
-        exisitng_org_geolocation = session.exec(select(Geolocation).where(Geolocation.id == existing_organization.address_id))    
+        exisitng_org_geolocation = session.exec(select(Geolocation).where(Geolocation.id == existing_organization.address_id)).first()    
         if exisitng_org_geolocation:
-            if address:
-                exisitng_org_geolocation.address_id = address
             if latitude:
                 exisitng_org_geolocation.latitude = latitude,
             if longitude:
@@ -416,6 +430,10 @@ async def create_organization(
         existing_organization.organization_type = organization_type
         if parent_organization:
             existing_organization.parent_id = parent_organization
+        if address:
+            existing_organization.address_id = address
+        if landmark:
+            existing_organization.landmark = landmark,
             
         session.add(existing_organization)
         session.commit()
