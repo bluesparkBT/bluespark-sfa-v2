@@ -13,8 +13,7 @@ MODEL_HTML_TYPES = {
         "address": "select",
         "landmark": "text",
         "latitude": "text",
-        "longitude": "text"
-        "hidden": "text"
+        "longitude": "text",
     },
     "role":{
         "id":"hidden",
