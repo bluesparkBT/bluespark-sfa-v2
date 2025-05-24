@@ -11,6 +11,7 @@ from utils.util_functions import validate_name, validate_email, validate_phone_n
 from utils.auth_util import get_current_user, check_permission, generate_random_password, get_tenant_hash, extract_username, add_organization_path
 from utils.model_converter_util import get_html_types
 from utils.get_hierarchy import get_child_organization
+from utils.domain_util import getPath
 import traceback
 
 # frontend domain
@@ -319,7 +320,7 @@ async def get_tenants(
                     "owner": tenant.owner_name,
                     "description": tenant.description,
                     "logo": tenant.logo_image,
-                    "domain": tenant.tenant_domain
+                    "domain": getPath() + "/" + tenant.tenant_hashed
                 }
             )
 
@@ -413,6 +414,8 @@ async def create_tenant(
         #     select(Organization).where(Organization.organization_name == verify_tenant(tenant_name))
         # ).first()
         print("current user of provide is:", current_user)
+        superadmin_id = session.exec(select(User.organization_id).where(User.role_id == Role.id == "Super Admin")).first()
+        
         hashed_tenant_name = get_tenant_hash(tenant_name) 
         tenant = Organization(
             organization_name = tenant_name,
@@ -422,7 +425,7 @@ async def create_tenant(
             logo_image=logo_image,
             organization_type=OrganizationType.company.value,
             tenant_domain = f"{Domain}/{hashed_tenant_name}",
-            parent_id = current_user.organization_id
+            parent_id = superadmin_id
         )
         session.add(tenant)
         session.commit()

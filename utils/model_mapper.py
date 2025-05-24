@@ -9,16 +9,18 @@ MODEL_HTML_TYPES = {
         "logo_image": "file",
         "parent_organization": "select",
         "organization_type": "select",
-        "inheritance_group": "select"
+        "inheritance_group": "select",
+        "hidden": "text"
     },
     "role":{
         "id":"hidden",
         "name":"text",
+        "module":"select",
+        "policy":"radio"
     },
     "policy":{
         "role_id":"hidden",
-        "module":"select",
-        "policy":"radio"
+       
     },
     "scope_group":{
         "id":"hidden",
