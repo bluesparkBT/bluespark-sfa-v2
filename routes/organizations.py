@@ -263,7 +263,7 @@ async def create_organization(
     parent_organization : int = Body(...),
     organization_type: str = Body(...),
     inheritance_group: Union[int, str, None] = Body(default=None),
-    address : Optional[Union[int, str, None]] = Body(default=None),
+    address : Optional[int| str| None] = Body(default=None),
     landmark : Optional[str] = Body(None),
     latitude : Optional[Union[float, str, None]] = Body(default=None),
     longitude: Optional[Union[float, str, None]] =Body(default=None)
@@ -275,25 +275,31 @@ async def create_organization(
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-        existing_tenant = session.exec(select(Organization).where(Organization.organization_name == organization_name)).first()
+        # existing_tenant = session.exec(select(Organization).where(Organization.organization_name == organization_name)).first()
 
-        if existing_tenant is not None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Company already registered",
-        )
+        # if existing_tenant is not None:
+        #     raise HTTPException(
+        #         status_code=404,
+        #         detail="Company already registered",
+        # )
+        
         #Check Validity
         if inheritance_group == "":
             inheritance_group = None
+        if validate_name(organization_name) == False:
+            raise HTTPException(
+                status_code=404,
+                detail="Company name is not valid",
+        )     
 
         if validate_name(owner_name) == False:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
+                status_code=404,
                 detail="Company owner name is not valid",
         )
         elif validate_image(logo_image) == False and logo_image is None:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
+                status_code=404,
                 detail="Logo image is not valid",
         )
             
@@ -386,19 +392,19 @@ async def create_organization(
         existing_organization = session.exec(select(Organization).where(Organization.id == id)).first()
         if existing_organization is None:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
+                status_code=404,
                 detail="Organization not found",
         )
         #Check Validity
         
         if validate_name(owner_name) == False:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
+                status_code=404,
                 detail="Company owner name is not valid",
         )
         elif validate_image(logo_image) == False and logo_image is None:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
+                status_code=404,
                 detail="Logo image is not valid",
         )
         exisitng_org_geolocation = session.exec(select(Geolocation).where(Geolocation.id == existing_organization.address_id)).first()    

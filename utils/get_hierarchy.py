@@ -56,10 +56,12 @@ def get_child_organization(session: SessionDep, organization_id: int , max_depth
         select(Organization).where(Organization.parent_id == organization_id)
     ).all()
 
-    
     org = session.exec(select(Organization).where(Organization.id == organization_id)).first()  
     
-    parent_org = session.exec(select(Organization).where(Organization.id == org.parent_id)).first()  
+    if org.parent_id:
+        parent_org = session.exec(select(Organization).where(Organization.id == org.parent_id)).first()  
+    else:
+        parent_org = None
     
     return {
             'id': organization_id,
@@ -68,7 +70,7 @@ def get_child_organization(session: SessionDep, organization_id: int , max_depth
             "description": org.description,
             "organization_type": org.organization_type,
             "inheritance_group": org.inheritance_group,
-            "parent_organization": parent_org.organization_name,
+            "parent_organization": parent_org.organization_name if parent_org is not None else None,
             "scope_groups": [{"id": sg.id, "scope_name": sg.scope_name} for sg in org.scope_groups],
 
             children_key: [get_child_organization(session, child.id, max_depth-1 if max_depth is not None else max_depth, children_key) for child in children if (max_depth is None or max_depth > 0)]           

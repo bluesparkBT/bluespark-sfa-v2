@@ -29,12 +29,9 @@ MODEL_HTML_TYPES = {
     "scope_group":{
         "id":"hidden",
         "name":"text",
+        "hidden": "hierarchical-checkbox"
     },
-    "scope_organization":{
-        "scope_id":"hidden",
-        "organizations": "hierarchical-checkbox"
-
-    },
+    
     "user": {
         "id": "hidden",
         "full_name": "text",
@@ -127,13 +124,15 @@ MODEL_HTML_TYPES = {
         "brand": "text",
         "code": "text",
         "price": "number",
-        "unit": "text",
+        "unit": "select",
         "category": "select",
         "organization": "select"
     },
     "inheritance": {
         "id": "hidden",
-        "name": "text"
+        "name": "text",
+        "category": "select",
+        "product": "select"
     }
 
 }

@@ -64,9 +64,6 @@ async def get_my_user(
     tenant: Optional[str] = None,  # Make tenant optional
 ):
     try:
-        if not check_permission(session, "Read", ["Users", "Administrative"], current_user):
-            raise HTTPException(status_code=403, detail="You do not have the required privilege")
-
         user = session.exec(select(User).where(User.id == current_user.id)).first()
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
@@ -103,7 +100,7 @@ async def get_my_user(
         traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
 
-@ar.get("/get-users/")
+@ar.get("/get-users")
 async def get_users(
     session: SessionDep,
     current_user: UserDep,
@@ -136,6 +133,8 @@ async def get_users(
             # Extract username without tenant prefix
             username_display = extract_username(user.username, user_org.organization_name)
             user_scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == user.scope_group_id)).first()
+            if user_scope_group:
+                scope_group = user_scope_group.scope_name
             user_role = session.exec(select(Role).where(Role.id == user.role_id)).first()
             manager = session.exec(select(User).where(User.id == user.manager_id)).first()
             user_list.append({
@@ -148,7 +147,7 @@ async def get_users(
                 "role": user_role.name,
                 "manager": manager,
                 "scope": user.scope,
-                "scope_group": user_scope_group.scope_name,
+                "scope_group": scope_group,
             })
 
         return user_list
@@ -259,7 +258,7 @@ async def create_user(
     organization: int = Body(...),
     phone_number:Optional [str] = Body(None),
     gender: Optional[str] = Body(None),
-    address: Optional[int] = Body(None)
+    address : Optional[int| str| None] = Body(default=None),
             
 ):
     try: 
@@ -292,6 +291,9 @@ async def create_user(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Phone number is not valid",
         )
+        
+        if address == "" or address is None:
+            address = None
             
         current_tenant = session.exec(select(Organization).where(Organization.id == current_user.organization_id)).first() if tenant == "provider" else session.exec(select(Organization).where(Organization.tenant_hashed == tenant)).first()
         print("the organization get from", current_tenant)   
@@ -398,7 +400,7 @@ async def update_user(
     id_type: str = Body(...),
     id_number: str = Body(...),
     image: str = Body(...),    
-    address: Optional[int] = Body(...)      
+    address: Optional[int |str | None] = Body(...)      
             
 ):
     try: 
@@ -432,6 +434,9 @@ async def update_user(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Phone number is not valid",
             )
+            
+        if address == "" or address is None:
+            address = None
 
        
         existing_user.fullname = full_name
@@ -459,7 +464,7 @@ async def update_user(
 
 
         return {
-            "message": "User: {existing_user} updated successfully"}
+            "message": "User updated successfully"}
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
@@ -503,17 +508,17 @@ async def get_scope_groups(
                 status_code=403, detail="You Do not have the required privilege"
             )
             
-        # current_org_id = current_user.organization_id
-        # if not current_org_id:
-        #     raise HTTPException(status_code=400, detail="User has no organization assigned")
-        organization_ids = get_organization_ids_by_scope_group(session, current_user)
+        filtered_scope_groups = fetch_scope_group_id_and_name(session, current_user)
+        print("fetched scope groups::::", filtered_scope_groups)
+
+        filtered_scope_group_ids = list(filtered_scope_groups.keys())
         scope_groups = session.exec(
-            select(ScopeGroup).distinct()
-            .where(ScopeGroup.parent_id.in_(organization_ids))
-            # .join(ScopeGroupLink)
-            # .where(ScopeGroupLink.organization_id.in_(organization_ids))
+            select(ScopeGroup)
+            .where(ScopeGroup.id.in_(filtered_scope_group_ids))
+            .distinct()
         ).all()
 
+        
         if not scope_groups:
             raise HTTPException(status_code=404, detail="No scope groups found for your organization")
         
@@ -585,9 +590,7 @@ async def form_scope_organization(
                "name":"", 
                "hidden": [get_child_organization(session, current_user.organization_id)]
             }
-            
-        print(org)
-        
+                    
         return {"data": org, "html_types": get_html_types("scope_group")}
         
     except Exception as e:
@@ -600,7 +603,7 @@ async def add_organization_to_scope(
     tenant: str,
     current_user: UserDep,
     name: str = Body(...),
-    hidden: List[int] = Body(...)
+    hidden: List[int] = Body(...),
 ):
     try:
         if not check_permission(
@@ -626,6 +629,7 @@ async def add_organization_to_scope(
       
         scope_group = ScopeGroup(
             scope_name=name,
+            parent_id = current_user.organization_id
         )
         
         session.add(scope_group)
@@ -635,7 +639,10 @@ async def add_organization_to_scope(
         #Add new entries
         to_add = set(hidden)
         for org_id in to_add:
-            scope_group_link_add = ScopeGroupLink(scope_group_id=scope_group.id, organization_id=org_id)
+            scope_group_link_add = ScopeGroupLink(
+                scope_group_id=scope_group.id,
+                organization_id=org_id
+                )
             session.add(scope_group_link_add)
             session.commit()
             session.refresh(scope_group_link_add)
@@ -746,6 +753,8 @@ async def delete_scope_group(
 
         # Commit all changes at once
         session.commit()
+        
+        session.refresh()
 
         return {"message": "Scope group deleted successfully"}
     
