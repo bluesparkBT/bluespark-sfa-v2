@@ -2,15 +2,9 @@ from sqlmodel import select
 from fastapi import Request, HTTPException, status, Depends
 from typing import Annotated
 from db import  get_session
-from models.Account import (
-    Organization,
-    User,
-    Role,
-    ScopeGroup
-)
+from models.Account import (Organization, User, Role, ScopeGroup, ScopeGroupLink)
 from models.Address import Address, Geolocation
-from models.Product import Category, Product
-from models.Inheritance import InheritanceGroup, ProductLink, CategoryLink
+from models.Product_Category import Category, Product, InheritanceGroup, ProductLink, CategoryLink
 from models.Warehouse import Stock, StockType, Warehouse, Vehicle
 from utils.get_hierarchy import get_organization_ids_by_scope_group
 from utils.auth_util import get_current_user
@@ -54,7 +48,6 @@ def fetch_role_id_and_name(session: SessionDep, current_user: UserDep):
 
 def fetch_scope_group_id_and_name(session: SessionDep, current_user: UserDep):
     organization_ids = get_organization_ids_by_scope_group(session, current_user)
-    print("fetched organizations", organization_ids)
 
     scope_group_row = session.exec(
         select(ScopeGroup.id, ScopeGroup.scope_name)
@@ -62,6 +55,20 @@ def fetch_scope_group_id_and_name(session: SessionDep, current_user: UserDep):
         ).all()
     scope_groups = {row[0]: row[1] for row in scope_group_row}
     return scope_groups
+
+# def fetch_scope_group_id_and_name(session: SessionDep, current_user: UserDep):
+#     organization_ids = get_organization_ids_by_scope_group(session, current_user)
+#     print("organizations::::", organization_ids)
+#     scope_group_rows = session.exec(
+#         select(ScopeGroup.id, ScopeGroup.scope_name)
+#         .join(ScopeGroupLink, ScopeGroup.id == ScopeGroupLink.scope_group_id)
+#         .where(ScopeGroupLink.organization_id.in_(organization_ids))
+#         .distinct()
+#     ).all()
+
+#     # Convert to dictionary: {id: scope_name}
+#     scope_groups = {row[0]: row[1] for row in scope_group_rows}
+#     return scope_groups
 
 
 def fetch_product_id_and_name(session: SessionDep, current_user: UserDep):
@@ -127,6 +134,27 @@ def fetch_address_id_and_name(session: SessionDep, current_user: UserDep):
 
     return {row[0]: row[1] for row in address_row}
 
+def fetch_classification_id_and_name(session: SessionDep, current_user: UserDep):
+    organization_ids = get_organization_ids_by_scope_group(session, current_user)
+
+    classification_row = session.exec(
+        select(Organization.classification_group_id, Organization.classification_group_name)
+        .where(Organization.id.in_(organization_ids))
+    ).all()
+
+    classifications = {row[0]: row[1] for row in classification_row if row[0] is not None}
+    return classifications
+
+def fetch_point_of_sale_id_and_name(session: SessionDep, current_user: UserDep):
+    organization_ids = get_organization_ids_by_scope_group(session, current_user)
+
+    pos_row = session.exec(
+        select(Organization.point_of_sale_id, Organization.point_of_sale_name)
+        .where(Organization.id.in_(organization_ids))
+    ).all()
+
+    pos = {row[0]: row[1] for row in pos_row if row[0] is not None}
+    return pos 
 
 def fetch_warehouse_id_and_name(session: SessionDep, current_user: UserDep):
     organization_ids = get_organization_ids_by_scope_group(session, current_user)
