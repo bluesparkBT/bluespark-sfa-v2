@@ -1,11 +1,10 @@
-from typing import Annotated, List, Dict, Any, Optional
+from typing import Annotated, List, Dict, Any, Optional, Union
 from db import SECRET_KEY, get_session
 from sqlmodel import Session, select
 from fastapi import APIRouter, HTTPException, Body, status, Depends
 from db import get_session
 from utils.model_converter_util import get_html_types
-from models.Product import Product, Category
-from models.Inheritance import InheritanceGroup
+from models.Product_Category import Product, Category, InheritanceGroup
 from models.Account import ScopeGroup,ScopeGroupLink 
 from utils.util_functions import validate_name
 from models.Account import Organization
@@ -37,13 +36,10 @@ def get_category(
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )  
-        # Fetch the inheritance group from the organization
         inherited_group_id = session.exec(
             select(Organization.inheritance_group).where(Organization.id == current_user.organization_id)
         ).first()
-        test= session.exec(select(Organization.inheritance_group))
-        print("test",test)
-        print("inherited_group_id",inherited_group_id)
+        
         inherited_group = session.exec(
             select(InheritanceGroup).where(InheritanceGroup.id == inherited_group_id)
         ).first()
@@ -55,8 +51,6 @@ def get_category(
             print("inherited_categories",inherited_categories)
         else:
             inherited_categories = []
-        # Fetch products associated with the inheritance group
-
         
         # organization_ids = get_organization_ids_by_scope_group(session, current_user)
         scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == current_user.scope_group_id)).first()
@@ -79,10 +73,9 @@ def get_category(
             category_temp = {
                 "id": category.id,
                 "Category Name": category.name,
-                "Parent Category id": category.parent_category,
-                "Parent Category name": category.parent_category,
+                "Parent Category": category.parent_category,
                 "UNSPC Code": category.code,
-                "Description": category.description,
+                "description": category.description,
             }
             if category_temp not in category_list:
                 category_list.append(category_temp)
@@ -167,7 +160,7 @@ def create_category(
     name: str = Body(...),
     code: str = Body(...),
     description: str | None = Body(...),
-    # parent_category: Optional [int] = Body(...),
+    parent_category: Optional[int| str| None] = Body(default=None),
     organization: str = Body(...)
 ):
     try:
@@ -182,10 +175,7 @@ def create_category(
         db_category_code = session.exec(
             select(Category.code).where(Category.organization_id.in_(organization_ids), Category.code == code)
         ).first()
-        # existing_category = session.exec(
-        #             select(Category).where(Category.code == code)
-        #         ).first()
-        
+
         if db_category_code:
             raise HTTPException(status_code=400, detail="Category with this code already exists")
        
@@ -199,12 +189,12 @@ def create_category(
             raise HTTPException(status_code=400, detail="Invalid category description format")
         
         # Create a new category entry from validated input
-
         new_category = Category(
             code=code, 
             name=name, 
-#            description=description,
+            description=description,
             organization_id=int(organization),
+            parent_id = parent_category
             
             )
         session.add(new_category)
@@ -218,17 +208,17 @@ def create_category(
         raise HTTPException(status_code=400, detail=str(e))
  
 # update a single category by ID
-@c.put("/update-category/{category_id}")
+@c.put("/update-category")
 def update_category(
     session: SessionDep, 
     current_user: UserDep,
     tenant: str,
-    category_id: int,
+    id: int,
 
     updated_code: str = Body(...),
     updated_name: str = Body(...),
-    updated_description: str = Body(...),
-    # updated_parent_category: int = Body(...),
+    description: str = Body(...),
+    updated_parent_category: int = Body(...),
     updated_organization: int = Body(...),
 ):
     try:
@@ -244,7 +234,7 @@ def update_category(
         organization_ids = get_organization_ids_by_scope_group(session, current_user)
 
         selected_category = session.exec(
-            select(Category).where(Category.organization_id.in_(organization_ids), Category.id == category_id)
+            select(Category).where(Category.organization_id.in_(organization_ids), Category.id == id)
         ).first()
 
         if not selected_category:
@@ -259,8 +249,9 @@ def update_category(
        
         selected_category.name = updated_name
         selected_category.code = updated_code
-        selected_category.description = updated_description
-        # selected_category.parent_category = updated_parent_category
+        selected_category.parent_category = updated_parent_category
+        if description:
+            selected_category.description = description
         if updated_organization == organization_ids:
             selected_category.organization_id = updated_organization
         else:
@@ -277,12 +268,12 @@ def update_category(
         raise HTTPException(status_code=400, detail=str(e))
 
 # Delete a category by ID
-@c.delete("/delete-category/{category_id}")
+@c.delete("/delete-category/{id}")
 def delete_category(
     session: SessionDep, 
     current_user: UserDep,
     tenant: str,
-    category_id: int,
+    id: int,
 ) :
     try:
         # Check permission
@@ -296,7 +287,7 @@ def delete_category(
         organization_ids = get_organization_ids_by_scope_group(session, current_user)
 
         selected_category = session.exec(
-            select(Category).where(Category.organization_id.in_(organization_ids), Category.id == category_id)
+            select(Category).where(Category.organization_id.in_(organization_ids), Category.id == id)
         ).first()
 
         if not selected_category:

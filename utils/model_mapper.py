@@ -112,13 +112,15 @@ MODEL_HTML_TYPES = {
         "brand": "text",
         "code": "text",
         "price": "number",
-        "unit": "text",
+        "unit": "select",
         "category": "select",
         "organization": "select"
     },
     "inheritance": {
         "id": "hidden",
-        "name": "text"
+        "name": "text",
+        "category": "select",
+        "product": "select"
     }
 
 }

@@ -93,7 +93,6 @@ async def get_form_fields_address(session: SessionDep, current_user: UserDep, te
         city="",
         sub_city="",
         woreda="",
-        landmark="",
     )
 
     return {
@@ -110,7 +109,6 @@ async def create_address(
     city : str = Body(...),
     sub_city : str = Body(...),
     woreda : str = Body(...),
-    landmark : str = Body(...),
 ):
     """
     Create a new address in the database.
@@ -138,7 +136,6 @@ async def create_address(
             city = city,
             sub_city = sub_city,
             woreda = woreda,
-            landmark = landmark
             
         )
         session.add(new_address)
@@ -160,7 +157,6 @@ async def update_address(
     city: Optional[str] = Body(...),
     sub_city: Optional[str] = Body(...),
     woreda: Optional[str] = Body(...),
-    landmark: Optional[str] = Body(...),
 ):
     """
     Update an existing address by ID.
@@ -180,7 +176,6 @@ async def update_address(
         address.city = city
         address.sub_city = sub_city
         address.woreda = woreda
-        address.landmark = landmark
 
         session.add(address)
         session.commit()
