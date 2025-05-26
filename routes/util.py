@@ -85,7 +85,7 @@ async def get_form_fields_warehouse(current_user: UserDep, endpoint: str) -> lis
         return ["id",
                 "description"]
     elif endpoint == "Stock":
-        return ["id"]
+        return ["id","min_access_policy"]
     elif endpoint == "Tenant":
         return ["id",
                 "description"]
@@ -101,7 +101,13 @@ async def get_form_fields_warehouse(current_user: UserDep, endpoint: str) -> lis
     elif endpoint == "Deposit":
         return ["id"]
     elif endpoint == "Warehouse":
-        return ["id" , "min_access_policy"]
+        return ["id"]
+    elif endpoint == "Item Request":
+        return [
+            "id",
+            "confirmed",
+            "isRequest",
+            "min_access_policy"]
     elif endpoint == "Warehouse Stop":
         return [
             "id",

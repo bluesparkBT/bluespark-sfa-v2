@@ -12,6 +12,7 @@ from utils.model_converter_util import get_html_types
 from utils.util_functions import validate_name, parse_enum, parse_datetime_field, format_date_for_input
 from utils.form_db_fetch import fetch_organization_id_and_name, fetch_user_id_and_name, fetch_product_id_and_name,fetch_category_id_and_name, fetch_warehouse_id_and_name, fetch_vehicle_id_and_name, fetch_stocks_id_and_name, fetch_warehouse_group_id_and_name, fetch_admin_warehouse_id_and_name, fetch_address_id_and_name
 from utils.warehouse_util import check_warehouse_permission
+from utils.get_hierarchy import get_organization_ids_by_scope_group
 
 
 WarehouseRouter = wr = APIRouter()\
@@ -734,74 +735,26 @@ async def get_warehouses(
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-    
+        organization_ids = get_organization_ids_by_scope_group(session, current_user)
 
-    
-        # Step 1: find warehouse IDs the current user is linked to via a deny access policy
-        deny_warehouses_subquery = (
-            select(WarehouseGroupLink.warehouse_id)
-            .join(WarehouseStoreAdminLink, WarehouseStoreAdminLink.warehouse_group_id == WarehouseGroupLink.warehouse_group_id)
-            .join(WarehouseGroup, WarehouseGroup.id == WarehouseGroupLink.warehouse_group_id)
-            .where(
-                WarehouseStoreAdminLink.user_id == current_user.id,
-                WarehouseGroup.access_policy == "deny"  # or AccessPolicy.deny if enum
-            )
-        )
-
-        # Step 2: return warehouses linked to the user, excluding the above
-        statement = (
+        warehouses = session.exec(
             select(Warehouse)
-            .join(WarehouseGroupLink, WarehouseGroupLink.warehouse_id == Warehouse.id)
-            .join(WarehouseStoreAdminLink, WarehouseStoreAdminLink.warehouse_group_id == WarehouseGroupLink.warehouse_group_id)
-            .join(WarehouseGroup, WarehouseGroup.id == WarehouseGroupLink.warehouse_group_id)
-            .where(
-                WarehouseStoreAdminLink.user_id == current_user.id,
-                Warehouse.id.not_in(deny_warehouses_subquery)
-            )
+            .where(Warehouse.organization_id.in_(organization_ids))
             .distinct()
-        )
-
-
-        warehouses = session.exec(statement).all()
-        print("warehouses",warehouses)
-
-        
-        access_policy_order = {
-            "deny": 0,
-            "view": 1,
-            "edit": 2,
-            "contribute": 3,
-            "manage": 4
-        }
+        ).all()
+    
         warehouse_list=[]
-
         for warehouse in warehouses:
-            # Get all groups for this warehouse
-            group_ids = session.exec(
-                select(WarehouseGroup.id, WarehouseGroup.access_policy)
-                .join(WarehouseGroupLink, WarehouseGroup.id == WarehouseGroupLink.warehouse_group_id)
-                .join(WarehouseStoreAdminLink, WarehouseGroup.id == WarehouseStoreAdminLink.warehouse_group_id)
-                .where(
-                    WarehouseGroupLink.warehouse_id == warehouse.id,
-                    WarehouseStoreAdminLink.user_id == current_user.id,
-                    WarehouseGroup.access_policy != "deny"  # skip deny
-                )
-            ).all()
-
-            if not group_ids:
-                continue  # skip if no valid access
-
-            # Find the lowest access policy
-            min_policy = min(group_ids, key=lambda g: access_policy_order[g.access_policy]).access_policy
-
+            print(warehouse)
+          
 
             warehouse_list.append({
                 "id": warehouse.id,
                 "warehouse_name": warehouse.warehouse_name,
                 "organization": warehouse.organization.organization_name,
-                "landmark": warehouse.landmark,
-                "min_access_policy": min_policy,
+                "landmark": warehouse.landmark
             })
+
        
 
         return warehouse_list
@@ -824,12 +777,7 @@ async def get_warehouse(
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-        if not check_warehouse_permission(
-            session, "Read", id,current_user
-        ):
-            raise HTTPException(
-                status_code=403, detail="You Do not have the required privilege"
-            )
+       
         warehouse = session.exec(select(Warehouse).where(Warehouse.id == id)).first()
         if not warehouse:
             raise HTTPException(status_code=404, detail="Warehouse not found")
@@ -873,12 +821,7 @@ async def update_warehouse(
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-        if not check_warehouse_permission(
-            session, "Update", id,current_user
-        ):
-            raise HTTPException(
-                status_code=403, detail="You Do not have the required privilege"
-            )
+       
         existing_warehouse = session.exec(select(Warehouse).where(Warehouse.id == id)).first()
 
         if not existing_warehouse:
@@ -940,12 +883,7 @@ async def delete_warehouse(
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-        if not check_warehouse_permission(
-            session, "Delete", id,current_user
-        ):
-            raise HTTPException(
-                status_code=403, detail="You Do not have the required privilege"
-            )
+       
     
         warehouse = session.get(Warehouse, id)
 
@@ -1033,7 +971,6 @@ async def form_stock(
                 status_code=403, detail="You Do not have the required privilege"
             )
         
-        
         stock_data = {
                 "id": "",
                 "warehouse": fetch_warehouse_id_and_name(session, current_user),
@@ -1069,6 +1006,12 @@ async def add_stock(
         if not check_permission(
             session, "Create", "Inventory Management", current_user
             ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
+        if not check_warehouse_permission(
+            session, "Create", warehouse,current_user
+        ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
@@ -1130,29 +1073,100 @@ async def get_stocks(
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-        
+        stock_list = []
+      
+        # Step 1: find warehouse IDs the current user is linked to via a deny access policy
+        deny_warehouses_subquery = (
+            select(WarehouseGroupLink.warehouse_id)
+            .join(WarehouseStoreAdminLink, WarehouseStoreAdminLink.warehouse_group_id == WarehouseGroupLink.warehouse_group_id)
+            .join(WarehouseGroup, WarehouseGroup.id == WarehouseGroupLink.warehouse_group_id)
+            .where(
+                WarehouseStoreAdminLink.user_id == current_user.id,
+                WarehouseGroup.access_policy == "deny"  # or AccessPolicy.deny if enum
+            )
+        )
+
+        # Step 2: return warehouses linked to the user, excluding the above
         statement = (
-            select(Stock)
-            .join(Warehouse, Stock.warehouse_id == Warehouse.id)
+            select(Warehouse)
             .join(WarehouseGroupLink, WarehouseGroupLink.warehouse_id == Warehouse.id)
             .join(WarehouseStoreAdminLink, WarehouseStoreAdminLink.warehouse_group_id == WarehouseGroupLink.warehouse_group_id)
-            .where(WarehouseStoreAdminLink.user_id == current_user.id)).distinct()
+            .join(WarehouseGroup, WarehouseGroup.id == WarehouseGroupLink.warehouse_group_id)
+            .where(
+                WarehouseStoreAdminLink.user_id == current_user.id,
+                Warehouse.id.not_in(deny_warehouses_subquery)
+            )
+            .distinct()
+        )
+
+
+        warehouses = session.exec(statement).all()
+        print("warehouses",warehouses)
+
+        
+        access_policy_order = {
+            "deny": 0,
+            "view": 1,
+            "edit": 2,
+            "contribute": 3,
+            "manage": 4
+        }
+      
+
+        for warehouse in warehouses:
+            # Get all groups for this warehouse
+            group_ids = session.exec(
+                select(WarehouseGroup.id, WarehouseGroup.access_policy)
+                .join(WarehouseGroupLink, WarehouseGroup.id == WarehouseGroupLink.warehouse_group_id)
+                .join(WarehouseStoreAdminLink, WarehouseGroup.id == WarehouseStoreAdminLink.warehouse_group_id)
+                .where(
+                    WarehouseGroupLink.warehouse_id == warehouse.id,
+                    WarehouseStoreAdminLink.user_id == current_user.id,
+                    WarehouseGroup.access_policy != "deny"  # skip deny
+                )
+            ).all()
+
+            if not group_ids:
+                continue  # skip if no valid access
+
+            # Find the lowest access policy
+            min_policy = min(group_ids, key=lambda g: access_policy_order[g.access_policy]).access_policy
+            for stock in warehouse.stocks:
+                stock_list.append({
+                    "id": stock.id,
+                    "warehouse": stock.warehouse.warehouse_name,
+                    "product": stock.product.name,
+                    "category": stock.category.name,
+                    "sub_category": stock.subcategory.name,
+                    "quantity": stock.quantity,
+                    "stock_type": stock.stock_type,
+                    "date_added": format_date_for_input(stock.date_added),
+                    "min_access_policy": min_policy
+                })
+
+        
+        # statement = (
+        #     select(Stock)
+        #     .join(Warehouse, Stock.warehouse_id == Warehouse.id)
+        #     .join(WarehouseGroupLink, WarehouseGroupLink.warehouse_id == Warehouse.id)
+        #     .join(WarehouseStoreAdminLink, WarehouseStoreAdminLink.warehouse_group_id == WarehouseGroupLink.warehouse_group_id)
+        #     .where(WarehouseStoreAdminLink.user_id == current_user.id)).distinct()
     
-        stocks = session.exec(statement).all()
+        # stocks = session.exec(statement).all()
 
-        stock_list = []
+   
 
-        for stock in stocks:
-            stock_list.append({
-                "id": stock.id,
-                "warehouse": stock.warehouse.warehouse_name,
-                "product": stock.product.name,
-                "category": stock.category.name,
-                "sub_category": stock.subcategory.name,
-                "quantity": stock.quantity,
-                "stock_type": stock.stock_type,
-                "date_added": format_date_for_input(stock.date_added)
-            })
+        # for stock in stocks:
+        #     stock_list.append({
+        #         "id": stock.id,
+        #         "warehouse": stock.warehouse.warehouse_name,
+        #         "product": stock.product.name,
+        #         "category": stock.category.name,
+        #         "sub_category": stock.subcategory.name,
+        #         "quantity": stock.quantity,
+        #         "stock_type": stock.stock_type,
+        #         "date_added": format_date_for_input(stock.date_added)
+        #     })
         return stock_list
 
     except Exception as e:
@@ -1174,15 +1188,15 @@ async def get_stock(
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-        # stock = session.exec(select(Stock).where(Stock.id == id)).first()
-        # if not check_warehouse_permission(
-        #     session, "Read", stock.warehouse_id,current_user
-        # ):
-        #     raise HTTPException(
-        #         status_code=403, detail="You Do not have the required privilege"
-        #     )
+        stock = session.exec(select(Stock).where(Stock.id == id)).first()
         if not stock:
             raise HTTPException(status_code=404, detail="Stock not found")
+        if not check_warehouse_permission(
+            session, "Read", stock.warehouse_id,current_user
+        ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
   
         return {
             "id": stock.id,
@@ -1226,12 +1240,12 @@ async def update_stock(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Stock does not exist",
         )
-        # if not check_warehouse_permission(
-        #     session, "Update", warehouse,current_user
-        # ):
-        #     raise HTTPException(
-        #         status_code=403, detail="You Do not have the required privilege"
-        #     )
+        if not check_warehouse_permission(
+            session, "Update", warehouse,current_user
+        ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
         
         
         existing_stock.warehouse_id=warehouse
@@ -1275,12 +1289,12 @@ async def delete_stock(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Stock not found",
             )
-        # if not check_warehouse_permission(
-        #     session, "Update", stock.warehouse_id,current_user
-        # ):
-        #     raise HTTPException(
-        #         status_code=403, detail="You Do not have the required privilege"
-        #     )
+        if not check_warehouse_permission(
+            session, "Delete", stock.warehouse_id,current_user
+        ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
         
         stops = session.exec(
             select(WarehouseStop).where(WarehouseStop.stock_id == id)
@@ -1325,6 +1339,12 @@ async def get_stock_logs(
         stock = session.exec(select(Stock).where(Stock.id == id)).first()
         if not stock:
             raise HTTPException(status_code=404, detail="Stock not found")
+        if not check_warehouse_permission(
+            session, "Read", stock.warehouse_id,current_user
+        ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
         
         stock_log_list=[]
 
@@ -1394,6 +1414,12 @@ async def create_warehouse_stop(
                 status_code=403, detail="You Do not have the required privilege"
             )
         stock_data = session.exec(select(Stock).where(Stock.id == stock)).first()
+        if not check_warehouse_permission(
+            session, "Create",stock_data.warehouse_id,current_user
+        ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
 
         if quantity > stock_data.quantity:
             raise HTTPException(
@@ -1438,38 +1464,90 @@ async def get_warehouse_stops(
                 status_code=403, detail="You Do not have the required privilege"
             )
         
-        statement = (
-            select(WarehouseStop)
-            .join(Stock, WarehouseStop.stock_id == Stock.id)
-            .join(Warehouse, Stock.warehouse_id == Warehouse.id)
-            .join(WarehouseGroupLink, WarehouseGroupLink.warehouse_id == Warehouse.id)
-            .join(WarehouseStoreAdminLink, WarehouseStoreAdminLink.warehouse_group_id == WarehouseGroupLink.warehouse_group_id)
-            .where(WarehouseStoreAdminLink.user_id == current_user.id)).distinct()
-        
-        warehouse_stops = session.exec(statement).all()
-
+    
         warehouse_stop_list = []
 
-        for stop in warehouse_stops:
-            warehouse_stop_list.append({
-                "id": stop.id,
-                "warehouse_name": stop.stock.warehouse.warehouse_name,
-                "stock": stop.stock.product.name,
-                "stock_type": stop.stock_type,
-                "quantity": stop.quantity,
-                "vehicle": stop.vehicle.name if stop.vehicle else "",
-                "requester": stop.requester.fullname,
-                "request_status": stop.request_status,
-                "request_type": stop.request_type,
-                "request_date": format_date_for_input(stop.request_date),
-                "approver": stop.approver.fullname if stop.approver_id is not None else "",
-                "approved_date": format_date_for_input(stop.approve_date),
-                "confirmed_date": stop.confirm_date,
-                "confirmed": stop.confirmed,
-                "isRequest": False
-            })
-        
+      
+        # Step 1: find warehouse IDs the current user is linked to via a deny access policy
+        deny_warehouses_subquery = (
+            select(WarehouseGroupLink.warehouse_id)
+            .join(WarehouseStoreAdminLink, WarehouseStoreAdminLink.warehouse_group_id == WarehouseGroupLink.warehouse_group_id)
+            .join(WarehouseGroup, WarehouseGroup.id == WarehouseGroupLink.warehouse_group_id)
+            .where(
+                WarehouseStoreAdminLink.user_id == current_user.id,
+                WarehouseGroup.access_policy == "deny"  # or AccessPolicy.deny if enum
+            )
+        )
 
+        # Step 2: return warehouses linked to the user, excluding the above
+        statement = (
+            select(Warehouse)
+            .join(WarehouseGroupLink, WarehouseGroupLink.warehouse_id == Warehouse.id)
+            .join(WarehouseStoreAdminLink, WarehouseStoreAdminLink.warehouse_group_id == WarehouseGroupLink.warehouse_group_id)
+            .join(WarehouseGroup, WarehouseGroup.id == WarehouseGroupLink.warehouse_group_id)
+            .where(
+                WarehouseStoreAdminLink.user_id == current_user.id,
+                Warehouse.id.not_in(deny_warehouses_subquery)
+            )
+            .distinct()
+        )
+
+
+        warehouses = session.exec(statement).all()
+        print("warehouses",warehouses)
+
+        
+        access_policy_order = {
+            "deny": 0,
+            "view": 1,
+            "edit": 2,
+            "contribute": 3,
+            "manage": 4
+        }
+      
+
+        for warehouse in warehouses:
+            # Get all groups for this warehouse
+            group_ids = session.exec(
+                select(WarehouseGroup.id, WarehouseGroup.access_policy)
+                .join(WarehouseGroupLink, WarehouseGroup.id == WarehouseGroupLink.warehouse_group_id)
+                .join(WarehouseStoreAdminLink, WarehouseGroup.id == WarehouseStoreAdminLink.warehouse_group_id)
+                .where(
+                    WarehouseGroupLink.warehouse_id == warehouse.id,
+                    WarehouseStoreAdminLink.user_id == current_user.id,
+                    WarehouseGroup.access_policy != "deny"  # skip deny
+                )
+            ).all()
+
+            if not group_ids:
+                continue  # skip if no valid access
+
+            # Find the lowest access policy
+            min_policy = min(group_ids, key=lambda g: access_policy_order[g.access_policy]).access_policy
+            for stock in warehouse.stocks:
+                st = session.exec(select(Stock).where(Stock.id == stock.id)).first()
+                print("stock", st)
+                for stop in st.warehouse_stops:
+                    print("stop", stop)
+                    warehouse_stop_list.append({
+                        "id": stop.id,
+                        "warehouse_name": stop.stock.warehouse.warehouse_name,
+                        "stock": stop.stock.product.name,
+                        "stock_type": stop.stock_type,
+                        "quantity": stop.quantity,
+                        "vehicle": stop.vehicle.name if stop.vehicle else "",
+                        "requester": stop.requester.fullname,
+                        "request_status": stop.request_status,
+                        "request_type": stop.request_type,
+                        "request_date": format_date_for_input(stop.request_date),
+                        "approver": stop.approver.fullname if stop.approver_id is not None else "",
+                        "approved_date": format_date_for_input(stop.approve_date),
+                        "confirmed_date": stop.confirm_date,
+                        "confirmed": stop.confirmed,
+                        "isRequest": False,
+                        "min_access_policy": min_policy
+                    })
+    
         return warehouse_stop_list
 
     except Exception as e:
