@@ -746,6 +746,8 @@ async def delete_scope_group(
 
         # Commit all changes at once
         session.commit()
+        
+        session.refresh()
 
         return {"message": "Scope group deleted successfully"}
     
