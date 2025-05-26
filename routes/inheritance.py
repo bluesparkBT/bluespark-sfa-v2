@@ -4,11 +4,11 @@ from utils.auth_util import get_current_user, check_permission
 from utils.form_db_fetch import add_category_link, add_product_link
 from db import SECRET_KEY, get_session
 from models.Account import User, AccessPolicy, Organization, OrganizationType, ScopeGroup, Scope, Role, ScopeGroupLink
-from models.Product import Product, Category
+from models.Product_Category import Product, Category,ProductLink, CategoryLink,InheritanceGroup
 from utils.model_converter_util import get_html_types
-
-from utils.form_db_fetch import get_organization_ids_by_scope_group
+from utils.form_db_fetch import fetch_category_id_and_name, fetch_product_id_and_name, fetch_role_id_and_name, fetch_classification_id_and_name, fetch_point_of_sale_id_and_name
 import traceback
+from sqlmodel import delete
 
 from sqlmodel import select, Session
 from models import InheritanceGroup
@@ -42,10 +42,9 @@ async def get_inheritance_groups(
         traceback.format_exc()
         raise HTTPException(status_code=400, detail=str(e))
 
-@In.get("/get-inheritance/{inheritance_id}")
 
 @In.get("/inheritance-form/")
-def het_inheritance_form(
+def inheritance_form(
      tenant: str,
     session: SessionDep,
     current_user: UserDep,   
@@ -62,16 +61,20 @@ def het_inheritance_form(
         form_structure = {
             "id": "",
             "name": "",
-            # "parent_category": fetch_category_id_and_name(session, current_user),
+            "category": fetch_category_id_and_name(session, current_user) ,
+            "product": fetch_product_id_and_name(session, current_user),
+            "role": fetch_role_id_and_name(session, current_user),
+            "classification": fetch_classification_id_and_name(session, current_user),  
+            "point_of_sale": fetch_point_of_sale_id_and_name(session, current_user),
       } 
 
-        return {"data": form_structure, "html_types": get_html_types("Inheritance")}
+        return {"data": form_structure, "html_types": get_html_types("inheritance")}
 
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))    
-
-
+  
+@In.get("/get-inheritance/{inheritance_id}")
 async def get_inheritance_group(
     session: SessionDep,
     current_user: UserDep,
@@ -94,114 +97,247 @@ async def get_inheritance_group(
         if not db_inheritance:
             raise HTTPException(status_code=404, detail="Inheritance group not found")
 
-        return db_inheritance
+        return {
+            "id": db_inheritance.id,
+            "inheritance_name": db_inheritance.name
+        }
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e)) 
 
-@In.post("/create-inheritance")
-async def create_inheritance_group(
-    session: SessionDep,
-    current_user: UserDep,
-    tenant : str,
-    name: str = Body(...), 
-    products: int = Body(...),
-    category: int = Body(...)
+# @In.post("/add-inheritance/")
+# async def add_inheritance_group(             
+#     session: SessionDep,
+#     current_user: UserDep,
+#     tenant: str,
+#     inheritance_name: str = Body(...),
+#     category: int | str = Body(...),
+#     product: int | str = Body(...),
+# ):
+#     # Initialize status variables
+#     category_link_status = {"message": "Category processing failed"}
+#     product_link_status = {"message": "Product processing failed"}
 
 
-):
-    """
-    """
-    try:
-        if not check_permission(
-            session, "Create", ["Inheritance", "Administrative"], current_user
-            ):
-            raise HTTPException(
-                status_code=403, detail="You Do not have the required privilege"
-            )
-        
-        new_group = InheritanceGroup(
-            name=name
-
-            )
-        session.add(new_group)
-        session.commit()
-        
-        return {"message": "Inheritance group created"}
+#     check_inheritance_exist = session.exec(
+#         select(InheritanceGroup).where(InheritanceGroup.name == inheritance_name)
+#     ).first()
+#     if check_inheritance_exist:
+#         raise HTTPException (status_code=400, 
+#                             detail= 'inheritance alredy exist')
     
-    except Exception as e:
-        traceback.print_exc()
-        raise HTTPException(status_code=400, detail=str(e))
+            
+#     new_group = InheritanceGroup(
+#             name=inheritance_name)
+    
+#     session.add(new_group)
+#     session.commit()
+#     # Category processing
+#     check_category = session.exec(
+#         select(Category).where(Category.id == category)
+#     ).first()
+    
+#     if check_category:
+#         existing_link = session.exec(
+#             select(CategoryLink).where(
+#                 CategoryLink.inheritance_group_id == new_group.id,
+#                 CategoryLink.category_id == category
+#             )
+#         ).first()
+        
+#         if existing_link:
+#             category_link_status = {"message": "Category already linked to inheritance group"}
+#         else:
+#             new_category_link = CategoryLink(
+#                 inheritance_group_id= new_group.id,
+#                 category_id=category
+#             )
+#             session.add(new_category_link)
+#             session.commit()
+#             session.refresh(new_category_link)
+#             category_link_status = {"message": "Category linked successfully"}
+#     else:
+#         category_link_status = {"message": "Category not defined"}
 
+#     # Product processing
+#     check_product = session.exec(
+#         select(Product).where(Product.id == product)
+#     ).first()
+    
+#     if check_product:
+#         existing_product_link = session.exec(
+#             select(ProductLink).where(
+#                 ProductLink.inheritance_group_id == new_group.id,
+#                 ProductLink.product_id == product
+#             )
+#         ).first()
+
+#         if existing_product_link:
+#             product_link_status = {"message": "Product already linked to inheritance group"}
+#         else:
+#             new_product_link = ProductLink(
+#                 inheritance_group_id=new_group.id,
+#                 product_id=product
+#             )
+#             session.add(new_product_link)
+#             session.commit()
+#             session.refresh(new_product_link)
+#             product_link_status = {"message": "Product linked successfully"}
+#     else:
+#         product_link_status = {"message": "Product not defined"}
+
+#     return {"message": {"Category": category_link_status, "Product": product_link_status}}
 
 @In.post("/add-inheritance/")
 async def add_inheritance_group(             
     session: SessionDep,
     current_user: UserDep,
     tenant: str,
-    inheritance_id: int = Body(...),
-    category_id: int | str = Body(...),
-    product_id: int | str = Body(...),
+    name: str = Body(...),
+    category: int | str = Body(None),  # Default to None if not provided
+    product: int | str = Body(None),   # Default to None if not provided
 ):
-    inheritance_group = session.exec(
-            select(Organization.inheritance_group).where(Organization.id == current_user.organization_id)
+    try:
+        if not check_permission(
+            session, "Create", "Inheritance", current_user
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
+        # Initialize status variables
+        category_link_status = {"message": "Category not processed"}
+        product_link_status = {"message": "Product not processed"}
+
+        # Check if inheritance group already exists
+        check_inheritance_exist = session.exec(
+            select(InheritanceGroup).where(InheritanceGroup.name == name)
         ).first()
-    if not inheritance_group:
-        raise HTTPException(status_code=404, detail="Inheritance group not found")
-    
-    if category_id:
-        check_category = session.exec(
-                select(Category).where(Category.id == category_id)
+
+        if check_inheritance_exist:
+            raise HTTPException(status_code=400, detail="Inheritance already exists")
+        
+        # Create a new inheritance group
+        new_group = InheritanceGroup(name=name)
+        session.add(new_group)
+        session.commit()
+
+        # Category processing (only if provided)
+        if category:
+            check_category = session.exec(
+                select(Category).where(Category.id == category)
             ).first()
-        if check_category.organization_id != None:
-            category_link_status = add_category_link(session,inheritance_id, category_id)
-    else:
-        category_link_status = {"message": "catagory not defined"}
-    if product_id:
 
-        check_product = session.exec(
-                select(Product).where(Product.id == product_id)
+            if check_category:
+                existing_link = session.exec(
+                    select(CategoryLink).where(
+                        CategoryLink.inheritance_group_id == new_group.id,
+                        CategoryLink.category_id == category
+                    )
+                ).first()
+
+                if existing_link:
+                    category_link_status = {"message": "Category already linked to inheritance group"}
+                else:
+                    new_category_link = CategoryLink(
+                        inheritance_group_id=new_group.id,
+                        category_id=category
+                    )
+                    session.add(new_category_link)
+                    session.commit()
+                    session.refresh(new_category_link)
+                    category_link_status = {"message": "Category linked successfully"}
+            else:
+                category_link_status = {"message": "Category not defined"}
+
+        # Product processing (only if provided)
+        if product:
+            check_product = session.exec(
+                select(Product).where(Product.id == product)
             ).first()
-        if check_product.organization_id != None:
-            product_link_status = add_product_link(session, inheritance_id, product_id)
-    else:
-        product_link_status =  {"message": "product not defined"}
 
-    
-  
-    return {"message": {"Category": category_link_status, "Product": product_link_status}}
+            if check_product:
+                existing_product_link = session.exec(
+                    select(ProductLink).where(
+                        ProductLink.inheritance_group_id == new_group.id,
+                        ProductLink.product_id == product
+                    )
+                ).first()
 
-@In.put("/update-inheritance/{inheritance_id}")
+                if existing_product_link:
+                    product_link_status = {"message": "Product already linked to inheritance group"}
+                else:
+                    new_product_link = ProductLink(
+                        inheritance_group_id=new_group.id,
+                        product_id=product
+                    )
+                    session.add(new_product_link)
+                    session.commit()
+                    session.refresh(new_product_link)
+                    product_link_status = {"message": "Product linked successfully"}
+            else:
+                product_link_status = {"message": "Product not defined"}
+
+        return {"message": {"Category": category_link_status, "Product": product_link_status}}
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@In.put("/update-inheritance/")
 async def update_inheritance_group(
     session: SessionDep,
     current_user: UserDep,
-    inheritance_id: int, 
+    tenant: str,
+    inheritance_id: int = Body(...), 
     new_inheritance_name: str = Body(...)
 ):
     try:
         if not check_permission(
-                session, "Read",[ "Inheritance", "Administrative"], current_user
-                ):
-                raise HTTPException(
-                    status_code=403, detail="You Do not have the required privilege"
-                )   
+            session, "Update",[ "Inheritance", "Administrative"], current_user
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )  
+         
         db_inheritance = session.exec(
                 select(InheritanceGroup).where(InheritanceGroup.id == inheritance_id)
-            ).first()  
+            ).first()
         if not db_inheritance:
             raise HTTPException(status_code=404, detail="Inheritance group not found")
+        
         db_inheritance.name = new_inheritance_name
         session.add(db_inheritance)
         session.commit()
         session.refresh(db_inheritance) 
 
-        return {
-                    "message": "Product updated successfully",
-            }   
+        return {"message": "Product updated successfully" }   
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
     
     
+# @In.delete("/delete-inheritance/{inheritance_id}")
+# async def delete_inheritance_group(
+#     session: SessionDep,
+#     current_user: UserDep,
+#     inheritance_id: int, 
+# ):
+#     if not check_permission(
+#             session, "Read",[ "Inheritance", "Administrative"], current_user
+#             ):
+#             raise HTTPException(
+#                 status_code=403, detail="You Do not have the required privilege"
+#             )   
+#     db_inheritance = session.exec(
+#             select(InheritanceGroup).where(InheritanceGroup.id == inheritance_id)
+#         ).first()
+#     if not db_inheritance:
+#         raise HTTPException(status_code=404, detail="Inheritance group not found")
+
+#     session.delete(db_inheritance)
+#     session.commit()
+#     return {"message": "Inheritance group deleted"}
+
 @In.delete("/delete-inheritance/{inheritance_id}")
 async def delete_inheritance_group(
     session: SessionDep,
@@ -209,17 +345,31 @@ async def delete_inheritance_group(
     inheritance_id: int, 
 ):
     if not check_permission(
-            session, "Read",[ "Inheritance", "Administrative"], current_user
-            ):
-            raise HTTPException(
-                status_code=403, detail="You Do not have the required privilege"
-            )   
+        session, "Read", ["Inheritance", "Administrative"], current_user
+    ):
+        raise HTTPException(
+            status_code=403, detail="You do not have the required privilege"
+        )   
+
     db_inheritance = session.exec(
-            select(InheritanceGroup).where(InheritanceGroup.id == inheritance_id)
-        ).first()
+        select(InheritanceGroup).where(InheritanceGroup.id == inheritance_id)
+    ).first()
+
     if not db_inheritance:
         raise HTTPException(status_code=404, detail="Inheritance group not found")
 
+    # Delete associated category links
+    session.exec(
+        delete(CategoryLink).where(CategoryLink.inheritance_group_id == inheritance_id)
+    )
+
+    # Delete associated product links
+    session.exec(
+        delete(ProductLink).where(ProductLink.inheritance_group_id == inheritance_id)
+    )
+
+    # Delete the inheritance group itself
     session.delete(db_inheritance)
     session.commit()
-    return {"message": "Inheritance group deleted"}
+
+    return {"message": "Inheritance group and related links deleted successfully"}
