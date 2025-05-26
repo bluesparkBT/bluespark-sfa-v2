@@ -11,7 +11,7 @@ from models.Account import (
 from models.Address import Address, Geolocation
 from models.Product import Category, Product
 from models.Inheritance import InheritanceGroup, ProductLink, CategoryLink
-from models.Warehouse import Stock, StockType, Warehouse, Vehicle
+from models.Warehouse import Stock, StockType, Warehouse, Vehicle, WarehouseGroup, WarehouseGroupLink, WarehouseStoreAdminLink
 from utils.get_hierarchy import get_organization_ids_by_scope_group
 from utils.auth_util import get_current_user
 from sqlmodel import Session, select
@@ -128,13 +128,28 @@ def fetch_address_id_and_name(session: SessionDep, current_user: UserDep):
     return {row[0]: row[1] for row in address_row}
 
 
-def fetch_warehouse_id_and_name(session: SessionDep, current_user: UserDep):
+def fetch_admin_warehouse_id_and_name(session: SessionDep, current_user: UserDep):
     organization_ids = get_organization_ids_by_scope_group(session, current_user)
 
     warehouse_row = session.exec(
         select(Warehouse.id, Warehouse.warehouse_name)
         .where(Warehouse.organization_id.in_(organization_ids))
-        ).all()
+        .distinct()
+    ).all()
+    warehouses = {row[0]: row[1] for row in warehouse_row}
+    return warehouses
+
+def fetch_warehouse_id_and_name(session: SessionDep, current_user: UserDep):
+    organization_ids = get_organization_ids_by_scope_group(session, current_user)
+
+    warehouse_row = session.exec(
+        select(Warehouse.id, Warehouse.warehouse_name)
+        .join(WarehouseGroupLink, WarehouseGroupLink.warehouse_id == Warehouse.id)
+        .join(WarehouseStoreAdminLink, WarehouseStoreAdminLink.warehouse_group_id == WarehouseGroupLink.warehouse_group_id)
+        .where(WarehouseStoreAdminLink.user_id == current_user.id)  
+        .where(Warehouse.organization_id.in_(organization_ids))
+        .distinct()
+    ).all()
     warehouses = {row[0]: row[1] for row in warehouse_row}
     return warehouses
 
@@ -144,7 +159,10 @@ def fetch_stocks_id_and_name(session: SessionDep, current_user: UserDep):
         select(Stock.id, Stock.stock_type, Product.name)
         .join(Warehouse, Warehouse.id == Stock.warehouse_id)
         .join(Product, Product.id == Stock.product_id)
-        .where(Warehouse.organization_id.in_(organization_ids))
+        .join(WarehouseGroupLink, WarehouseGroupLink.warehouse_id == Warehouse.id)
+        .join(WarehouseStoreAdminLink, WarehouseStoreAdminLink.warehouse_group_id == WarehouseGroupLink.warehouse_group_id)
+        .where(WarehouseStoreAdminLink.user_id == current_user.id) 
+        .where(Warehouse.organization_id.in_(organization_ids)).distinct()
     ).all()
 
     print(stock_row)
@@ -221,3 +239,17 @@ def add_product_link(session: SessionDep, inheritance_group_id: int, product_id:
     session.refresh(new_link)
 
     return {"message": "product linked successfully", "link": new_link}
+
+def fetch_warehouse_group_id_and_name(session: SessionDep, current_user: UserDep):
+    organization_ids = get_organization_ids_by_scope_group(session, current_user)
+    group_row = session.exec(
+        select(WarehouseGroup.id, WarehouseGroup.name).where(WarehouseGroup.organization_id.in_(organization_ids))
+    ).all()
+
+    print(group_row)
+
+    groups = {
+        row[0] :row[1]
+        for row in group_row
+    }
+    return groups

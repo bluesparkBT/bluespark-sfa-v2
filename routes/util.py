@@ -101,10 +101,11 @@ async def get_form_fields_warehouse(current_user: UserDep, endpoint: str) -> lis
     elif endpoint == "Deposit":
         return ["id"]
     elif endpoint == "Warehouse":
-        return ["id" ]
+        return ["id" , "min_access_policy"]
     elif endpoint == "Warehouse Stop":
         return [
             "id",
-            "confirmed"]
+            "confirmed",
+            "isRequest"]
     else:
         return []

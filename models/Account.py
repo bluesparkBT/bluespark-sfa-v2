@@ -1,4 +1,3 @@
-from models.Warehouse import WarehouseStoreAdminLink
 from sqlmodel import SQLModel, Field, Relationship
 from enum import Enum
 from datetime import  datetime
@@ -13,6 +12,11 @@ class ScopeGroupLink(SQLModel, table=True):
     scope_group_id: int = Field(foreign_key="scope_group.id", index=True)
     organization_id: int = Field(foreign_key="organization.id", index=True)
 
+class WarehouseStoreAdminLink(SQLModel, table=True):
+    __tablename__ = "warehouse_store_admin_link"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="users.id", index=True)
+    warehouse_group_id: int = Field(foreign_key="warehouse_group.id", index=True)
 
 class ScopeGroup(SQLModel, table=True):
     __tablename__ = "scope_group"
@@ -165,7 +169,7 @@ class User(SQLModel, table=True):
     id_type: Optional[IdType] = Field(default=None)
     id_number: Optional[str] = Field(default=None)    
     address_id: Optional[int] = Field(default=None, foreign_key="address.id", index=True)
-    warehouses: Optional[List["Warehouse"]] = Relationship(back_populates="store_admins", link_model=WarehouseStoreAdminLink)
+    warehouse_groups: Optional[List["WarehouseGroup"]] = Relationship(back_populates="store_admins", link_model=WarehouseStoreAdminLink)
     requester_warehouse_stops: List["WarehouseStop"] = Relationship(
         back_populates="requester",
         sa_relationship_kwargs={"foreign_keys": "[WarehouseStop.requester_id]"}

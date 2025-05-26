@@ -1,3 +1,4 @@
+from models.Account import AccessPolicy, WarehouseStoreAdminLink
 from sqlmodel import SQLModel, Field, Relationship
 from enum import Enum   
 from typing import Optional, List
@@ -27,12 +28,26 @@ class RequestStatus(str, Enum):
    rejected = "Rejected"
 
 
-class WarehouseStoreAdminLink(SQLModel, table=True):
-    __tablename__ = "warehouse_store_admin_link"
+
+
+class WarehouseGroupLink(SQLModel, table=True):
+    __tablename__ = "warehouse_group_link"
 
     id: Optional[int] = Field(default=None, primary_key=True)
     warehouse_id: int = Field(foreign_key="warehouse.id", index=True)
-    user_id: int = Field(foreign_key="users.id", index=True)
+    warehouse_group_id: int = Field(foreign_key="warehouse_group.id", index=True)
+
+class WarehouseGroup(SQLModel, table=True):
+    __tablename__ = "warehouse_group"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str = Field(index=True)
+    access_policy: AccessPolicy 
+    organization_id: int = Field(foreign_key="organization.id")
+    warehouses: List["Warehouse"] = Relationship(back_populates="warehouse_groups", link_model=WarehouseGroupLink)
+    store_admins: List["User"] = Relationship(back_populates="warehouse_groups", link_model=WarehouseStoreAdminLink)
+
+
 
 class Warehouse(SQLModel, table=True):
     __tablename__ = "warehouse"
@@ -40,8 +55,10 @@ class Warehouse(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     warehouse_name: str = Field(index=True)
     organization_id: int = Field(foreign_key="organization.id")
+    address_id: Optional[int] = Field(foreign_key="address.id", default=None)
+    landmark: Optional[str] = Field(default=None) 
     location_id: int = Field(foreign_key="geolocation.id")
-    store_admins: List["User"] = Relationship(back_populates="warehouses", link_model=WarehouseStoreAdminLink)
+    warehouse_groups: List["WarehouseGroup"] = Relationship(back_populates="warehouses", link_model=WarehouseGroupLink)
     stocks: Optional[List["Stock"]] = Relationship(back_populates="warehouse")
     organization: Optional["Organization"] = Relationship(back_populates="warehouses")
 
@@ -122,12 +139,6 @@ class WarehouseStop(SQLModel, table=True):
         back_populates="approver_warehouse_stops"
     )
     stock: Optional["Stock"] = Relationship(back_populates="warehouse_stops")
-
-
-
-
-    
-
 
 
 

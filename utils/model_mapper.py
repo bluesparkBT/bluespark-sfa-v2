@@ -74,11 +74,23 @@ MODEL_HTML_TYPES = {
         "id":"hidden",
         "warehouse_name":"text",
         "organization":"select",
-        "location":"text"
+        "address": "select",
+        "landmark": "text",
+        "latitude":"number",
+        "longitude": "number",
     },
-     "warehouse_storeadmin":{
-        "warehouse_id":"hidden",
-        "store_admin": "checkbox"
+      "warehouse-storeadmin-add":{
+        "warehouse_group":"select",
+        "store_admins": "select multiple"
+    },
+     "warehouse-storeadmin-update":{
+        "warehouse_group":"hidden",
+        "store_admins": "select multiple"
+    },
+    "warehouse-group":{
+        "name": "text",
+        "access_policy": "select",
+        "warehouses": "select multiple"
     },
     "stock":{
         "id":"hidden",

@@ -2,9 +2,10 @@
 from typing import Annotated, List, Dict, Any
 from datetime import timedelta, date, datetime
 from fastapi import APIRouter, HTTPException, Body, status, Depends, Path
+from models.Warehouse import WarehouseGroup
 from sqlmodel import select, Session
 from db import get_session
-from models.Account import User, ScopeGroup, ScopeGroupLink, Organization, OrganizationType, RoleModulePermission, Scope, Role, AccessPolicy
+from models.Account import User, ScopeGroup, ScopeGroupLink, Organization, OrganizationType, RoleModulePermission, Scope, Role, AccessPolicy, WarehouseStoreAdminLink
 from models.Account import ModuleName as modules
 from utils.auth_util import verify_password, create_access_token, get_password_hash
 from utils.util_functions import validate_name, validate_email, validate_phone_number, parse_enum
@@ -501,6 +502,7 @@ async def create_tenant(
             modules.territory.value,
             modules.route.value,
             modules.address.value,
+            modules.inventory_management.value
             
             
         ]
@@ -529,7 +531,27 @@ async def create_tenant(
         session.add(tenant_admin)
         session.commit()
         session.refresh(tenant_admin)
+
+        warehouse_group = WarehouseGroup(
+            id = None,
+            name = f"{tenant_name} Admin Warehouse Group",
+            access_policy= AccessPolicy.manage,
+            organization_id=tenant.id
+        )
         
+        session.add(warehouse_group)
+        session.commit()
+        session.refresh(warehouse_group)
+
+        link = WarehouseStoreAdminLink(
+                id=None,
+                user_id = tenant_admin.id,
+                warehouse_group_id = warehouse_group.id,
+            )
+        session.add(link)
+        session.commit()
+        session.refresh(link)
+
         return {
             "message": "Tenant and system admin created successfully",
             "tenant": tenant_name,
