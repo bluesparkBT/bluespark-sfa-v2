@@ -583,7 +583,7 @@ async def form_scope_organization(
         org = {
                "id": "",
                "name":"", 
-               "children": [get_child_organization(session, current_user.organization_id)]
+               "hidden": [get_child_organization(session, current_user.organization_id)]
             }
             
         print(org)
