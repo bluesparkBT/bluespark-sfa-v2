@@ -1,32 +1,37 @@
-from typing import Optional
+from typing import Optional, List
 from sqlmodel import SQLModel, Field, Relationship
 from datetime import date
+from models.Account import Organization
 
 class ClassificationGroup(SQLModel, table=True):
     __tablename__ = "classification_group"
 
     id: Optional[int] = Field(default=None, primary_key=True)
+    # For example: "Gold", "Silver", "Platinum"
     name: str = Field(index=True)
-    description: str
-    organization_id: int = Field(foreign_key="organization.id")  # Reference to Organization
+    description: Optional[str] = Field(default=None)
+    # organization_id: int = Field(foreign_key="organization.id")  # Reference to Organization
+    organization: Optional[Organization] = Relationship(back_populates="classification_groups")
 
-    # Optional references
-    #point_of_sale_id: Optional[int] = Field(default=None, foreign_key="point_of_sale.id")
+
+    point_of_sale_id: Optional[int] = Field(default=None, foreign_key="point_of_sale.id")
     territory_id: Optional[int] = Field(default=None, foreign_key="territory.id")
-    # route_id: Optional[int] = Field(default=None, foreign_key="route.id")
+    route_id: Optional[int] = Field(default=None, foreign_key="route.id")
 
-    # Relationship with CustomerDiscount
-    customer_discounts: list["CustomerDiscount"] = Relationship(back_populates="classification_group")
+    # A classification group can have many discount entries.
+    customer_discounts: List["CustomerDiscount"] = Relationship(back_populates="classification_group")
 
 
 class CustomerDiscount(SQLModel, table=True):
     __tablename__ = "customer_discount"
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    start_date: date = Field(default=None)    
-    end_date: date = Field(default=None)
-    discount: float
-    image: Optional[str] = Field(default=None)  # File storage for an image
-    
-    classification_group_id: int = Field(foreign_key="classification_group.id")  # Reference to ClassificationGroup
+    # Defines the validity period for the discount
+    start_date: date = Field()
+    end_date: date = Field()
+    # The discount amount or percentage applied to customers of the classification.
+    discount: float = Field(description="Discount amount or percentage applicable.")
+
+    # Each discount references the classification group to which it applies.
+    classification_group_id: int = Field(foreign_key="classification_group.id")
     classification_group: Optional[ClassificationGroup] = Relationship(back_populates="customer_discounts")
