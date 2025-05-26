@@ -275,13 +275,14 @@ async def create_organization(
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-        existing_tenant = session.exec(select(Organization).where(Organization.organization_name == organization_name)).first()
+        # existing_tenant = session.exec(select(Organization).where(Organization.organization_name == organization_name)).first()
 
-        if existing_tenant is not None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Company already registered",
-        )
+        # if existing_tenant is not None:
+        #     raise HTTPException(
+        #         status_code=status.HTTP_400_BAD_REQUEST,
+        #         detail="Company already registered",
+        # )
+        
         #Check Validity
         if inheritance_group == "":
             inheritance_group = None
