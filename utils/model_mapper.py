@@ -14,6 +14,7 @@ MODEL_HTML_TYPES = {
         "landmark": "text",
         "latitude": "text",
         "longitude": "text",
+        "hidden": "text"
     },
     "role":{
         "id":"hidden",
@@ -28,12 +29,9 @@ MODEL_HTML_TYPES = {
     "scope_group":{
         "id":"hidden",
         "name":"text",
+        "hidden": "hierarchical-checkbox"
     },
-    "scope_organization":{
-        "scope_id":"hidden",
-        "organizations": "hierarchical-checkbox"
-
-    },
+    
     "user": {
         "id": "hidden",
         "full_name": "text",
