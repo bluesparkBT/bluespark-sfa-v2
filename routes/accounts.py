@@ -251,12 +251,12 @@ async def create_user(
 
     full_name: str = Body(...),
     username: str = Body(...),
-    email: str = Body(...),
+    email: str | None = Body(...),
     role: int = Body(...),
     scope: str = Body(...),
     scope_group: int = Body(...),
     organization: int = Body(...),
-    phone_number:Optional [str] = Body(None),
+    phone_number:Optional [str | None] = Body(None),
     gender: Optional[str] = Body(None),
     address : Optional[int| str| None] = Body(default=None),
             
@@ -281,12 +281,12 @@ async def create_user(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Fullname is not valid",
         )
-        elif validate_email(email) == False:
+        elif email is not None and validate_email(email) == False:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Email is not valid",
         )
-        elif validate_phone_number(phone_number) == False:
+        elif phone_number is not None and validate_phone_number(phone_number) == False:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Phone number is not valid",
@@ -386,12 +386,12 @@ async def update_user(
     id: int = Body(...),
     full_name: str = Body(...),
     username: str = Body(...),
-    email: str = Body(...),
+    email: Optional[str | None] = Body(...),
     role: int = Body(...),
     scope: str = Body(...),
     scope_group: int = Body(...),
     organization: int = Body(...),
-    phone_number: Optional[str] = Body(None),
+    phone_number: Optional[str| None] = Body(None),
     gender: Optional[str] = Body(None),
     salary: float = Body(...),
     position: str = Body(...),
@@ -422,18 +422,16 @@ async def update_user(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Fullname is not valid",
             )
-
-        elif not validate_email(email):
+        elif email is not None and validate_email(email) == False:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Email is not valid",
-            )
-
-        elif phone_number not in (None, "") and not validate_phone_number(phone_number):
+        )
+        elif phone_number is not None and validate_phone_number(phone_number) == False:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Phone number is not valid",
-            )
+        )
             
         if address == "" or address is None:
             address = None

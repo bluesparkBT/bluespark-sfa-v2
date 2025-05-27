@@ -110,7 +110,6 @@ MODEL_HTML_TYPES = {
         "description": "textarea",
         "image": "file",
         "brand": "text",
-        "code": "text",
         "price": "number",
         "unit": "select",
         "category": "select",

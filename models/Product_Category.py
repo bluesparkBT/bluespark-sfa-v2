@@ -61,7 +61,6 @@ class Product(SQLModel, table=True):
     description: Optional[str] = Field(default=None)
     image: Optional[str] = Field(default=None)
     brand: Optional[str] = Field(default=None, index=True)
-    code: str = Field(default=None, index=True)
     price: float = Field(default=None)
     unit: Product_units = Field(default=None)
     category_id: Optional[int] = Field(default=None, foreign_key="category.id", index=True)

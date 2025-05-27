@@ -63,7 +63,6 @@ def get_products(
                 "SKU": product.sku,
                 "description": product.description,
                 "Brand": product.brand,
-                "Code": product.code,
                 "Price": product.price,
                 "Unit": product.unit,
                 "Category": product_category.name if product_category else "N/A",
@@ -109,7 +108,6 @@ def get_product(
             "SKU": db_product.sku,
             "description": db_product.description,
             "Brand": db_product.brand,
-            "Code": db_product.code,
             "Price": db_product.price,
             "Unit": db_product.unit,
         })
@@ -147,7 +145,6 @@ def get_product_form(
             "description": "",
             "image": "",
             "brand": "",
-            "code": "",
             "price": "",
             "unit": {i.value: i.value for i in Product_units},
             "category": fetch_category_id_and_name(session, current_user) ,
@@ -173,7 +170,6 @@ def create_product(
     description: str= Body(...),
     image: str = Body(...),
     brand: str = Body(...),  
-    code: str = Body(...),
     price: float = Body(...),
     unit: str = Body(...)
 ):
@@ -189,8 +185,7 @@ def create_product(
         organization_ids = get_organization_ids_by_scope_group(session, current_user)
         db_category_code = session.exec(
             select(Product)
-            .where(Product.organization_id.in_(organization_ids),
-                   Product.code == code, Product.name == name, Product.sku == sku)
+            .where(Product.organization_id.in_(organization_ids), Product.name == name, Product.sku == sku)
             ).first()
         if db_category_code:
             raise HTTPException(status_code=400, 
@@ -209,7 +204,6 @@ def create_product(
             brand=brand,
             category_id=category_id,
             organization_id=organization,
-            code=code,
             price=price,
             unit=unit,  
         )
@@ -237,7 +231,6 @@ def update_product(
     description: str= Body(...),
     image: str = Body(...),
     brand: str = Body(...),  
-    code: str = Body(...),
     price: float = Body(...),
     unit: str = Body(...)
 ):
@@ -268,7 +261,6 @@ def update_product(
         if image:
             selected_product.image = image
         selected_product.brand = brand
-        selected_product.code = code
         selected_product.price = price
         selected_product.unit = unit
         selected_product.category_id = category
