@@ -2,16 +2,17 @@ from typing import Optional, List
 from sqlmodel import SQLModel, Field, Relationship
 from datetime import date
 from models.Account import Organization
+from models.PointOfSale import PointOfSale
+from models.Territory import Territory
 
 class ClassificationGroup(SQLModel, table=True):
     __tablename__ = "classification_group"
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    # For example: "Gold", "Silver", "Platinum"
     name: str = Field(index=True)
     description: Optional[str] = Field(default=None)
-    # organization_id: int = Field(foreign_key="organization.id")  # Reference to Organization
-    organization: Optional[Organization] = Relationship(back_populates="classification_groups")
+    organization_id: int = Field(foreign_key="organization.id")  # Reference to Organization
+    organization: Organization = Relationship(back_populates="classification_groups")
 
 
     point_of_sale_id: Optional[int] = Field(default=None, foreign_key="point_of_sale.id")
