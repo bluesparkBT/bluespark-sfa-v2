@@ -10,7 +10,7 @@ from utils.auth_util import verify_password, create_access_token, get_password_h
 from utils.util_functions import validate_name, validate_email, validate_phone_number, parse_enum
 from utils.auth_util import get_current_user, check_permission, generate_random_password, get_tenant_hash, extract_username, add_organization_path
 from utils.model_converter_util import get_html_types
-from utils.get_hierarchy import get_child_organization
+from utils.form_db_fetch import get_organization_ids_by_scope_group
 from utils.domain_util import getPath
 import traceback
 
@@ -306,7 +306,9 @@ async def get_tenants(
                 status_code=403, detail="You do not have the required privilege"
             )
         tenant_list = []
-        
+        #add a filter to get only companies the super admin has scopeGroup to manage
+        organization_ids = get_organization_ids_by_scope_group(session, current_user)
+
         tenants = session.exec(
             select(Organization).where(
                 (Organization.organization_type == OrganizationType.company)
@@ -315,12 +317,12 @@ async def get_tenants(
         # print(tenants)
         for tenant in  tenants:
             tenant_list.append({
-                    "id": tenant.id,
-                    "tenant": tenant.organization_name,
-                    "owner": tenant.owner_name,
-                    "description": tenant.description,
-                    "logo": tenant.logo_image,
-                    "domain": f"{Domain}/{tenant.tenant_hashed}"                }
+                "id": tenant.id,
+                "tenant": tenant.organization_name,
+                "owner": tenant.owner_name,
+                "description": tenant.description,
+                "logo": tenant.logo_image,
+                "domain": f"{Domain}/{tenant.tenant_hashed}"                }
             )
 
         return tenant_list

@@ -156,6 +156,17 @@ def fetch_point_of_sale_id_and_name(session: SessionDep, current_user: UserDep):
     pos = {row[0]: row[1] for row in pos_row if row[0] is not None}
     return pos 
 
+def fetch_territory_id_and_name(session: SessionDep, current_user: UserDep):
+    organization_ids = get_organization_ids_by_scope_group(session, current_user)
+
+    territory_row = session.exec(
+        select(Organization.territory_id, Organization.territory_name)
+        .where(Organization.id.in_(organization_ids))
+    ).all()
+
+    territories = {row[0]: row[1] for row in territory_row if row[0] is not None}
+    return territories
+
 def fetch_warehouse_id_and_name(session: SessionDep, current_user: UserDep):
     organization_ids = get_organization_ids_by_scope_group(session, current_user)
 
