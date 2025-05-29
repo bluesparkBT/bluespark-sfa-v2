@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import Depends, HTTPException, status, Path, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jwt.exceptions import InvalidTokenError
-from sqlmodel import select
+from sqlmodel import select, Session
 from models.Account import User
 from db import get_session
 
@@ -17,6 +17,12 @@ import traceback
 import string
 import random
 import re
+
+from utils.get_hierarchy import get_organization_ids_by_scope_group
+# from utils.form_db_fetch import fetch_id_and_name
+
+
+
 
 security = HTTPBearer()
 SECRET_KEY = "secret_here"
@@ -133,11 +139,13 @@ def check_permission(
         bool: True if the user has access to any of the given modules.
     """
     try:
-        print(f"Checking permission for user_id={user.id}, username={user.username}, modules={endpoint_groups}, policy={policy_type}")
-
         # Make sure it's a list
         if isinstance(endpoint_groups, str):
             endpoint_groups = [endpoint_groups]
+        elif not endpoint_groups:
+            raise HTTPException(
+                status_code=404, detail="Module Access not found"
+            )
 
         user = session.exec(select(User).where(User.id == user.id)).first()
         if not user or not user.role_id:
@@ -196,3 +204,50 @@ def check_permission(
         print(f"Error in check_permission: {e}")
         traceback.print_exc()
         return False
+
+
+def check_permission_and_scope(
+    session: Session,
+    policy_type: str,
+    model_class: Union[str, List[str], type],
+    current_user: User,
+    endpoint_group: str = None,
+):
+    try:
+        # policy_type = custom_util[RequestType(request_type.upper())]
+
+        # Infer endpoint_group from model_class if not passed
+        if endpoint_group is None:
+            if isinstance(model_class, list) and model_class:
+                endpoint_group = model_class[0]
+            elif isinstance(model_class, str):
+                endpoint_group = model_class
+            elif hasattr(model_class, "__name__"):
+                endpoint_group = model_class.__name__
+            else:
+                raise ValueError("Cannot infer endpoint group from model_class")
+
+        print("parameters passed to check_permission:", policy_type, endpoint_group)
+
+        if not check_permission(
+            session,
+            policy_type=policy_type,
+            endpoint_groups=endpoint_group,
+            user=current_user,
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail="You do not have the required privilege",
+            )
+
+        organization_ids = get_organization_ids_by_scope_group(session, current_user)
+
+        return {
+            "policy_type": policy_type,
+            "module": endpoint_group,
+            "organization_ids": organization_ids,
+        }
+
+    except KeyError:
+        traceback.print_exc()
+        raise HTTPException(status_code=400, detail="Invalid request type or model")

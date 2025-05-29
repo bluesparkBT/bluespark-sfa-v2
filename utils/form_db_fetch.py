@@ -5,7 +5,7 @@ from db import  get_session
 from models.Account import (Organization, User, Role, ScopeGroup, ScopeGroupLink)
 from models.Address import Address, Geolocation
 from models.Product_Category import Category, Product, InheritanceGroup, ProductLink, CategoryLink
-from models.Warehouse import Stock, StockType, Warehouse, Vehicle
+#from models.Warehouse import Stock, StockType, Warehouse, Vehicle
 from utils.get_hierarchy import get_organization_ids_by_scope_group
 from utils.auth_util import get_current_user
 from sqlmodel import Session, select
@@ -13,6 +13,15 @@ from sqlmodel import Session, select
 SessionDep = Annotated[Session, Depends(get_session)]
 UserDep = Annotated[dict, Depends(get_current_user)]
 
+
+def fetch_id_and_name(session: Session, current_user: User, model_class: type):
+    organization_ids = get_organization_ids_by_scope_group(session, current_user)
+
+    stmt = select(model_class.id, model_class.name).where(
+        getattr(model_class, "organization_id").in_(organization_ids)
+    )
+    rows = session.exec(stmt).all()
+    return {row[0]: row[1] for row in rows}
 
 def fetch_user_id_and_name(session: SessionDep, current_user: UserDep):
     organization_ids = get_organization_ids_by_scope_group(session, current_user)
@@ -156,17 +165,6 @@ def fetch_point_of_sale_id_and_name(session: SessionDep, current_user: UserDep):
     pos = {row[0]: row[1] for row in pos_row if row[0] is not None}
     return pos 
 
-def fetch_territory_id_and_name(session: SessionDep, current_user: UserDep):
-    organization_ids = get_organization_ids_by_scope_group(session, current_user)
-
-    territory_row = session.exec(
-        select(Organization.territory_id, Organization.territory_name)
-        .where(Organization.id.in_(organization_ids))
-    ).all()
-
-    territories = {row[0]: row[1] for row in territory_row if row[0] is not None}
-    return territories
-
 def fetch_warehouse_id_and_name(session: SessionDep, current_user: UserDep):
     organization_ids = get_organization_ids_by_scope_group(session, current_user)
 
@@ -205,12 +203,6 @@ def fetch_vehicle_id_and_name(session: SessionDep, current_user: UserDep):
     return vehicles
 
 
-def convert_promotional(stock_type: StockType):
-    if stock_type == StockType.promotional:
-        return "(Promotional)"
-    else:
-        return ""
-    
 def add_category_link(session: SessionDep, inheritance_group_id: int, category_id: int):
 
 # Check if the link already exists to prevent duplicates
@@ -260,3 +252,32 @@ def add_product_link(session: SessionDep, inheritance_group_id: int, product_id:
     session.refresh(new_link)
 
     return {"message": "product linked successfully", "link": new_link}
+    
+def get_user_inheritance_group(session, current_user):
+    """
+    Retrieves the inheritance group associated with the current user's organization.
+
+    Args:
+        session: SQLModel session instance.
+        current_user: User instance with an organization_id.
+
+    Returns:
+        inherited_group: The InheritanceGroup object if found, otherwise None.
+        inherited_products: List of inherited products if the group exists, otherwise an empty list.
+    """
+    inherited_group_id = session.exec(
+        select(Organization.inheritance_group).where(
+            Organization.id == current_user.organization_id
+        )
+    ).first()
+
+    if not inherited_group_id:
+        return None, []
+
+    inherited_group = session.exec(
+        select(InheritanceGroup).where(InheritanceGroup.id == inherited_group_id)
+    ).first()
+
+    if inherited_group:
+        return inherited_group, inherited_group.product
+    return None, []

@@ -1,6 +1,7 @@
-from typing import Optional
+from typing import Optional, List
 from sqlmodel import SQLModel, Field, Relationship
 from enum import Enum
+from models.Product_Category import PointOfSaleLink
 
 # Define Enum for status
 class POSStatus(str, Enum):
@@ -23,7 +24,7 @@ class PointOfSale(SQLModel, table=True):
     # Relationships
     outlet: Optional["Outlet"] = Relationship(back_populates="point_of_sale")
     walk_in_customer: Optional["WalkInCustomer"] = Relationship(back_populates="point_of_sale")
-
+    inheritance_groups: List["InheritanceGroup"] = Relationship(back_populates="point_of_sales", link_model=PointOfSaleLink)
 
 class Outlet(SQLModel, table=True):
     __tablename__ = "outlet"
@@ -46,8 +47,9 @@ class WalkInCustomer(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True)  # Walk-in customer name
     email: Optional[str] = Field(default=None)  # Optional email (Alphanumeric type assumed as text)
-    landmark: str = Field(index=True)  # Landmark for customer reference
     location_id: Optional[int] = Field(default=None, foreign_key="geolocation.id")  # Optional Reference to Location
-
+    route_id: Optional[int] = Field(default=None, foreign_key="route.id")
+    territoy_id: Optional[int] = Field(default=None, foreign_key="territory.id")  # Optional Reference to Location
+  # Optional Reference to Location
     # Relationship with PointOfSale
     point_of_sale: Optional[PointOfSale] = Relationship(back_populates="walk_in_customer")

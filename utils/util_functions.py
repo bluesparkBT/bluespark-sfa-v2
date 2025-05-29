@@ -15,26 +15,30 @@ def capitalize_name(name: str) -> str:
     return formatted_name
 
 
-def validate_name(name: str) -> bool:
+def validate_name(name: str) -> str:
     name_match = re.match(r"^([0-9A-Za-z \u1200-\u137f\-&_]*)$", name)
     
     if name_match:
-        return True
+        return name_match.group(0)
     else:
-        return False 
+        return False
     
 def validate_image(image_b64str: str) -> bool:
     """Validates if the image string is in a valid base64 format."""
-    if re.match(r"^data:image/(jpeg|png|jpg);base64,[A-Za-z0-9+/=]+$", image_b64str):
-        return True
+    image_match = re.match(r"^data:image/(jpeg|png|jpg);base64,[A-Za-z0-9+/=]+$", image_b64str)
+    if image_match:
+        return image_match.group(0)
     else:
         return False
     
 
 def validate_email(email: str) -> bool:
     """Validates if the email address is in a valid format (RFC 5322 simplified)."""
-    email_regex = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
-    return re.match(email_regex, email) is not None
+    email_match = re.match(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", email) 
+    if email_match:
+        return email_match.group(0)
+    else:
+        return False
 
 
 def validate_phone_number(phone_number) -> bool:
@@ -43,12 +47,13 @@ def validate_phone_number(phone_number) -> bool:
         return False
 
     phone_number = str(phone_number).replace(" ", "")
-    # Matches +251 followed by 7xx or 9xx and 7 more digits
-    phone_regex = r"^\+251[79]\d{8}$"
-    # Matches local format like 07xxxxxxxx or 09xxxxxxxx
-    local_regex = r"^0[79]\d{8}$"
+    
+    phone_match = re.match(r"^([\+]?251|(0[79]))\d+$", phone_number)
 
-    return bool(re.match(phone_regex, phone_number) or re.match(local_regex, phone_number))
+    if phone_match:
+        return phone_match.group(0)
+    else:
+        return False
 
 def parse_datetime_field(value: Optional[str]) -> Optional[datetime]:
         if not value:

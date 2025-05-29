@@ -1,10 +1,14 @@
 .env
 alembic.ini
 .venv/
-
+include/
 __pycache__/
 models/__pycache__/
 routes/__pycache__/
 utils/__pycache__/
-
+lib/
+lib64
+bin/
 alembic/
+pyenv.cfg
+requirements.txt

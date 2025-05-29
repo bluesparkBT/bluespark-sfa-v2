@@ -27,10 +27,9 @@ class Geolocation(SQLModel, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     name: Optional[str] = Field(default=None)
-    address_id: Optional[int] = Field(default=None, foreign_key="address.id", index=True)
     latitude: float
     longitude: float
-
+    address_id: Optional[int] = Field(default=None, foreign_key="address.id", index=True)
     address: Optional[Address] = Relationship(back_populates="geolocation")
    
 

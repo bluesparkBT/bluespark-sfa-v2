@@ -4,9 +4,10 @@ from sqlmodel import Session, select
 from fastapi import APIRouter, HTTPException, Body, status, Depends
 from db import get_session
 from utils.model_converter_util import get_html_types
-from models.Account import User, ScopeGroup,ScopeGroupLink 
+from models.Product_Category import Product, Category, InheritanceGroup
+from models.Account import ScopeGroup,ScopeGroupLink 
 from utils.util_functions import validate_name
-from models.viewModel.AccountsView import UserAccountView as TemplateView
+from models.viewModel.CategoryView import CategoryView as TemplateView
 from models.Account import Organization
 from utils.auth_util import get_current_user, check_permission, check_permission_and_scope
 from utils.get_hierarchy import get_organization_ids_by_scope_group
@@ -14,9 +15,7 @@ from utils.form_db_fetch import fetch_category_id_and_name, fetch_organization_i
 import traceback
 
 
-endpoint_name = "account"
-
-db_model = User
+endpoint_name = "category"
 
 endpoint = {
     "get": f"/get-{endpoint_name}",
@@ -28,56 +27,19 @@ endpoint = {
 }
 
 role_modules = {   
-    "get": ["Administrative"],
-    "get_form": ["Administrative"],
-    "create": ["Administrative"],
-    "update": ["Administrative"],
-    "delete": ["Administrative"],
+    "get": ["Administrative", "Category"],
+    "get_form": ["Administrative", "Category"],
+    "create": ["Administrative", "Category"],
+    "update": ["Administrative", "Category"],
+    "delete": ["Administrative", "Category"],
 }
 
-AccountRouter = c = APIRouter()
+CategoryRouter = c = APIRouter()
 
 SessionDep = Annotated[Session, Depends(get_session)]
 
 UserDep = Annotated[dict, Depends(get_current_user)]
 
-
-#Authentication Related
-@c.post("/login/")
-def login(
-    session: SessionDep,
-    tenant: str,
-    username: str = Body(...),
-    password: str = Body(...)
-):
-    try:
-        current_tenant = session.exec(select(Organization).where(Organization.tenant_hashed == tenant)).first()
-        if not current_tenant:
-            raise HTTPException(status_code=404, detail="Tenant not found")
-        
-        db_username = add_organization_path(username, current_tenant.organization_name)
-        user = session.exec(
-            select(User).where(User.username == db_username)
-        ).first()
-        if not user or not verify_password(password + db_username, user.hashedPassword):
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
-        
-        access_token_expires = timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS)
-        token = create_access_token(
-            data={
-                "sub": user.username,
-                "user_id": user.id,
-                "organization": user.organization_id,
-                },
-            expires_delta = access_token_expires,
-        )
-        
-        return {"access_token": token}
-    
-    except Exception as e:
-        traceback.print_exc()
-        return {"error": str(e)}
-        
 @c.get(endpoint['get'])
 def get_template(
     session: SessionDep,
@@ -89,11 +51,48 @@ def get_template(
     try:  
         orgs_in_scope = check_permission_and_scope(session, "Read", role_modules['get'], current_user)
         
-        entries_list = session.exec(
-            select(db_model).where(db_model.organization_id.in_(orgs_in_scope["organization_ids"]))
-        ).all()
+        inherited_group_id = session.exec(
+            select(Organization.inheritance_group).where(Organization.id == current_user.organization_id)
+        ).first()
+        
+        inherited_group = session.exec(
+            select(InheritanceGroup).where(InheritanceGroup.id == inherited_group_id)
+        ).first()
 
-        return entries_list
+        if inherited_group:
+            inherited_categories = inherited_group.categories
+
+        else:
+            inherited_categories = []
+        
+        # organization_ids = get_organization_ids_by_scope_group(session, current_user)
+        # scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == current_user.scope_group_id)).first()
+   
+        # if scope_group != None:
+        #     existing_orgs = [organization.id for organization in scope_group.organizations ]
+        # if scope_group == None:
+        #     existing_orgs= []
+
+        categories = session.exec(
+            select(Category).where(Category.organization_id.in_(orgs_in_scope["organization_ids"]))
+        ).all()
+        # categories = organization_group.categories
+
+        categories.extend(inherited_categories)
+
+        category_list = []
+        for category in categories:
+            category_temp = {
+                "id": category.id,
+                "Category Name": category.name,
+                "Parent Category": category.parent_category,
+                "UNSPC Code": category.code,
+                "description": category.description,
+            }
+            if category_temp not in category_list:
+                category_list.append(category_temp)
+
+        return category_list
 
     except Exception as e:
         traceback.print_exc()
@@ -117,15 +116,15 @@ def get_template(
         # Fetch categories based on organization IDs
         organization_ids = get_organization_ids_by_scope_group(session, current_user)
 
-        entry = session.exec(
-            select(db_model).where(db_model.organization_id.in_(organization_ids), db_model.id == id)
+        db_category = session.exec(
+            select(Category).where(Category.organization_id.in_(organization_ids), Category.id == id)
         ).first()
 
-        if not entry:
+        if not db_category:
             raise HTTPException(status_code=404, detail="Category not found")
         
 
-        return entry
+        return db_category
     
     except Exception as e:
         traceback.print_exc()
@@ -183,7 +182,7 @@ def create_template(
         organization_ids = get_organization_ids_by_scope_group(session, current_user)
 
         # Create a new category entry from validated input
-        new_category = db_model.model_validate(valid)
+        new_category = Category.model_validate(valid)
         session.add(new_category)
         session.commit()
         session.refresh(new_category)
@@ -200,6 +199,7 @@ def update_template(
     session: SessionDep, 
     current_user: UserDep,
     tenant: str,
+   
     valid: TemplateView,
 ):
     try:
@@ -214,24 +214,33 @@ def update_template(
         # Fetch categories based on organization IDs
         organization_ids = get_organization_ids_by_scope_group(session, current_user)
 
-        selected_entry = session.exec(
-            select(db_model).where(db_model.organization_id.in_(organization_ids), db_model.id == valid.id)
+        selected_category = session.exec(
+            select(Category).where(Category.organization_id.in_(organization_ids), Category.id == valid.id)
         ).first()
 
-        if not selected_entry:
-            raise HTTPException(status_code=404, detail=f"{endpoint_name} not found")
+        if not selected_category:
+            raise HTTPException(status_code=404, detail="Category not found")
+
+
+       
+       
+        selected_category.name = valid.name
+        selected_category.code = valid.code
+        selected_category.parent_category = valid.parent_category
+
         
+        selected_category.description = valid.description
         if valid.organization == organization_ids:
-            selected_entry.organization_id = valid.organization
+            selected_category.organization_id = valid.organization
         else:
-            {"message": "invalid input select your own organization id"}    
+            {"message": "invalid input select your owen organization id"}    
  
         # Commit the changes and refresh the object
-        session.add(valid)
+        session.add(selected_category)
         session.commit()
-        session.refresh(valid)
+        session.refresh(selected_category)
 
-        return {"message": f"{endpoint_name} Updated successfully"}
+        return {"message": "Category Updated successfully"}
 
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -255,19 +264,19 @@ def delete_template(
         # Fetch categories based on organization IDs
         organization_ids = get_organization_ids_by_scope_group(session, current_user)
 
-        selected_entry = session.exec(
-            select(db_model).where(db_model.organization_id.in_(organization_ids), db_model.id == id)
+        selected_category = session.exec(
+            select(Category).where(Category.organization_id.in_(organization_ids), Category.id == id)
         ).first()
 
-        if not selected_entry:
-            raise HTTPException(status_code=404, detail=f"{endpoint_name} not found")
+        if not selected_category:
+            raise HTTPException(status_code=404, detail="Category not found")
 
     
         # Delete category after validation
-        session.delete(selected_entry)
+        session.delete(selected_category)
         session.commit()
 
-        return {"message": f"{endpoint_name} deleted successfully"}
+        return {"message": "Category deleted successfully"}
 
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
