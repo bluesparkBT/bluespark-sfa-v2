@@ -170,6 +170,23 @@ class User(SQLModel, table=True):
     id_number: Optional[str] = Field(default=None)    
     address_id: Optional[int] = Field(default=None, foreign_key="address.id", index=True)
     warehouse_groups: Optional[List["WarehouseGroup"]] = Relationship(back_populates="store_admins", link_model=WarehouseStoreAdminLink)
+
+
+
+class ActionType(str, Enum):
+    approve = "Approve"
+    request = "Request"
+    delete = "Delete"
+    confirm = "Confirm"
+    void = "Void"
+    review = "Review"
+
+class Designation(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="users.id")
+    action_type: ActionType
+    module_access: ModuleName
+    users: Optional["User"] = Relationship(back_populates="designation")
     requester_warehouse_stops: List["WarehouseStop"] = Relationship(
         back_populates="requester",
         sa_relationship_kwargs={"foreign_keys": "[WarehouseStop.requester_id]"}

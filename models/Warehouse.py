@@ -27,9 +27,6 @@ class RequestStatus(str, Enum):
    approved = "Approved"
    rejected = "Rejected"
 
-
-
-
 class WarehouseGroupLink(SQLModel, table=True):
     __tablename__ = "warehouse_group_link"
 
@@ -69,76 +66,66 @@ class Stock(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     warehouse_id: int = Field(foreign_key="warehouse.id")
     product_id: int = Field(foreign_key="product.id")
-    category_id: int = Field(foreign_key="category.id")
-    subcategory_id: Optional[int] = Field(foreign_key="category.id", default=None)
     quantity: int = Field(default=1)
-    date_added: Optional[datetime] = Field(default=None)
+    date_added: datetime 
     stock_type: StockType = Field(default=StockType.regular)
     warehouse: Optional[Warehouse] = Relationship(back_populates="stocks")
-    product: Optional["Product"] = Relationship(back_populates="stocks")
-    category: Optional["Category"] = Relationship(
-        sa_relationship_kwargs={"foreign_keys": "[Stock.category_id]"},
-        back_populates="category_stocks"
-    )
-    subcategory: Optional["Category"] = Relationship(
-        sa_relationship_kwargs={"foreign_keys": "[Stock.subcategory_id]"},
-        back_populates="subcategory_stocks"
-    )
-    stock_logs: Optional[List["StockLog"]] = Relationship(back_populates="stock")
-    warehouse_stops: Optional[List["WarehouseStop"]] = Relationship(back_populates="stock")
+    product: Optional["Product"] = Relationship(back_populates="stock")
 
 
 class StockLog(SQLModel, table=True):
     __tablename__ = "stock_log"
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    stock_id: int = Field(foreign_key="stock.id")
+    stock_id: str = Field(index=True)
+    product_id: int = Field(foreign_key="product.id")
+    quantity: int = Field(default=1)
     stock_in_date: Optional[datetime] = Field(default=None)
     stock_out_date: Optional[datetime] = Field(default=None)
     request_type: Optional[RequestType] = Field(default=None)
     log_type: LogType = Field(default=LogType.stock_in)
-    stock: Optional["Stock"] = Relationship(back_populates="stock_logs")
+    product: Optional["Product"] = Relationship(back_populates="stock_logs")
 
 class Vehicle(SQLModel, table=True):
     __tablename__ = "vehicle"
     id: int = Field(primary_key=True)
     name: str
-    make: Optional[str] = Field(index=True) 
-    model: Optional[str] = Field(index=True)
+    make: Optional[str] = Field(index=True, default=None) 
+    model: Optional[str] = Field(index=True, default=None)
     year: Optional[int] = Field(default=None)
     color: Optional[str] = Field(default=None)
     vin: Optional[str] = Field(default=None)
     description: Optional[str] = Field(default=None)
     plate_number: str = Field(index=True)
-    organization_id: Optional[int] = Field(foreign_key="organization.id", index=True)
+    organization_id: int = Field(foreign_key="organization.id", index=True)
     warehouse_stops: Optional[List["WarehouseStop"]] = Relationship(back_populates="vehicle")
 
 class WarehouseStop(SQLModel, table=True):
     __tablename__ = "warehouse_stop"
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    requester_id: int = Field(foreign_key="users.id")
+    requester_id: int = Field(foreign_key="designation.id")
     request_type: RequestType = Field(default=RequestType.stock_out)
     request_status: RequestStatus = Field(default=RequestStatus.pending)
     request_date: Optional[datetime] = Field(default=None)
-    approver_id: Optional[int] = Field(foreign_key="users.id", default=None)
+    approver_id: Optional[int] = Field(foreign_key="designation.id", default=None)
     approve_date: Optional[datetime] = Field(default=None)
     confirmed: Optional[bool] = Field(default=False)
     confirm_date: Optional[datetime] = Field(default=None)
     vehicle_id: Optional[int]= Field(foreign_key="vehicle.id")
-    stock_id: Optional[int]= Field(foreign_key="stock.id")
+    product_id: Optional[int]= Field(foreign_key="product.id")
     stock_type: StockType = Field(default=StockType.regular)
     quantity: int = Field(default=1)
     vehicle: Optional["Vehicle"] = Relationship(back_populates="warehouse_stops")
-    requester: Optional["User"] = Relationship(
+    requester: Optional["Designation"] = Relationship(
         sa_relationship_kwargs={"foreign_keys": "[WarehouseStop.requester_id]"},
         back_populates="requester_warehouse_stops"
     )
-    approver: Optional["User"] = Relationship(
+    approver: Optional["Designation"] = Relationship(
         sa_relationship_kwargs={"foreign_keys": "[WarehouseStop.approver_id]"},
         back_populates="approver_warehouse_stops"
     )
-    stock: Optional["Stock"] = Relationship(back_populates="warehouse_stops")
+    product: Optional["Product"] = Relationship(back_populates="warehouse_stops")
 
 
 

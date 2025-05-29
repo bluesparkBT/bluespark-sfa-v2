@@ -19,7 +19,10 @@ class Product(SQLModel, table=True):
     category: Optional["Category"] = Relationship(back_populates="products")
     organization_id: Optional[int] = Field(default=None, foreign_key="organization.id", index=True)
     inheritance_groups: List["InheritanceGroup"] = Relationship(back_populates="products", link_model=ProductLink)
-    stocks: List["Stock"] = Relationship(back_populates="product")
+    stock: Optional["Stock"] = Relationship(back_populates="product")
+    stock_logs: Optional[List["StockLog"]] = Relationship(back_populates="product")
+    warehouse_stops: Optional[List["WarehouseStop"]] = Relationship(back_populates="product")
+
 
 
 
