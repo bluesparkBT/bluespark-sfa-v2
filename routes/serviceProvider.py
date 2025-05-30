@@ -1,8 +1,27 @@
 from typing import Annotated, List, Dict, Any, Optional, Union
-from db import SECRET_KEY, get_session
+from db import SECRET_KEY, get_session, engine
 from sqlmodel import Session, select
 from fastapi import APIRouter, HTTPException, Body, status, Depends
 from db import get_session
+from models.viewModel.AccountsView import EmailSchema
+
+from datetime import datetime, timedelta
+import requests
+
+from fastapi_mail import FastMail, MessageSchema,ConnectionConfig
+from starlette.requests import Request
+from starlette.responses import JSONResponse
+from pydantic import EmailStr, BaseModel
+from utils.auth_util import (
+    get_current_user,
+    check_permission,
+    check_permission_and_scope,
+    generate_random_password,
+    get_password_hash,
+    add_organization_path,
+    verify_password,
+    create_access_token
+)
 from utils.model_converter_util import get_html_types
 from models.Account import User, ScopeGroup,ScopeGroupLink, Organization, Role
 from utils.util_functions import validate_name
@@ -210,6 +229,106 @@ def update_template(
 
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+    
+    
+
+conf = ConnectionConfig(
+    MAIL_USERNAME="sfapwr@bluespark.et",
+    MAIL_PASSWORD="Hard&test&work6756",
+    MAIL_PORT=465,  # Use 465 for SSL or 587 for STARTTLS
+    MAIL_SERVER="mail.bluespark.et",
+    MAIL_STARTTLS=False,  # Use True if port 587
+    MAIL_SSL_TLS=True,    # Set True for SSL (port 465)
+    MAIL_FROM="sfapwr@bluespark.et",  # Ensure this email is valid
+    USE_CREDENTIALS=True,
+    VALIDATE_CERTS=True
+)
+
+@c.post("/forgot-Password")
+async def send_mail(data: EmailSchema, db: Session = Depends(get_session)):
+    # username = data.username
+
+    # # Check if the user exists
+    # user = db.exec(select(User).where(User.username == username)).first()
+    # if not user:
+    #     raise HTTPException(status_code=404, detail="User not found")
+
+    # # Retrieve the user's role using their role_id
+    # role = db.exec(select(Role).where(Role.id == user.role_id)).first()
+    # if not role or role.name != "SuperAdmin":
+    #     raise HTTPException(
+    #         status_code=403, detail="Access denied. Only SuperAdmins can request new passwords."
+    #     )
+
+    # Generate a new random password and hash it
+    new_password = generate_random_password()
+    hashed_password = get_password_hash(new_password)
+
+    # Update user's password in the database
+    # user.hashedPassword = hashed_password
+    # db.add(user)
+    # db.commit()
+    # db.refresh(user)
+
+    # Build the email template with the generated password included
+    template = f"""
+<html>
+  <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
+    <div style="max-width: 600px; margin: auto; background-color: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);">
+      
+      <div style="text-align: center;">
+        <h2 style="color: #0047AB;">Sales Force Automation (SFA)</h2>
+        <h4 style="color: #008CBA;">Powered by BlueSpark Business Technology Solutions</h4>
+      </div>
+      
+      <hr style="border: none; height: 1px; background-color: #ddd; margin: 20px 0;">
+      
+      <p style="font-size: 16px; color: #333;">Hello,</p>
+      
+      <p style="font-size: 16px; color: #333;">
+        Thank you for using <strong>Sales for Automation (SFA)</strong>. We value your trust and are committed to delivering smart solutions for your business efficiency.
+      </p>
+      
+      <p style="font-size: 16px; color: #333;">
+        Your New Password is: 
+        <span style="font-weight: bold; color: #d9534f; font-size: 18px;">{new_password}</span>
+      </p>
+      
+      <p style="font-size: 16px; color: #333;">
+        Please use this password to log in and make sure to update it immediately for security reasons.
+      </p>
+      
+      <hr style="border: none; height: 1px; background-color: #ddd; margin: 20px 0;">
+      
+      <div style="text-align: center;">
+        <p style="font-size: 14px; color: #888;">
+          If you have any questions or need assistance, please contact 
+          <strong>BlueSpark Business Technology Solutions Support</strong>.
+        </p>
+      </div>
+      
+    </div>
+  </body>
+</html>
+"""
+
+    # Prepare the email message. The recipient is now static.
+    message = MessageSchema(
+        subject="Your New Password",
+        recipients=["mikasol9134@gmail.com"],
+        body=template,
+        subtype="html"
+    )
+
+    # Send the email
+    fm = FastMail(conf)
+
+    await fm.send_message(message)
+  
+    print(f"New password generated for user : {new_password}")
+
+    return JSONResponse(status_code=200, content={"message": "Email with new password has been sent"})
+
 
 # Delete a category by ID
 @c.delete(endpoint['delete']+ "/{id}")
@@ -246,3 +365,6 @@ def delete_template(
 
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+
