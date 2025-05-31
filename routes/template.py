@@ -55,7 +55,7 @@ def get_template(
         orgs_in_scope = check_permission_and_scope(session, "Read", role_modules['get'], current_user)
         
         entries_list = session.exec(
-            select(db_model).where(db_model.organization_id.in_(orgs_in_scope["organization_ids"]))
+            select(db_model).where(db_model.organization.in_(orgs_in_scope["organization_ids"]))
         ).all()
         
         
@@ -78,7 +78,8 @@ def get_template(
         orgs_in_scope = check_permission_and_scope(session, "Read", role_modules['get'], current_user)
 
         entry = session.exec(
-            select(db_model).where(db_model.organization_id.in_(orgs_in_scope), db_model.id == id)
+            select(db_model).where(db_model.organization.in_(organization_ids), db_model.id == id)
+
         ).first()
 
         if not entry:
@@ -133,14 +134,15 @@ def update_template(
         orgs_in_scope = check_permission_and_scope(session, "Update", role_modules['update'], current_user)
 
         selected_entry = session.exec(
-            select(db_model).where(db_model.organization_id.in_(orgs_in_scope), db_model.id == valid.id)
+            select(db_model).where(db_model.organization.in_(organization_ids), db_model.id == valid.id)
+
         ).first()
 
         if not selected_entry:
             raise HTTPException(status_code=404, detail=f"{endpoint_name} not found")
         
         if valid.organization == organization_ids:
-            selected_entry.organization_id = valid.organization
+            selected_entry.organization = valid.organization
         else:
             {"message": "invalid input select your own organization id"}    
  
@@ -167,7 +169,7 @@ def delete_template(
         orgs_in_scope = check_permission_and_scope(session, "Delete", role_modules['delete'], current_user)
 
         selected_entry = session.exec(
-            select(db_model).where(db_model.organization_id.in_(orgs_in_scope), db_model.id == id)
+            select(db_model).where(db_model.organization.in_(organization_ids), db_model.id == id)
         ).first()
 
         if not selected_entry:

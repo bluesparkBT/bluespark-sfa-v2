@@ -111,7 +111,7 @@ class Period(SQLModel, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True)
-    organization_id: Optional[int] = Field(foreign_key="organization.id", index=True)
+    organization: Optional[int] = Field(foreign_key="organization.id", index=True)
     type: str
     start: datetime = Field(default=datetime.now(), index=True)
     end: datetime = Field(default=datetime.now(), index=True)

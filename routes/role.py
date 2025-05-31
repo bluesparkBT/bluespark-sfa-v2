@@ -66,7 +66,7 @@ async def get_roles(
             
         organization_ids = get_organization_ids_by_scope_group(session, current_user)
         roles = session.exec(
-            select(Role).where(Role.organization_id.in_(organization_ids))
+            select(Role).where(Role.organization.in_(organization_ids))
         ).all()
         
         
@@ -80,7 +80,7 @@ async def get_roles(
                     permissions += f"<strong>{perm.module}</strong> ({perm.access_policy.value}), "
             filtered_data.append({
                 "id": role.id,
-                "role_name": role.name,
+                "name": role.name,
                 "roles": permissions.rstrip(", ")
             })
      
@@ -104,10 +104,10 @@ async def get_my_role(
             )
         user = session.exec(select(User).where(User.id ==current_user.id)).first()
 
-        if not user or not user.role_id:
+        if not user or not user.role:
             raise HTTPException(status_code=404, detail="User or assigned role not found")
         
-        role = session.exec(select(Role).where(Role.id == user.role_id)).first()
+        role = session.exec(select(Role).where(Role.id == user.role)).first()
         if not role:
             raise HTTPException(status_code=404, detail="Role not found")
 
@@ -117,7 +117,7 @@ async def get_my_role(
 
         return {
             "id": role.id,
-            "role_name": role.name,
+            "name": role.name,
             **{  
                 perm.module: perm.access_policy
                 for perm in permissions
@@ -146,7 +146,7 @@ async def create_role(
             raise HTTPException(status_code=404, detail="Role not found")
         role_module_permissions = session.exec(
             select(RoleModulePermission.module, RoleModulePermission.access_policy).where(
-                RoleModulePermission.role_id == id
+                RoleModulePermission.role == id
             )
         ).all()
 
@@ -177,10 +177,10 @@ async def form_roles(
             )
         policy_type =  {i.value: i.value for i in AccessPolicy}
         # Check if current user is a super admin
-        user_scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == current_user.scope_group_id)).first()
+        user_scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == current_user.scope_group)).first()
          
         # Filter modules, exclude "Service Provider" unless super admin
-        if user_scope_group.scope_name == "Super Admin Scope":
+        if user_scope_group.name == "Super Admin Scope":
             modules_dict = {i.value: i.value for i in modules}
         else:
             modules_dict = {
@@ -221,11 +221,9 @@ async def create_role(
                         status_code=status.HTTP_400_BAD_REQUEST,
                         detail="Required field missing",
                 )
-
-
         #check exisiting role
         print("id", id)
-        role_id: int
+        role: int
         if(id !=""):
             role = session.query(Role).where(Role.id==id).first()
 
@@ -240,16 +238,16 @@ async def create_role(
                 #create role
                 role = Role(
                     name=name,
-                    organization_id = current_user.organization_id
+                    organization = current_user.organization
                 )
 
 
                 session.add(role)
                 session.commit()
                 session.refresh(role)
-                role_id = role.id
+                role = role.id
             else:
-                role_id = role.id
+                role = role.id
         else:
             #create role
             if validate_name(name) == False:
@@ -259,14 +257,14 @@ async def create_role(
             )
             role = Role(
                 name=name,
-                organization_id = current_user.organization_id
+                organization = current_user.organization
             )
 
 
             session.add(role)
             session.commit()
             session.refresh(role)
-            role_id = role.id
+            role = role.id
 
         
 
@@ -275,7 +273,7 @@ async def create_role(
         # grant module permissions from list of modules defined as modules_togrant
        
         role_module_permission = session.exec(select(RoleModulePermission)
-                                    .where((RoleModulePermission.role_id == role_id)&
+                                    .where((RoleModulePermission.role == role)&
                                           (RoleModulePermission.module == module))).first()
         if(role_module_permission):
             role_module_permission.module = module
@@ -283,7 +281,7 @@ async def create_role(
         else:
             role_module_permission= RoleModulePermission(
                     id=None,
-                    role_id=role_id,
+                    role=role,
                     module=module,
                     access_policy=policy
                 )
@@ -310,17 +308,17 @@ async def form_modules(
             )
         policy_type =  {i.value: i.value for i in AccessPolicy}
         # Check if current user is a super admin
-        user_scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == current_user.scope_group_id)).first()
+        user_scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == current_user.scope_group)).first()
          
         # Filter modules, exclude "Service Provider" unless super admin
-        if user_scope_group.scope_name == "Super Admin Scope":
+        if user_scope_group.name == "Super Admin Scope":
             modules_dict = {i.value: i.value for i in modules}
         else:
             modules_dict = {
                 i.value: i.value for i in modules if i.value != "Service Provider"
             }
         role = {
-            "role_id":"",
+            "role":"",
             "module":modules_dict,
             "policy":policy_type,
         }
@@ -334,7 +332,7 @@ async def update_role(
     session: SessionDep,
     tenant: str,
     current_user: UserDep,    
-    role_id: int = Body(...),
+    role: int = Body(...),
     module: str = Body(...),
     policy: str = Body(...),
 
@@ -347,7 +345,7 @@ async def update_role(
                 status_code=403, detail="You Do not have the required privilege"
             )
         role_module_permission = session.exec(select(RoleModulePermission)
-                                    .where((RoleModulePermission.role_id == role_id)&
+                                    .where((RoleModulePermission.role == role)&
                                           (RoleModulePermission.module == module))).first()
         if(role_module_permission):
             role_module_permission.module = module
@@ -355,7 +353,7 @@ async def update_role(
         else:
             role_module_permission= RoleModulePermission(
                     id=None,
-                    role_id=role_id,
+                    role=role,
                     module=module,
                     access_policy=policy
                 )
@@ -406,7 +404,7 @@ async def update_role(
         if (parse_enum(AccessPolicy,policy, "policy") != None and parse_enum(mod,module,"Module") != None):
             print("in here")
             role_module_permission = session.exec(select(RoleModulePermission)
-                                    .where((RoleModulePermission.role_id == id)&
+                                    .where((RoleModulePermission.role == id)&
                                           (RoleModulePermission.module == module))).first()
             if(role_module_permission):
                 role_module_permission.module = module
@@ -414,7 +412,7 @@ async def update_role(
             else:
                 role_module_permission= RoleModulePermission(
                         id=None,
-                        role_id=id,
+                        role=id,
                         module=module,
                         access_policy=policy
                     )
@@ -446,15 +444,15 @@ async def delete_role(
         role = session.exec(select(Role).where(Role.id == id)).first()
         if not role:
             raise HTTPException(status_code=404, detail="Role not found")
-        assigned_users = session.exec(select(User).where(User.role_id == id)).all()
+        assigned_users = session.exec(select(User).where(User.role == id)).all()
 
         for user in assigned_users:
-            user.role_id = None
+            user.role = None
             session.add(user)  # mark for update
 
         session.commit()
 
-        assigned_role_module= session.exec(select(RoleModulePermission).where(RoleModulePermission.role_id == id)).all()
+        assigned_role_module= session.exec(select(RoleModulePermission).where(RoleModulePermission.role == id)).all()
 
         for role_module in assigned_role_module:
             session.delete(role_module) 

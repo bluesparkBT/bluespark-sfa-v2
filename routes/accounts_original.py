@@ -34,7 +34,7 @@ def login(
         if not current_tenant:
             raise HTTPException(status_code=404, detail="Tenant not found")
         
-        db_username = add_organization_path(username, current_tenant.organization_name)
+        db_username = add_organization_path(username, current_tenant.name)
         user = session.exec(
             select(User).where(User.username == db_username)
         ).first()
@@ -46,7 +46,7 @@ def login(
             data={
                 "sub": user.username,
                 "user_id": user.id,
-                "organization": user.organization_id,
+                "organization": user.organization,
                 },
             expires_delta = access_token_expires,
         )
@@ -72,8 +72,8 @@ async def get_my_user(
             superadmin_user = session.exec(select(User).where(User.id == current_user.id)).first()
             print("super admin user:", superadmin_user)
 
-            username_display = extract_username(superadmin_user.username, service_provider.organization_name)
-            organization_name = service_provider.organization_name
+            username_display = extract_username(superadmin_user.username, service_provider.name)
+            name = service_provider.name
         else:
             current_tenant = session.exec(
                 select(Organization).where(Organization.tenant_hashed == tenant)
@@ -81,19 +81,19 @@ async def get_my_user(
             if not current_tenant:
                 raise HTTPException(status_code=404, detail="Tenant not found")
 
-            organization_name = current_tenant.organization_name
-            username_display = extract_username(user.username, organization_name)
+            name = current_tenant.name
+            username_display = extract_username(user.username, name)
 
         return {
             "id": user.id,
-            "fullname": user.fullname,
+            "full_name": user.full_name,
             "username": username_display,
             "phone_number": user.phone_number,
-            "organization": organization_name,
-            "role_id": user.role_id,
+            "organization": name,
+            "role": user.role,
             "manager_id": user.manager_id,
             "scope": user.scope,
-            "scope_group_id": user.scope_group_id,
+            "scope_group": user.scope_group,
         }
 
     except Exception as e:
@@ -117,33 +117,33 @@ async def get_users(
         organization_ids = get_organization_ids_by_scope_group(session, current_user)
 
         users = session.exec(
-            select(User).where(User.organization_id.in_(organization_ids))
+            select(User).where(User.organization.in_(organization_ids))
         ).all()
 
         user_list = []
         for user in users:
             # Fetch the organization for each user
             user_org = session.exec(
-                select(Organization).where(Organization.id == user.organization_id)
+                select(Organization).where(Organization.id == user.organization)
             ).first()
 
             if not user_org:
                 continue  
 
             # Extract username without tenant prefix
-            username_display = extract_username(user.username, user_org.organization_name)
-            user_scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == user.scope_group_id)).first()
+            username_display = extract_username(user.username, user_org.name)
+            user_scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == user.scope_group)).first()
             if user_scope_group:
-                scope_group = user_scope_group.scope_name
-            user_role = session.exec(select(Role).where(Role.id == user.role_id)).first()
+                scope_group = user_scope_group.name
+            user_role = session.exec(select(Role).where(Role.id == user.role)).first()
             manager = session.exec(select(User).where(User.id == user.manager_id)).first()
             user_list.append({
                 "id": user.id,
-                "fullname": user.fullname,
+                "full_name": user.full_name,
                 "username": username_display,
                 "email": user.email,
                 "phone_number": user.phone_number,
-                "organization": user_org.organization_name,
+                "organization": user_org.name,
                 "role": user_role.name,
                 "manager": manager,
                 "scope": user.scope,
@@ -177,14 +177,14 @@ async def get_user(
             raise HTTPException(status_code=404, detail="User not found")
         user_data = {
             "id": user.id, 
-            "full_name": user.fullname, 
+            "full_name": user.full_name, 
             "username": user.username,
             "email": user.email,
             "phone_number": user.phone_number,
-            "organization": user.organization_id,
-            "role": user.role_id,
+            "organization": user.organization,
+            "role": user.role,
             "scope": user.scope,
-            "scope_group": user.scope_group_id,
+            "scope_group": user.scope_group,
             "gender": user.gender,
             "date_of_birth": format_date_for_input(user.date_of_birth),
             "date_of_joining": format_date_for_input(user.date_of_joining),
@@ -279,7 +279,7 @@ async def create_user(
         if validate_name(full_name) == False:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Fullname is not valid",
+                detail="full_name is not valid",
         )
         elif email is not None and validate_email(email) == False:
             raise HTTPException(
@@ -295,27 +295,27 @@ async def create_user(
         if address == "" or address is None:
             address = None
             
-        current_tenant = session.exec(select(Organization).where(Organization.id == current_user.organization_id)).first() if tenant == "provider" else session.exec(select(Organization).where(Organization.tenant_hashed == tenant)).first()
+        current_tenant = session.exec(select(Organization).where(Organization.id == current_user.organization)).first() if tenant == "provider" else session.exec(select(Organization).where(Organization.tenant_hashed == tenant)).first()
         print("the organization get from", current_tenant)   
                
         user_name = username
-        stored_username = add_organization_path(user_name, current_tenant.organization_name)
+        stored_username = add_organization_path(user_name, current_tenant.name)
 
         password = generate_random_password()
         hashed_password = get_password_hash(password + stored_username)
         
         new_user = User(
             id= None,
-            fullname=full_name,
+            full_name=full_name,
             username= stored_username,
             email=email,
             phone_number=phone_number,
             hashedPassword = hashed_password,
-            organization_id= organization,   
-            role_id= role,       
+            organization= organization,   
+            role= role,       
             gender=parse_enum(Gender,gender, "Gender"),
             scope=parse_enum(Scope,scope, "Scope"),
-            scope_group_id=scope_group,
+            scope_group=scope_group,
             address_id = address
 
         )
@@ -420,7 +420,7 @@ async def update_user(
         if not validate_name(full_name):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Fullname is not valid",
+                detail="full_name is not valid",
             )
         elif email is not None and validate_email(email) == False:
             raise HTTPException(
@@ -437,12 +437,12 @@ async def update_user(
             address = None
 
        
-        existing_user.fullname = full_name
+        existing_user.full_name = full_name
         existing_user.username = username
         existing_user.email = email
         existing_user.phone_number = phone_number
         # existing_user.hashedPassword = get_password_hash(password + username) if password != "" else existing_user.hashedPassword
-        existing_user.organization_id = organization
+        existing_user.organization = organization
         existing_user.gender = parse_enum(Gender,gender, "Gender")
         existing_user.salary = float(salary)
         existing_user.position = position
@@ -451,9 +451,9 @@ async def update_user(
         existing_user.id_type = parse_enum(IdType,id_type, "Id Type")
         existing_user.id_number = id_number
         existing_user.scope = parse_enum(Scope,scope, "Scope")
-        existing_user.scope_group_id = scope_group
+        existing_user.scope_group = scope_group
         existing_user.image = image
-        existing_user.role_id = role
+        existing_user.role = role
         existing_user.address_id = address
 
         session.add(existing_user)
@@ -524,8 +524,8 @@ async def get_scope_groups(
         for scope_group in scope_groups:
             scope_group_list.append({
                 "id": scope_group.id,
-                "scope_name": scope_group.scope_name,
-                "organizations": [org.organization_name for org in scope_group.organizations],
+                "name": scope_group.name,
+                "organizations": [org.name for org in scope_group.organizations],
             })
 
         return scope_group_list
@@ -558,7 +558,7 @@ async def get_scope_group(
             
         return {
                 "id": scope_group.id,
-                "name": scope_group.scope_name,
+                "name": scope_group.name,
                 "hidden": [org.id for org in scope_group.organizations],
             }
         
@@ -579,14 +579,14 @@ async def form_scope_organization(
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-        current_tenant = session.exec(select(Organization).where(Organization.id == current_user.organization_id)).first() if tenant == "provider" else session.exec(select(Organization).where(Organization.tenant_hashed == tenant)).first()
+        current_tenant = session.exec(select(Organization).where(Organization.id == current_user.organization)).first() if tenant == "provider" else session.exec(select(Organization).where(Organization.tenant_hashed == tenant)).first()
        
-        print("current tenant",get_child_organization(session, current_user.organization_id) )
+        print("current tenant",get_child_organization(session, current_user.organization) )
         
         org = {
                "id": "",
                "name":"", 
-               "hidden": [get_child_organization(session, current_user.organization_id)]
+               "hidden": [get_child_organization(session, current_user.organization)]
             }
                     
         return {"data": org, "html_types": get_html_types("scope_group")}
@@ -617,17 +617,16 @@ async def add_organization_to_scope(
                 detail="Scope name is not valid",
         )
 
-        existing_scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.scope_name == name)).first()
+        existing_scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.name == name)).first()
         
         if existing_scope_group:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Scope group already exists",
             )
-      
         scope_group = ScopeGroup(
-            scope_name=name,
-            parent_id = current_user.organization_id
+            name=name,
+            parent_id = current_user.organization
         )
         
         session.add(scope_group)
@@ -638,8 +637,8 @@ async def add_organization_to_scope(
         to_add = set(hidden)
         for org_id in to_add:
             scope_group_link_add = ScopeGroupLink(
-                scope_group_id=scope_group.id,
-                organization_id=org_id
+                scope_group=scope_group.id,
+                organization=org_id
                 )
             session.add(scope_group_link_add)
             session.commit()
@@ -681,7 +680,7 @@ async def update_scope_group(
                 detail="Scope group name is not valid",
         )
         
-        scope_group.scope_name = name
+        scope_group.name = name
         session.add(scope_group)
         session.commit()
         session.refresh(scope_group)
@@ -694,7 +693,7 @@ async def update_scope_group(
         # Add new entries
         to_add = new_org_ids_set - existing_org_ids
         for org_id in to_add:
-            scope_group_link_add = ScopeGroupLink(scope_group_id=id, organization_id=org_id)
+            scope_group_link_add = ScopeGroupLink(scope_group=id, organization=org_id)
             session.add(scope_group_link_add)
             session.commit()
             session.refresh(scope_group_link_add)
@@ -705,8 +704,8 @@ async def update_scope_group(
         if to_remove:
             links_to_remove = session.exec(
                 select(ScopeGroupLink)
-                .where(ScopeGroupLink.scope_group_id == id)
-                .where(ScopeGroupLink.organization_id.in_(to_remove))
+                .where(ScopeGroupLink.scope_group == id)
+                .where(ScopeGroupLink.organization.in_(to_remove))
             ).all()
 
             for link in links_to_remove:
@@ -736,14 +735,14 @@ async def delete_scope_group(
             raise HTTPException(status_code=404, detail="Scope group not found")
 
         # Delete links associated with the scope group
-        scope_group_links = session.exec(select(ScopeGroupLink).where(ScopeGroupLink.scope_group_id == id)).all()
+        scope_group_links = session.exec(select(ScopeGroupLink).where(ScopeGroupLink.scope_group == id)).all()
         for link in scope_group_links:
             session.delete(link)
 
         # Unassign users from the scope group
-        assigned_users = session.exec(select(User).where(User.scope_group_id == id)).all()
+        assigned_users = session.exec(select(User).where(User.scope_group == id)).all()
         for user in assigned_users:
-            user.scope_group_id = None
+            user.scope_group = None
             session.add(user)  # mark for update
 
         # Delete the scope group

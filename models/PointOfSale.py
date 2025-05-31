@@ -14,7 +14,7 @@ class PointOfSale(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     status: POSStatus  # Enum status
     registered_on: str = Field(index=True)  # Registration date in text format
-    organization_id: int = Field(foreign_key="organization.id")  # Reference to Organization
+    organization: int = Field(foreign_key="organization.id")  # Reference to Organization
     # default_credit_group_id: int = Field(foreign_key="credit_group.id")  # Reference to Default Credit Group
 
     # Optional references

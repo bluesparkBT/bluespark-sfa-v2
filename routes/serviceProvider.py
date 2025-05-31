@@ -7,16 +7,8 @@ from db import get_session
 import traceback
 from utils.auth_util import verify_password, create_access_token, get_password_hash
 from utils.util_functions import validate_name, validate_email, validate_phone_number, parse_enum
-from utils.auth_util import (
-    get_current_user,
-    check_permission,
-    check_permission_and_scope,
-    generate_random_password,
-    get_password_hash,
-    add_organization_path,
-    verify_password,
-    create_access_token
-)
+from utils.auth_util import get_current_user, check_permission, generate_random_password, get_tenant_hash, extract_username, add_organization_path
+
 from utils.model_converter_util import get_html_types
 from utils.form_db_fetch import get_organization_ids_by_scope_group
 from utils.domain_util import getPath
@@ -25,19 +17,14 @@ from utils.auth_util import check_permission_and_scope
 from models.Account import User, ScopeGroup, ScopeGroupLink, Organization, OrganizationType, RoleModulePermission, Scope, Role, AccessPolicy
 from models.Account import ModuleName as modules
 from models.viewModel.AccountsView import SuperAdminView as TemplateView
-from models.viewModel.AccountsView import EmailSchema
-from models.viewModel.AccountsView import OrganizationView
+from models.viewModel.AccountsView import OrganizationView, UpdateSuperAdminView
 
-from fastapi_mail import FastMail, MessageSchema,ConnectionConfig
-from starlette.requests import Request
-from starlette.responses import JSONResponse
-from pydantic import EmailStr, BaseModel
 endpoint_name = "superadmin"
 
 db_model = User
 
 endpoint = {
-    "get": f"/get-{endpoint_name}",
+    "get": f"/get-{endpoint_name}s",
     "get_by_id": f"/get-{endpoint_name}",
     "get_form": f"/{endpoint_name}-form/",
     "create": f"/create-{endpoint_name}",
@@ -69,14 +56,24 @@ UserDep = Annotated[dict, Depends(get_current_user)]
 @c.get("/has-superadmin")
 def has_superadmin_created(
     session: SessionDep
-) ->bool:
-    existing_superadmin = session.exec(select(db_model).where(db_model.role_id == Role.id == "Super Admin")).first()
-    if existing_superadmin:
-        print("Super admin and tenant already exists")
-        return True
-    else: 
+) -> bool:
+    # Find a user whose role is named "Super Admin"
+    role = session.exec(select(Role).where(Role.name == "Super Admin")).first()
+    if not role:
         return False
-        
+    superadmin = session.exec(select(User).where(User.role == role.id)).first()
+    # superadmin = session.exec(
+    #     select(User)
+    #     .join(Role, User.role == Role.id)
+    #     .where(Role.name == "Super Admin")
+    # ).first()
+    if superadmin:
+        print("Super admin exists")
+        return True
+    else:
+        print("No super admin found")
+        return False
+
 @c.post("/login/")
 def login(
     session: SessionDep,
@@ -101,17 +98,18 @@ def login(
             data={
                 "sub": user.username,
                 "user_id": user.id,
-                "organization": user.organization_id,
+                "organization": user.organization,
                 },
             expires_delta = access_token_expires,
         )
         
         return {"access_token": token}
     
+    except HTTPException as http_exc:
+        raise http_exc
     except Exception as e:
         traceback.print_exc()
-        return {"error": str(e)}
-        
+        raise HTTPException(status_code=500, detail="Something went wrong")
 #CRUD
 @c.get(endpoint['get'])
 def get(
@@ -123,13 +121,16 @@ def get(
         orgs_in_scope = check_permission_and_scope(session, "Read", role_modules['get'], current_user)
 
         entries_list = session.exec(
-            select(db_model).where(db_model.organization_id.in_(orgs_in_scope["organization_ids"]))
+            select(db_model).where(db_model.organization.in_(orgs_in_scope["organization_ids"]))
         ).all()
 
         return entries_list
 
+    except HTTPException as http_exc:
+        raise http_exc
     except Exception as e:
         traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Something went wrong")
  
 @c.get(endpoint['get_by_id'] + "/{id}")
 def get_by_Id_template(
@@ -139,9 +140,10 @@ def get_by_Id_template(
     id: int,
 ):
     try:
-        orgs_in_scope = check_permission_and_scope(session, "Read", role_modules['Read'], current_user)
+
+        orgs_in_scope = check_permission_and_scope(session, "Update", role_modules['update'], current_user)
         entry = session.exec(
-            select(db_model).where(db_model.organization_id.in_(orgs_in_scope["organization_ids"]), db_model.id == id)
+            select(db_model).where(db_model.organization.in_(orgs_in_scope["organization_ids"]), db_model.id == id)
         ).first()
 
         if not entry:
@@ -150,6 +152,8 @@ def get_by_Id_template(
 
         return entry
     
+    except HTTPException as http_exc:
+        raise http_exc
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Something went wrong")
@@ -160,7 +164,8 @@ def create_template(
     valid: TemplateView,
 ):
     try:
-        existing_superadmin = session.exec(select(User).where(User.role_id == Role.id == "Super Admin")).first()
+        existing_superadmin = session.exec(select(User).where(User.role == Role.id == "Super Admin")).first()
+
         if existing_superadmin is not None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -194,8 +199,9 @@ def create_template(
             session.refresh(service_provider_scope_group)
 
         scope_group_link = ScopeGroupLink(
-            scope_group_id=service_provider_scope_group.id,
-            organization_id=service_provider.id,
+            scope_group=service_provider_scope_group.id,
+            organization=service_provider.id,
+
         )
         session.add(scope_group_link)
         session.commit()
@@ -204,7 +210,8 @@ def create_template(
         #create role
         role = Role(
             name="Super Admin",
-            organization_id = service_provider.id
+            organization = service_provider.id
+
         )
         session.add(role)
         session.commit()
@@ -218,7 +225,7 @@ def create_template(
         ]
         for module in modules_to_grant: 
             role_module_permission= RoleModulePermission(
-                role_id=role.id,
+                role=role.id,
                 module=module,
                 access_policy=AccessPolicy.manage
             )
@@ -231,10 +238,11 @@ def create_template(
             username=stored_username,
             email=valid.email,
             hashedPassword=get_password_hash(valid.password + stored_username),
-            organization_id=service_provider.id,
-            role_id=role.id,
+            organization=service_provider.id,
+            role=role.id,
             scope = Scope.managerial_scope.value,
-            scope_group_id=service_provider_scope_group.id,
+            scope_group=service_provider_scope_group.id,
+
         )
         session.add(new_user)
         session.commit()
@@ -245,49 +253,41 @@ def create_template(
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Something went wrong")
  
-# @c.post(endpoint['update'])
-# def update_template(
-#     session: SessionDep, 
-#     current_user: UserDep,
-#     tenant: str,
-#     # valid: UpdateSuperAdminView,
-# ):
-#     try:
-#         orgs_in_scope = check_permission_and_scope(session, "Update", role_modules['update'], current_user)
-#         selected_entry = session.exec(
-#             select(db_model).where(db_model.organization_id.in_(orgs_in_scope["organization_ids"]), db_model.id == valid.id)
-#         ).first()
+@c.post(endpoint['update'])
+def update_template(
+    session: SessionDep, 
+    current_user: UserDep,
+    tenant: str,
+    valid: UpdateSuperAdminView,
+):
+    try:
+        orgs_in_scope = check_permission_and_scope(session, "Update", role_modules['update'], current_user)
+        selected_entry = session.exec(
+            select(db_model).where(db_model.organization.in_(orgs_in_scope["organization_ids"]), db_model.id == valid.id)
+        ).first()
 
-#         if not selected_entry:
-#             raise HTTPException(status_code=404, detail=f"{endpoint_name} not found")
-#         user_org = session.exec(select(Organization).where(Organization.id == selected_entry.organization_id)).first() 
-#         old_username = selected_entry.username
-#         new_username = add_organization_path(valid.username, user_org.name)
+        if not selected_entry:
+            raise HTTPException(status_code=404, detail=f"{endpoint_name} not found")
+        user_org = session.exec(select(Organization).where(Organization.id == selected_entry.organization)).first() 
+        old_username = selected_entry.username
+        new_username = add_organization_path(valid.username, user_org.name)
         
-#         selected_entry.fullname = valid.fullname
-#         selected_entry.username = new_username
-#         selected_entry.email = valid.email
-#         selected_entry.phone_number = valid.phone_number
-#         if verify_password(valid.old_password + old_username, selected_entry.hashedPassword):
-#             selected_entry.hashedPassword = get_password_hash(valid.new_password + selected_entry.username)
-#         else:
-#             raise HTTPException(status_code=401, detail="Incorrect password")
-#         if valid.role_id:
-#             selected_entry.role_id = valid.role_id
-#         if valid.scope_group_id:
-#             selected_entry.scope_group_id = valid.scope_group_id       
-#         session.add(selected_entry)
-#         session.commit()
-#         session.refresh(selected_entry)
+        selected_entry.full_name = valid.full_name
+        selected_entry.username = new_username
+        selected_entry.email = valid.email
+        selected_entry.phone_number = valid.phone_number
+        if verify_password(valid.old_password + old_username, selected_entry.hashedPassword):
+            selected_entry.hashedPassword = get_password_hash(valid.new_password + selected_entry.username)
+        else:
+            raise HTTPException(status_code=401, detail="Incorrect password")
+        if valid.role:
+            selected_entry.role = valid.role
+        if valid.scope_group:
+            selected_entry.scope_group = valid.scope_group       
+        session.add(selected_entry)
+        session.commit()
+        session.refresh(selected_entry)
 
-#         return {"message": f"{endpoint_name} Updated successfully"}
-
-#     except Exception as e:
-#         traceback.print_exc()
-#         raise HTTPException(status_code=500, detail="Something went wrong")
-
-
-    
 
 conf = ConnectionConfig(
     MAIL_USERNAME="sfapwr@bluespark.et",
@@ -386,7 +386,11 @@ async def send_mail(data: EmailSchema,
 
     return JSONResponse(status_code=200, content={"message": "Email with new password has been sent"})
 
-
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Something went wrong")
 @c.delete(endpoint['delete']+ "/{id}")
 def delete_template(
     session: SessionDep, 
@@ -397,7 +401,7 @@ def delete_template(
     try:
         orgs_in_scope = check_permission_and_scope(session, "Delete", role_modules['delete'], current_user) 
         selected_entry = session.exec(
-            select(db_model).where(db_model.organization_id.in_(orgs_in_scope["organization_ids"]), db_model.id == id)
+            select(db_model).where(db_model.organization.in_(orgs_in_scope["organization_ids"]), db_model.id == id)
         ).first()
 
         if not selected_entry:
@@ -406,6 +410,9 @@ def delete_template(
         session.delete(selected_entry)
         session.commit()
 
-        return {"message": f"{endpoint_name} deleted successfully"}
+        return {"message": f"{endpoint_name} deleted successfully"}   
+    except HTTPException as http_exc:
+        raise http_exc
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail="Something went wrong")

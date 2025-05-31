@@ -20,7 +20,7 @@ class PerformanceCreation(BaseModel):
 
 class period(BaseModel):
     name: Annotated [ str, AfterValidator( validate_name) ]
-    organization_id: Optional[int]
+    organization: Optional[int]
     type: str
     start: datetime
     end: datetime

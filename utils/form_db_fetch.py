@@ -5,6 +5,7 @@ from db import  get_session
 from models.Account import (Organization, User, Role, ScopeGroup, ScopeGroupLink)
 from models.Address import Address, Geolocation
 from models.Product_Category import Category, Product, InheritanceGroup, ProductLink, CategoryLink
+from models.Marketing import ClassificationGroup
 #from models.Warehouse import Stock, StockType, Warehouse, Vehicle
 from utils.get_hierarchy import get_organization_ids_by_scope_group
 from utils.auth_util import get_current_user
@@ -18,16 +19,15 @@ def fetch_id_and_name(session: Session, current_user: User, model_class: type):
     organization_ids = get_organization_ids_by_scope_group(session, current_user)
 
     stmt = select(model_class.id, model_class.name).where(
-        getattr(model_class, "organization_id").in_(organization_ids)
+        getattr(model_class, "organization").in_(organization_ids)
     )
     rows = session.exec(stmt).all()
     return {row[0]: row[1] for row in rows}
 
 def fetch_user_id_and_name(session: SessionDep, current_user: UserDep):
     organization_ids = get_organization_ids_by_scope_group(session, current_user)
-    
     users_row = session.exec(
-        select(User.id, User.fullname).where(User.organization_id.in_(organization_ids))
+        select(User.id, User.username).where(User.organization.in_(organization_ids))
     ).all()
     
     users = {row[0]: row[1] for row in users_row}
@@ -37,7 +37,7 @@ def fetch_organization_id_and_name(session: SessionDep, current_user: UserDep):
     organization_ids = get_organization_ids_by_scope_group(session, current_user)
 
     organization_rows = session.exec(
-        select(Organization.id, Organization.organization_name)
+        select(Organization.id, Organization.name)
         .where(Organization.id.in_(organization_ids))
     ).all()
 
@@ -49,7 +49,7 @@ def fetch_role_id_and_name(session: SessionDep, current_user: UserDep):
 
     role_rows = session.exec(
         select(Role.id, Role.name)
-        .where(Role.organization_id.in_(organization_ids))
+        .where(Role.organization.in_(organization_ids))
     ).all()
 
     roles = {row[0]: row[1] for row in role_rows}
@@ -59,8 +59,8 @@ def fetch_scope_group_id_and_name(session: SessionDep, current_user: UserDep):
     organization_ids = get_organization_ids_by_scope_group(session, current_user)
 
     scope_group_row = session.exec(
-        select(ScopeGroup.id, ScopeGroup.scope_name)
-        .where(ScopeGroup.parent_id.in_(organization_ids))
+        select(ScopeGroup.id, ScopeGroup.name)
+        .where(ScopeGroup.tenant_id.in_(organization_ids))
         ).all()
     scope_groups = {row[0]: row[1] for row in scope_group_row}
     return scope_groups
@@ -69,13 +69,13 @@ def fetch_scope_group_id_and_name(session: SessionDep, current_user: UserDep):
 #     organization_ids = get_organization_ids_by_scope_group(session, current_user)
 #     print("organizations::::", organization_ids)
 #     scope_group_rows = session.exec(
-#         select(ScopeGroup.id, ScopeGroup.scope_name)
-#         .join(ScopeGroupLink, ScopeGroup.id == ScopeGroupLink.scope_group_id)
-#         .where(ScopeGroupLink.organization_id.in_(organization_ids))
+#         select(ScopeGroup.id, ScopeGroup.name)
+#         .join(ScopeGroupLink, ScopeGroup.id == ScopeGroupLink.scope_group)
+#         .where(ScopeGroupLink.organization.in_(organization_ids))
 #         .distinct()
 #     ).all()
 
-#     # Convert to dictionary: {id: scope_name}
+#     # Convert to dictionary: {id: name}
 #     scope_groups = {row[0]: row[1] for row in scope_group_rows}
 #     return scope_groups
 
@@ -85,7 +85,7 @@ def fetch_product_id_and_name(session: SessionDep, current_user: UserDep):
 
     product_row = session.exec(
         select(Product.id, Product.name)
-        .where(Role.organization_id.in_(organization_ids))
+        .where(Role.organization.in_(organization_ids))
         ).all()
     products = {row[0]: row[1] for row in product_row}
     return products
@@ -95,7 +95,7 @@ def fetch_category_id_and_name(session: SessionDep, current_user: UserDep):
 
     category_row = session.exec(
         select(Category.id, Category.name)
-        .where(Category.organization_id.in_(organization_ids))
+        .where(Category.organization.in_(organization_ids))
         ).all()
     categories = {row[0]: row[1] for row in category_row}
     return categories
@@ -126,7 +126,7 @@ def fetch_address_id_and_name(session: SessionDep, current_user: UserDep):
     organization_ids = get_organization_ids_by_scope_group(session, current_user)
 
     address_ids = session.exec(
-        select(Organization.address_id)
+        select(Organization.address)
         .where(Organization.id.in_(organization_ids))
     ).all()
     
@@ -147,8 +147,8 @@ def fetch_classification_id_and_name(session: SessionDep, current_user: UserDep)
     organization_ids = get_organization_ids_by_scope_group(session, current_user)
 
     classification_row = session.exec(
-        select(Organization.classification_group_id, Organization.classification_group_name)
-        .where(Organization.id.in_(organization_ids))
+        select(ClassificationGroup.id, ClassificationGroup.name)
+        .where(ClassificationGroup.organization.in_(organization_ids))
     ).all()
 
     classifications = {row[0]: row[1] for row in classification_row if row[0] is not None}
@@ -165,42 +165,42 @@ def fetch_point_of_sale_id_and_name(session: SessionDep, current_user: UserDep):
     pos = {row[0]: row[1] for row in pos_row if row[0] is not None}
     return pos 
 
-def fetch_warehouse_id_and_name(session: SessionDep, current_user: UserDep):
-    organization_ids = get_organization_ids_by_scope_group(session, current_user)
+# def fetch_warehouse_id_and_name(session: SessionDep, current_user: UserDep):
+#     organization_ids = get_organization_ids_by_scope_group(session, current_user)
 
-    warehouse_row = session.exec(
-        select(Warehouse.id, Warehouse.warehouse_name)
-        .where(Warehouse.organization_id.in_(organization_ids))
-        ).all()
-    warehouses = {row[0]: row[1] for row in warehouse_row}
-    return warehouses
+#     warehouse_row = session.exec(
+#         select(Warehouse.id, Warehouse.warehouse_name)
+#         .where(Warehouse.organization.in_(organization_ids))
+#         ).all()
+#     warehouses = {row[0]: row[1] for row in warehouse_row}
+#     return warehouses
 
-def fetch_stocks_id_and_name(session: SessionDep, current_user: UserDep):
-    organization_ids = get_organization_ids_by_scope_group(session, current_user)
-    stock_row = session.exec(
-        select(Stock.id, Stock.stock_type, Product.name)
-        .join(Warehouse, Warehouse.id == Stock.warehouse_id)
-        .join(Product, Product.id == Stock.product_id)
-        .where(Warehouse.organization_id.in_(organization_ids))
-    ).all()
+# def fetch_stocks_id_and_name(session: SessionDep, current_user: UserDep):
+#     organization_ids = get_organization_ids_by_scope_group(session, current_user)
+#     stock_row = session.exec(
+#         select(Stock.id, Stock.stock_type, Product.name)
+#         .join(Warehouse, Warehouse.id == Stock.warehouse_id)
+#         .join(Product, Product.id == Stock.product_id)
+#         .where(Warehouse.organization.in_(organization_ids))
+#     ).all()
 
-    print(stock_row)
+#     print(stock_row)
 
-    stocks = {
-        row[0] :row[2] + convert_promotional(row[1])
-        for row in stock_row
-    }
-    return stocks
+#     stocks = {
+#         row[0] :row[2] + convert_promotional(row[1])
+#         for row in stock_row
+#     }
+#     return stocks
 
-def fetch_vehicle_id_and_name(session: SessionDep, current_user: UserDep):
-    organization_ids = get_organization_ids_by_scope_group(session, current_user)
+# def fetch_vehicle_id_and_name(session: SessionDep, current_user: UserDep):
+#     organization_ids = get_organization_ids_by_scope_group(session, current_user)
 
-    vehicle_row = session.exec(
-        select(Vehicle.id, Vehicle.name)
-        .where(Vehicle.organization_id.in_(organization_ids))
-        ).all()
-    vehicles = {row[0]: row[1] for row in vehicle_row}
-    return vehicles
+#     vehicle_row = session.exec(
+#         select(Vehicle.id, Vehicle.name)
+#         .where(Vehicle.organization.in_(organization_ids))
+#         ).all()
+#     vehicles = {row[0]: row[1] for row in vehicle_row}
+#     return vehicles
 
 
 def add_category_link(session: SessionDep, inheritance_group_id: int, category_id: int):
@@ -259,7 +259,7 @@ def get_user_inheritance_group(session, current_user):
 
     Args:
         session: SQLModel session instance.
-        current_user: User instance with an organization_id.
+        current_user: User instance with an organization.
 
     Returns:
         inherited_group: The InheritanceGroup object if found, otherwise None.
@@ -267,7 +267,7 @@ def get_user_inheritance_group(session, current_user):
     """
     inherited_group_id = session.exec(
         select(Organization.inheritance_group).where(
-            Organization.id == current_user.organization_id
+            Organization.id == current_user.organization
         )
     ).first()
 

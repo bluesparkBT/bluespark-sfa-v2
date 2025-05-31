@@ -52,7 +52,7 @@ def get_template(
         orgs_in_scope = check_permission_and_scope(session, "Read", role_modules['get'], current_user)
         
         inherited_group_id = session.exec(
-            select(Organization.inheritance_group).where(Organization.id == current_user.organization_id)
+            select(Organization.inheritance_group).where(Organization.id == current_user.organization)
         ).first()
         
         inherited_group = session.exec(
@@ -66,7 +66,7 @@ def get_template(
             inherited_categories = []
         
         # organization_ids = get_organization_ids_by_scope_group(session, current_user)
-        # scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == current_user.scope_group_id)).first()
+        # scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == current_user.scope_group)).first()
    
         # if scope_group != None:
         #     existing_orgs = [organization.id for organization in scope_group.organizations ]
@@ -74,7 +74,7 @@ def get_template(
         #     existing_orgs= []
 
         categories = session.exec(
-            select(Category).where(Category.organization_id.in_(orgs_in_scope["organization_ids"]))
+            select(Category).where(Category.organization.in_(orgs_in_scope["organization_ids"]))
         ).all()
         # categories = organization_group.categories
 
@@ -117,7 +117,7 @@ def get_template(
         organization_ids = get_organization_ids_by_scope_group(session, current_user)
 
         db_category = session.exec(
-            select(Category).where(Category.organization_id.in_(organization_ids), Category.id == id)
+            select(Category).where(Category.organization.in_(organization_ids), Category.id == id)
         ).first()
 
         if not db_category:
@@ -215,7 +215,7 @@ def update_template(
         organization_ids = get_organization_ids_by_scope_group(session, current_user)
 
         selected_category = session.exec(
-            select(Category).where(Category.organization_id.in_(organization_ids), Category.id == valid.id)
+            select(Category).where(Category.organization.in_(organization_ids), Category.id == valid.id)
         ).first()
 
         if not selected_category:
@@ -231,7 +231,7 @@ def update_template(
         
         selected_category.description = valid.description
         if valid.organization == organization_ids:
-            selected_category.organization_id = valid.organization
+            selected_category.organization = valid.organization
         else:
             {"message": "invalid input select your owen organization id"}    
  
@@ -265,7 +265,7 @@ def delete_template(
         organization_ids = get_organization_ids_by_scope_group(session, current_user)
 
         selected_category = session.exec(
-            select(Category).where(Category.organization_id.in_(organization_ids), Category.id == id)
+            select(Category).where(Category.organization.in_(organization_ids), Category.id == id)
         ).first()
 
         if not selected_category:

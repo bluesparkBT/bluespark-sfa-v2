@@ -12,7 +12,7 @@ from utils.get_hierarchy import get_organization_ids_by_scope_group, get_child_o
 from utils.form_db_fetch import fetch_organization_id_and_name, fetch_inheritance_group_id_and_name, fetch_address_id_and_name
 import traceback
 
-TenantRouter =tr= APIRouter()
+OrganizationRouter =tr= APIRouter()
 SessionDep = Annotated[Session, Depends(get_session)]
 UserDep = Annotated[dict, Depends(get_current_user)]
 
@@ -47,14 +47,16 @@ async def get_my_tenant(
         # Return the organization information
         return {
             "id": organization.id,
-            "organization": organization.organization_name,
+            "organization": organization.name,
             "owner": organization.owner_name,
             "logo": organization.logo_image,
         }
         
+    except HTTPException as http_exc:
+        raise http_exc
     except Exception as e:
         traceback.print_exc()
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong")
 
 @tr.get("/get-organizations/")
 async def get_organizations(
@@ -73,20 +75,23 @@ async def get_organizations(
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-            
-        current_tenant_id = session.exec(select(Organization.id).where(Organization.id == current_user.organization_id)).first() if tenant == "provider" else session.exec(select(Organization.id).where(Organization.tenant_hashed == tenant)).first()
-       
+        organization_ids = get_organization_ids_by_scope_group(session, current_user)
+        if tenant == "provider":
+            current_tenant = session.exec(select(Organization).where(Organization.id == current_user.organization)).first()
+        else :
+            current_tenant = session.exec(select(Organization).where(Organization.tenant_hashed == tenant)).first()
         
-        organizations = get_heirarchy(session, current_tenant_id, None, current_user)
-        
+        organizations = get_heirarchy(session, current_tenant.id, None, current_user)
         if not organizations:
             raise HTTPException(status_code=404, detail="No organizations found")
 
         return organizations
         
+    except HTTPException as http_exc:
+        raise http_exc
     except Exception as e:
         traceback.print_exc()
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong")
     
 @tr.get("/get-children-organizations/{id}")
 async def get_children_organizations(
@@ -108,7 +113,7 @@ async def get_children_organizations(
                 status_code=403, detail="You Do not have the required privilege"
             )
         
-        organizations = session.exec(select(Organization).where(Organization.parent_id == id)).all()
+        organizations = session.exec(select(Organization).where(Organization.parent_organization == id)).all()
 
         if not organizations:
             return []
@@ -118,24 +123,26 @@ async def get_children_organizations(
         for org in organizations:
             organization_list.append({
                 "id": org.id,
-                "organization": org.organization_name,
+                "organization": org.name,
                 "owner": org.owner_name,
                 "logo": org.logo_image,
                 "description": org.description,
                 "organization_type": org.organization_type,
                 "inheritance_group": org.inheritance_group,
-                "parent_organization": org.parent_id,
+                "parent_organization": org.parent_organization,
                 "scope_groups": [
-                    {"id": sg.id, "scope_name": sg.scope_name}
+                    {"id": sg.id, "name": sg.name}
                     for sg in org.scope_groups
                 ]
             })
 
         return organization_list
 
+    except HTTPException as http_exc:
+        raise http_exc
     except Exception as e:
         traceback.print_exc()
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong")
     
 @tr.get("/get-my-organization/")
 async def get_my_organization(
@@ -164,7 +171,7 @@ async def get_my_organization(
                 status_code=403, detail="You Do not have the required privilege"
             )
             
-        organization = session.exec(select(Organization).where(Organization.id == current_user.organization_id)).first()
+        organization = session.exec(select(Organization).where(Organization.id == current_user.organization)).first()
         if not organization:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -174,14 +181,16 @@ async def get_my_organization(
         # Return the organization information
         return {
             "id": organization.id,
-            "organization": organization.organization_name,
+            "organization": organization.name,
             "owner": organization.owner_name,
             "logo": organization.logo_image,
         }
         
+    except HTTPException as http_exc:
+        raise http_exc
     except Exception as e:
         traceback.print_exc()
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong")
     
 @tr.get("/get-organization/{id}")
 async def get_organization(
@@ -204,16 +213,18 @@ async def get_organization(
   
         return {
             "id": organization.id,
-            "organization_name": organization.organization_name,
+            "name": organization.name,
             "description": organization.description,
             "owner_name": organization.owner_name,
             "logo_image": organization.logo_image,
             "organization_type": organization.organization_type,
-            "parent_organization": organization.parent_id
+            "parent_organization": organization.parent_organization
         }
+    except HTTPException as http_exc:
+        raise http_exc
     except Exception as e:
         traceback.print_exc()
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong")
      
 @tr.get("/organization-form/")
 async def get_form_fields_organization(
@@ -232,7 +243,7 @@ async def get_form_fields_organization(
 
         organization_data = {
             "id": "",
-            "organization_name": "",
+            "name": "",
             "owner_name": "",
             "description": "",
             "logo_image": "",
@@ -247,16 +258,18 @@ async def get_form_fields_organization(
         
 
         return {"data": organization_data, "html_types": get_html_types('organization')}
+    except HTTPException as http_exc:
+        raise http_exc
     except Exception as e:
         traceback.print_exc()
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong")
 
 @tr.post("/create-organization/")
 async def create_organization(
     session: SessionDep,
     current_user: UserDep,
     tenant: str,
-    organization_name: str = Body(...),
+    name: str = Body(...),
     owner_name: str = Body(...),
     description: str = Body(...),
     logo_image: str = Body(...),
@@ -275,7 +288,7 @@ async def create_organization(
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-        # existing_tenant = session.exec(select(Organization).where(Organization.organization_name == organization_name)).first()
+        # existing_tenant = session.exec(select(Organization).where(Organization.name == name)).first()
 
         # if existing_tenant is not None:
         #     raise HTTPException(
@@ -286,7 +299,7 @@ async def create_organization(
         #Check Validity
         if inheritance_group == "":
             inheritance_group = None
-        if validate_name(organization_name) == False:
+        if validate_name(name) == False:
             raise HTTPException(
                 status_code=404,
                 detail="Company name is not valid",
@@ -319,8 +332,8 @@ async def create_organization(
         org_geolocation = None
         if latitude is not None and longitude is not None:
             org_geolocation = Geolocation(
-                name=f"{organization_name} location",
-                address_id=address,
+                name=f"{name} location",
+                address=address,
                 latitude=latitude,
                 longitude=longitude
             )
@@ -331,14 +344,14 @@ async def create_organization(
 
         organization = Organization(
             id = None,
-            organization_name = organization_name,
+            name = name,
             owner_name = owner_name,
             description = description,
             logo_image = logo_image,
-            parent_id = parent_organization,
+            parent_organization = parent_organization,
             organization_type = organization_type,
             inheritance_group = inheritance_group,
-            address_id = address,
+            address = address,
             landmark= landmark,
             location_id=org_geolocation.id if org_geolocation else None
 
@@ -349,17 +362,19 @@ async def create_organization(
         session.refresh(organization)
 
         scope_group_link = ScopeGroupLink(
-            scope_group_id=current_user.scope_group_id,
-            organization_id=organization.id,
+            scope_group=current_user.scope_group,
+            organization=organization.id,
         )
         session.add(scope_group_link)
         session.commit()
         
-        return {"message": "Organization created successfully", "organization": organization_name}
+        return {"message": "Organization created successfully", "organization": name}
     
+    except HTTPException as http_exc:
+        raise http_exc
     except Exception as e:
         traceback.print_exc()
-        raise HTTPException(status_code=400, detail=str(e))           
+        raise HTTPException(status_code=500, detail="Something went wrong")           
 
 @tr.put("/update-organization/")
 async def create_organization(
@@ -368,7 +383,7 @@ async def create_organization(
     tenant: str,
 
     id: int = Body(...),
-    organization_name: str = Body(...),
+    name: str = Body(...),
     owner_name: str = Body(...),
     description: str = Body(...),
     logo_image: str = Body(...),
@@ -407,7 +422,7 @@ async def create_organization(
                 status_code=404,
                 detail="Logo image is not valid",
         )
-        exisitng_org_geolocation = session.exec(select(Geolocation).where(Geolocation.id == existing_organization.address_id)).first()    
+        exisitng_org_geolocation = session.exec(select(Geolocation).where(Geolocation.id == existing_organization.address)).first()    
         if exisitng_org_geolocation:
             if latitude:
                 exisitng_org_geolocation.latitude = latitude,
@@ -418,8 +433,8 @@ async def create_organization(
             session.commit()            
         else:
             org_geolocation = Geolocation(
-                name = f"{organization_name} location",
-                address_id = address,
+                name = f"{name} location",
+                address = address,
                 latitude = latitude,
                 longitude = longitude
             )
@@ -427,7 +442,7 @@ async def create_organization(
             session.commit()
 
         
-        existing_organization.organization_name = organization_name
+        existing_organization.name = name
         existing_organization.owner_name = owner_name
         existing_organization.description = description
         if inheritance_group:
@@ -435,9 +450,9 @@ async def create_organization(
         existing_organization.logo_image = logo_image
         existing_organization.organization_type = organization_type
         if parent_organization:
-            existing_organization.parent_id = parent_organization
+            existing_organization.parent_organization = parent_organization
         if address:
-            existing_organization.address_id = address
+            existing_organization.address = address
         if landmark:
             existing_organization.landmark = landmark,
             
@@ -445,7 +460,7 @@ async def create_organization(
         session.commit()
         session.refresh(existing_organization)
         
-        return {"message": "Organization updated successfully", "organization": organization_name}
+        return {"message": "Organization updated successfully", "organization": name}
     
     except Exception as e:
         traceback.print_exc()
@@ -493,16 +508,18 @@ async def delete_organization(
 
         return {"message": "Organization deleted successfully"}
     
+    except HTTPException as http_exc:
+        raise http_exc
     except Exception as e:
         traceback.print_exc()
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong")
 
 # @ar.get("/get-organization-hierarchy/")
 # async def get_organization_hierarchy(
 #     session: SessionDep,
 # tenant: str,
 #     current_user: UserDep,
-#     scope_group_id: int = Body(...),
+#     scope_group: int = Body(...),
 # ):
 #     try:
 #         if not check_permission(
@@ -511,14 +528,14 @@ async def delete_organization(
 #             raise HTTPException(
 #                 status_code=403, detail="You Do not have the required privilege"
 #             )
-#         scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == scope_group_id)).first()
+#         scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == scope_group)).first()
 #         if not scope_group:
 #             raise HTTPException(status_code=404, detail="Scope group not found")
 
 #         hierarchy = get_hierarchy(scope_group, session)
         
 #         return {
-#             "scope_group": scope_group.scope_name,
+#             "scope_group": scope_group.name,
 #             "hierarchy": hierarchy
 #         }
 #     except Exception as e:

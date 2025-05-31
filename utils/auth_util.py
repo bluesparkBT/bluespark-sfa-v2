@@ -49,6 +49,7 @@ def add_organization_path(username: str, tenant_name: str) -> str:
 def extract_username(username: str, tenant_name: str) -> str:
     prefix = re.sub(r"\s+", "_", tenant_name.strip().lower()) + "_"
     # prefix = f"{tenant_name.lower()}_"
+    print("TENATN USER NAME",username, tenant_name)
     if username.startswith(prefix):
         return username[len(prefix):]
     raise ValueError("Username does not match the given tenant prefix.")
@@ -148,11 +149,11 @@ def check_permission(
             )
 
         user = session.exec(select(User).where(User.id == user.id)).first()
-        if not user or not user.role_id:
+        if not user or not user.role:
             print("User not found or has no role")
             return False
 
-        role = session.exec(select(Role).where(Role.id == user.role_id)).first()
+        role = session.exec(select(Role).where(Role.id == user.role)).first()
         if not role:
             print("Role not found")
             return False
@@ -183,7 +184,7 @@ def check_permission(
 
             permission = session.exec(
                 select(RoleModulePermission)
-                .where(RoleModulePermission.role_id == role.id)
+                .where(RoleModulePermission.role == role.id)
                 .where(RoleModulePermission.module == endpoint_group)
             ).first()
 

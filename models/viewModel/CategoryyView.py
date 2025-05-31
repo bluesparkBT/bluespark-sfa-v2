@@ -15,6 +15,6 @@ class CategoryView(BaseModel):
     code:  Annotated [ str,  AfterValidator( validate_name) ] 
     description: Optional[str] = None
     parent_category: Optional[int] = None
-    organization_id: int 
+    organization: int 
 
     # parent_category: Optional[str] = None
