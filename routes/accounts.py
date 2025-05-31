@@ -71,7 +71,7 @@ async def get_my_user(
             superadmin_user = session.exec(select(User).where(User.id == current_user.id)).first()
             print("super admin user:", superadmin_user)
 
-            username_display = extract_username(superadmin_user.username, service_provider.organization_name)
+            username_display = user.username
             organization_name = service_provider.organization_name
         else:
             current_tenant = session.exec(
@@ -81,7 +81,7 @@ async def get_my_user(
                 raise HTTPException(status_code=404, detail="Tenant not found")
 
             organization_name = current_tenant.organization_name
-            username_display = extract_username(user.username, organization_name)
+            username_display = user.username
 
         return {
             "id": user.id,
