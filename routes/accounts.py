@@ -72,7 +72,7 @@ async def get_my_user(
             print("super admin user:", superadmin_user)
 
             username_display = user.username
-            organization_name = service_provider.organization_name
+            organization_name = service_provider.name
         else:
             current_tenant = session.exec(
                 select(Organization).where(Organization.tenant_hashed == tenant)
@@ -80,7 +80,7 @@ async def get_my_user(
             if not current_tenant:
                 raise HTTPException(status_code=404, detail="Tenant not found")
 
-            organization_name = current_tenant.organization_name
+            organization_name = current_tenant.name
             username_display = user.username
 
         return {
