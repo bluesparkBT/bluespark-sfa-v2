@@ -372,7 +372,7 @@ async def send_mail(data: EmailSchema,
     # Prepare the email message. The recipient is now static.
     message = MessageSchema(
         subject="Your New Password",
-        recipients=["mikasol9134@gmail.com"],
+        recipients=["yalew.tenna@bluespark.et"],
         body=template,
         subtype="html"
     )
