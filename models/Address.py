@@ -14,11 +14,7 @@ class Address(SQLModel, table=True):
     geolocation: Optional["Geolocation"] = Relationship(back_populates="address")
 
 
-    @model_validator(mode="after")
-    def check(self) -> Self:
-        if self.landmark == "null" or self.landmark == "":
-            self.landmark = None
-        return self
+
 
 
 class Geolocation(SQLModel, table=True):

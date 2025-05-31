@@ -8,17 +8,45 @@ from models.Address import Address, Geolocation
 from models.Utils import ErrorLog
 from utils.address_util import check_address
 from utils.auth_util import get_current_user
+from models.viewModel.AddressView import AddressView as TemplateView
+
 from utils.model_converter_util import get_html_types
-from utils.auth_util import check_permission
+from utils.auth_util import check_permission, check_permission_and_scope
+from utils.form_db_fetch import get_organization_ids_by_scope_group
+from models.Account import Organization
 
 SessionDep = Annotated[Session, Depends(get_session)]
 UserDep = Annotated[dict, Depends(get_current_user)]
 
 AddressRouter = ar = APIRouter()
 
+endpoint_name = "addresses"
+db_model = Address
 
-@ar.get("/get-addresses")
-async def get_addresses(session: SessionDep, current_user: UserDep, tenant: str) -> list[Address]:
+endpoint = {
+    "get": f"/get-{endpoint_name}",
+    "get_by_id": f"/get-{endpoint_name}",
+    "get_form": f"/{endpoint_name}-form/",
+    "create": f"/create-{endpoint_name}",
+    "update": f"/update-{endpoint_name}",
+    "delete": f"/delete-{endpoint_name}",
+}
+
+role_modules = {   
+    "get": ["Administrative", "Address"],
+    "get_form": ["Administrative", "Address"],
+    "create": ["Administrative", "Address"],
+    "update": ["Administrative", "Address"],
+    "delete": ["Administrative", "Address"],
+}
+
+
+@ar.get(endpoint['get'])
+async def get_addresses(
+    session: SessionDep, 
+    current_user: UserDep, 
+    tenant: str
+):
     """
     Retrieve all addresses from the database.
 
@@ -29,31 +57,38 @@ async def get_addresses(session: SessionDep, current_user: UserDep, tenant: str)
         list[Address]: A list of Address objects.
         If empty it returns an empty list. []
     """
-    try:
+    try:  
         if not check_permission(
-            session, "Read", ["Administrative", "Address"], current_user
+            session, "Read",role_modules['get'], current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-        addresses = session.exec(select(Address)).all()
-        return addresses
-    except Exception as e:
-        error_details = traceback.format_exc()
-        errorlog = ErrorLog(
-            id=None,
-            endpoint="/addresses",
-            request_data=None,
-            error_message=str(e),
-            stack_trace=error_details,
-        )
-        session.add(errorlog)
-        session.commit()
-        raise HTTPException(
-            status_code=400, detail="Internal Server Error, Please Try again"
-        )
 
-@ar.get("/get-address/{id}")
+        # Fetch categories based on organization IDs
+        organization_ids = get_organization_ids_by_scope_group(session, current_user)
+        # orgs_address_id = [
+        #     address_id for address_id in session.exec(
+        #         select(Organization.address_id).where(Organization.id.in_(organization_ids))
+        #     ).all()
+        # ]
+
+        # entries_list = session.exec(
+        #     select(db_model).where(db_model.id.in_(orgs_address_id))
+        # ).all()
+        entry = session.exec(
+            select(db_model)).all()    
+
+        if not entry:
+            raise HTTPException(status_code=404, detail="Address not found")
+        
+        return entry
+
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Something went wrong")
+
+@ar.get(endpoint['get_by_id'] + "/{id}")
 async def get_address_by_id(session: SessionDep, current_user: UserDep, tenant: str, id: int):
     """
     Retrieve a specific address by its ID.
@@ -70,22 +105,23 @@ async def get_address_by_id(session: SessionDep, current_user: UserDep, tenant: 
     """
     try:
         if not check_permission(
-            session, "Read",["Address", "Administrative"], current_user
+            session, "Read",role_modules['get'], current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-        address = session.exec(select(Address).where(Address.id == id)).first()
-        if not address:
-            raise HTTPException(status_code=404, detail="Address not found")
-        return address
-    except HTTPException as e:
-        raise e
-    except Exception as e:
-        error_details = traceback.format_exc()
-        raise HTTPException(status_code=400, detail=error_details)
 
-@ar.get("/address-form")
+        entry = session.exec(select(db_model).where(db_model.id == id)).first()
+        if not entry:
+            raise HTTPException(status_code=404, detail="Address not found")
+        return entry
+    
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Something went wrong")
+    
+
+@ar.get(endpoint['get_form'])
 async def get_form_fields_address(session: SessionDep, current_user: UserDep, tenant: str):
     address = Address(
         id="",
@@ -100,15 +136,12 @@ async def get_form_fields_address(session: SessionDep, current_user: UserDep, te
         "html_types": get_html_types('address'),
     }
 
-@ar.post("/create-address")
-async def create_address(
+@ar.post(endpoint['create'])
+async def create_template(
     session: SessionDep,
-    current_user: UserDep,
     tenant: str,
-    country: str = Body(...),
-    city : str = Body(...),
-    sub_city : str = Body(...),
-    woreda : str = Body(...),
+    current_user: UserDep,
+    valid: TemplateView,
 ):
     """
     Create a new address in the database.
@@ -125,74 +158,81 @@ async def create_address(
     """
     try:
         if not check_permission(
-            session, "Create", ["Address", "Administrative"], current_user
+            session, "Create",role_modules['create'], current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-        new_address = Address(
-            id = None,
-            country = country,
-            city = city,
-            sub_city = sub_city,
-            woreda = woreda,
-            
-        )
-        session.add(new_address)
-        session.commit()
-        
-        return {"Address Created successfully."}
-    except Exception as e:
-        traceback.print.exc()
-        traceback.print_exc()
-        raise HTTPException(status_code=400, detail=f"Create address failed: {str(e)}")
 
-@ar.put("/update-address/")
+        organization_ids = get_organization_ids_by_scope_group(session, current_user)
+
+        # Create a new category entry from validated input
+        new_entry = db_model.model_validate(valid)
+        session.add(new_entry)
+        session.commit()
+        session.refresh(new_entry)
+
+        return new_entry
+
+    except Exception as e:
+        traceback.print_exc()
+      
+@ar.put(endpoint['update'])
 async def update_address(
     session: SessionDep,
     current_user: UserDep,
     tenant: str,
-    id: int = Body(...),
-    country: Optional[str] = Body(...),
-    city: Optional[str] = Body(...),
-    sub_city: Optional[str] = Body(...),
-    woreda: Optional[str] = Body(...),
+
+    valid: TemplateView,
+
+    
 ):
     """
     Update an existing address by ID.
     """
     try:
         # Check permissions first
-        if not check_permission(session, "Update", ["Address", "Administrative"], current_user):
-            raise HTTPException(status_code=403, detail="Permission denied")
-
+        if not check_permission(
+            session, "Update",role_modules['update'], current_user
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
         # Fetch address
-        address = session.exec(select(Address).where(Address.id == id)).first()
-        if not address:
-            raise HTTPException(status_code=404, detail="Address not found")
+        #orgs_in_scope = check_permission_and_scope(session, "Update", role_modules['update'], current_user)
+        # selected_entry = session.exec(
+        #     select(db_model).where(db_model.organization_id.in_(orgs_in_scope["organization_ids"]), db_model.id == valid.id)
+        # ).first()
+        selected_entry = session.exec(
+            select(db_model).where( db_model.id == valid.id)
+        ).first()
 
+        if not selected_entry:
+            raise HTTPException(status_code=404, detail=f"{endpoint_name} not found")
+       
         # Update only if values are provided (this is safe since you use Body(...))
-        address.country = country
-        address.city = city
-        address.sub_city = sub_city
-        address.woreda = woreda
+        selected_entry.country = valid.country
+        selected_entry.city = valid.city
+        selected_entry.sub_city = valid.sub_city
+        selected_entry.woreda = valid.woreda
 
-        session.add(address)
+        session.add(selected_entry)
         session.commit()
-        session.refresh(address)
+        session.refresh(selected_entry)
 
-        return address
+        return {"message": f"{endpoint_name} Updated successfully"}
 
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=400, detail=f"Update failed: {str(e)}")
 
-@ar.delete("/delete-address/{id}")
+@ar.delete(endpoint['delete']+ "/{id}")
 async def delete_address(
     id: int,
     session: SessionDep,
     current_user: UserDep,
-    tenant: str
+    tenant: str,
+
 ):
     """
     Delete an address from the database.
@@ -212,17 +252,27 @@ async def delete_address(
 
 
     try:
-        # Check permissions first
-        if not check_permission(session, "Update", ["Address", "Administrative"], current_user):
-            raise HTTPException(status_code=403, detail="Permission denied")
+        if not check_permission(
+            session, "Delete",role_modules['delete'], current_user
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
+        # Fetch address
+        #orgs_in_scope = check_permission_and_scope(session, "Update", role_modules['update'], current_user)
+        # selected_entry = session.exec(
+        #     select(db_model).where(db_model.organization_id.in_(orgs_in_scope["organization_ids"]), db_model.id == valid.id)
+        # ).first()
+        selected_entry = session.exec(
+            select(db_model).where( db_model.id == id)
+        ).first()
 
-        address = session.exec(select(Address).where(Address.id == id)).first()
-        if not address:
-            raise HTTPException(status_code=404, detail="Address not found")
-        
-        session.delete(address)
+        if not selected_entry:
+            raise HTTPException(status_code=404, detail=f"{endpoint_name} not found")
+       
+        session.delete(selected_entry)
         session.commit()
-        return {"message": "Address deleted successfully"}
+        return {"message": f"{endpoint_name} deleted successfully"}
     
     except Exception as e:
         traceback.print.exc()

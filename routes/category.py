@@ -194,7 +194,7 @@ def create_template(
         raise HTTPException(status_code=400, detail=str(e))
  
 # update a single category by ID
-@c.post(endpoint['update'])
+@c.put(endpoint['update'])
 def update_template(
     session: SessionDep, 
     current_user: UserDep,

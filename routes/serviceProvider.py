@@ -8,6 +8,7 @@ import traceback
 from utils.auth_util import verify_password, create_access_token, get_password_hash
 from utils.util_functions import validate_name, validate_email, validate_phone_number, parse_enum
 from utils.auth_util import get_current_user, check_permission, generate_random_password, get_tenant_hash, extract_username, add_organization_path
+
 from utils.model_converter_util import get_html_types
 from utils.form_db_fetch import get_organization_ids_by_scope_group
 from utils.domain_util import getPath
@@ -139,6 +140,7 @@ def get_by_Id_template(
     id: int,
 ):
     try:
+
         orgs_in_scope = check_permission_and_scope(session, "Update", role_modules['update'], current_user)
         entry = session.exec(
             select(db_model).where(db_model.organization.in_(orgs_in_scope["organization_ids"]), db_model.id == id)
@@ -163,6 +165,7 @@ def create_template(
 ):
     try:
         existing_superadmin = session.exec(select(User).where(User.role == Role.id == "Super Admin")).first()
+
         if existing_superadmin is not None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -198,6 +201,7 @@ def create_template(
         scope_group_link = ScopeGroupLink(
             scope_group=service_provider_scope_group.id,
             organization=service_provider.id,
+
         )
         session.add(scope_group_link)
         session.commit()
@@ -207,6 +211,7 @@ def create_template(
         role = Role(
             name="Super Admin",
             organization = service_provider.id
+
         )
         session.add(role)
         session.commit()
@@ -237,6 +242,7 @@ def create_template(
             role=role.id,
             scope = Scope.managerial_scope.value,
             scope_group=service_provider_scope_group.id,
+
         )
         session.add(new_user)
         session.commit()
@@ -282,14 +288,109 @@ def update_template(
         session.commit()
         session.refresh(selected_entry)
 
-        return {"message": f"{endpoint_name} Updated successfully"}
+
+conf = ConnectionConfig(
+    MAIL_USERNAME="sfapwr@bluespark.et",
+    MAIL_PASSWORD="Hard&test&work6756",
+    MAIL_PORT=465,  # Use 465 for SSL or 587 for STARTTLS
+    MAIL_SERVER="mail.bluespark.et",
+    MAIL_STARTTLS=False,  # Use True if port 587
+    MAIL_SSL_TLS=True,    # Set True for SSL (port 465)
+    MAIL_FROM="sfapwr@bluespark.et",  # Ensure this email is valid
+    USE_CREDENTIALS=True,
+    VALIDATE_CERTS=True
+)
+
+@c.post("/forgot-Password")
+async def send_mail(data: EmailSchema, 
+                    db: Session = Depends(get_session),                        
+):
+    username = data.username
+
+    service_provider = db.exec(select(Organization).where(Organization.organization_type == "Service Provider")).first()
+
+    db_username = add_organization_path(username, service_provider.name)
+
+    # Check if the user exists
+    user = db.exec(select(db_model).where(db_model.username == db_username)).first()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    stored_username = add_organization_path(username, service_provider.name)
+    #Generate a new random password and hash it
+    new_password = generate_random_password()
+    hashed_password = get_password_hash(new_password + stored_username)
+
+    #Update user's password in the database
+    user.hashedPassword = hashed_password
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    # Build the email template with the generated password included
+    template = f"""
+<html>
+  <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
+    <div style="max-width: 600px; margin: auto; background-color: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);">
+      
+      <div style="text-align: center;">
+        <h2 style="color: #0047AB;">Sales Force Automation (SFA)</h2>
+        <h4 style="color: #008CBA;">Powered by BlueSpark Business Technology Solutions</h4>
+      </div>
+      
+      <hr style="border: none; height: 1px; background-color: #ddd; margin: 20px 0;">
+      
+      <p style="font-size: 16px; color: #333;">Hello,</p>
+      
+      <p style="font-size: 16px; color: #333;">
+        Thank you for using <strong>Sales for Automation (SFA)</strong>. We value your trust and are committed to delivering smart solutions for your business efficiency.
+      </p>
+      
+      <p style="font-size: 16px; color: #333;">
+        Your New Password is: 
+        <span style="font-weight: bold; color: #d9534f; font-size: 18px;">{new_password}</span>
+      </p>
+      
+      <p style="font-size: 16px; color: #333;">
+        Please use this password to log in and make sure to update it immediately for security reasons.
+      </p>
+      
+      <hr style="border: none; height: 1px; background-color: #ddd; margin: 20px 0;">
+      
+      <div style="text-align: center;">
+        <p style="font-size: 14px; color: #888;">
+          If you have any questions or need assistance, please contact 
+          <strong>BlueSpark Business Technology Solutions Support</strong>.
+        </p>
+      </div>
+      
+    </div>
+  </body>
+</html>
+"""
+
+    # Prepare the email message. The recipient is now static.
+    message = MessageSchema(
+        subject="Your New Password",
+        recipients=["yalew.tenna@bluespark.et"],
+        body=template,
+        subtype="html"
+    )
+
+    # Send the email
+    fm = FastMail(conf)
+
+    await fm.send_message(message)
+  
+    print(f"New password generated for user : {new_password}")
+
+    return JSONResponse(status_code=200, content={"message": "Email with new password has been sent"})
 
     except HTTPException as http_exc:
         raise http_exc
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Something went wrong")
-    
 @c.delete(endpoint['delete']+ "/{id}")
 def delete_template(
     session: SessionDep, 
@@ -309,8 +410,7 @@ def delete_template(
         session.delete(selected_entry)
         session.commit()
 
-        return {"message": f"{endpoint_name} deleted successfully"}
-    
+        return {"message": f"{endpoint_name} deleted successfully"}   
     except HTTPException as http_exc:
         raise http_exc
     except Exception as e:
