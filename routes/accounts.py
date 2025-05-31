@@ -49,7 +49,7 @@ SessionDep = Annotated[Session, Depends(get_session)]
 UserDep = Annotated[dict, Depends(get_current_user)]
 
 
-@ar.get("/get-my-user/")
+@c.get("/get-my-user/")
 async def get_my_user(
     session: SessionDep,
     current_user: UserDep,
