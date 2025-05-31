@@ -4,7 +4,7 @@ from typing import Annotated, List
 from models import Account, ScopeGroup, ScopeGroupLink
 from db import SECRET_KEY, get_session
 
-from models.Account import Organization
+from models.Account import Organization, User
 
 
 SessionDep = Annotated[Session, Depends(get_session)]
@@ -18,7 +18,7 @@ def get_organization_ids_by_scope_group(session, current_user) -> List[int]:
 
     Args:
         session: The database session.
-        current_user: The current user dictionary containing at least 'scope_group_id'.
+        current_user: The current user dictionary containing at least 'scope_group'.
 
     Returns:
         List[int]: A list of organization IDs.
@@ -28,7 +28,7 @@ def get_organization_ids_by_scope_group(session, current_user) -> List[int]:
     """
     # Fetch the user's scope group object
     user_scope_group = session.exec(
-        select(ScopeGroup).where(ScopeGroup.id == current_user.scope_group_id)
+        select(ScopeGroup).where(ScopeGroup.id == current_user.scope_group)
     ).first()
 
     if not user_scope_group:
@@ -48,39 +48,38 @@ def get_organization_ids_by_scope_group(session, current_user) -> List[int]:
     return organization_ids
 
 
-def get_child_organization(session: SessionDep, organization_id: int , max_depth = None, children_key="children"):
+def get_child_organization(session: SessionDep, organization: int , max_depth = None, children_key="children", scope_organizations=[]):
     """
     Fetch all child organizations (descendants) from the database.
     """
     children = session.exec(
-        select(Organization).where(Organization.parent_id == organization_id)
+        select(Organization).where(Organization.parent_organization == organization)
     ).all()
 
-    org = session.exec(select(Organization).where(Organization.id == organization_id)).first()  
+    org = session.exec(select(Organization).where(Organization.id == organization)).first()  
     
-    if org.parent_id:
-        parent_org = session.exec(select(Organization).where(Organization.id == org.parent_id)).first()  
+    if org.parent_organization:
+        parent_org = session.exec(select(Organization).where(Organization.id == org.parent_organization)).first()  
     else:
         parent_org = None
-    
+        
     return {
-            'id': organization_id,
-            'name': "All" if org.parent_id is None else org.organization_name, 
+            'id': organization,
+            'name': "All" if org.parent_organization is None else org.name, 
             "owner": org.owner_name,
             "description": org.description,
             "organization_type": org.organization_type,
             "inheritance_group": org.inheritance_group,
-            "parent_organization": parent_org.organization_name if parent_org is not None else None,
-            "scope_groups": [{"id": sg.id, "scope_name": sg.scope_name} for sg in org.scope_groups],
-
-            children_key: [get_child_organization(session, child.id, max_depth-1 if max_depth is not None else max_depth, children_key) for child in children if (max_depth is None or max_depth > 0)]           
+            "parent_organization": parent_org.name if parent_org is not None else None,
+            "scope_groups": [{"id": sg.id, "name": sg.name} for sg in org.scope_groups],
+            children_key: [get_child_organization(session, child.id, max_depth-1 if max_depth is not None else max_depth, children_key) for child in children if ((child.id in scope_organizations) and (max_depth is None or max_depth > 0))]           
         }
     
-def get_heirarchy(session: SessionDep, organization_id: int , max_depth, current_user):
+def get_heirarchy(session: SessionDep, organization: int , max_depth, current_user, children_key="hidden"):
     
     
     user_scope_group = session.exec(
-        select(ScopeGroup).where(ScopeGroup.id == current_user.scope_group_id)
+        select(ScopeGroup).where(ScopeGroup.id == current_user.scope_group)
     ).first()
 
     if not user_scope_group:
@@ -89,26 +88,28 @@ def get_heirarchy(session: SessionDep, organization_id: int , max_depth, current
         )
     # Get organization IDs associated with this scope group
     
-    organization_ids = [org.id for org in user_scope_group.organizations]
+    scope_organizations = session.exec(select(Organization.id).where(Organization.parent_organization == organization)).all()
     
-    heirarchy = get_child_organization(session, organization_id, max_depth, "hidden")
+    [[scope_organizations.append(org.id), scope_organizations.extend(get_parent_organizations(session, org.id))] for org in user_scope_group.organizations]
+        
+    heirarchy = get_child_organization(session, organization, max_depth, children_key, set(scope_organizations))
     
     return heirarchy
     
     
-def get_parent_organizations(session: SessionDep, organization_id: int) -> List[int]:
+def get_parent_organizations(session: SessionDep, organization: int) -> List[int]:
     """
     Fetch all parent organizations recursively (up to the top-level root).
     """
     parents = []
-    current_id = organization_id
+    current_id = organization
 
     while current_id is not None:
         org = session.get(Organization, current_id)
-        if not org or org.parent_id is None:
+        if not org or org.parent_organization is None:
             break
-        parents.append(org.parent_id)
-        current_id = org.parent_id
+        parents.append(org.parent_organization)
+        current_id = org.parent_organization
 
     return parents  # List of parent IDs (ordered bottom-up)
 
@@ -117,8 +118,8 @@ def get_parent_organizations(session: SessionDep, organization_id: int) -> List[
 def get_org_with_parents(session: Session, org_ids: List[int]) -> List[Organization]:
     all_ids = set(org_ids)
     for org_id in org_ids:
-        parent_ids = get_parent_organizations(session, org_id)
-        all_ids.update(parent_ids)
+        parent_organizations = get_parent_organizations(session, org_id)
+        all_ids.update(parent_organizations)
     return session.exec(select(Organization).where(Organization.id.in_(all_ids))).all()
 
 
@@ -136,7 +137,7 @@ def get_child_employee(session: SessionDep, employee_id: int):
         emp = queue.pop(0)
         employee.append(emp)
         db_emp = session.exec(
-            select(Account.id).where(Account.manager == employee_id)
+            select(User.id).where(User.manager == user_id)
         ).all()
         queue.extend(db_emp)
 

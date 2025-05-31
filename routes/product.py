@@ -30,7 +30,7 @@ def get_products(
                 status_code=403, detail="You Do not have the required privilege"
             )
         inherited_group_id = session.exec(
-            select(Organization.inheritance_group).where(Organization.id == current_user.organization_id)
+            select(Organization.inheritance_group).where(Organization.id == current_user.organization)
         ).first()
 
         inherited_group = session.exec(
@@ -42,7 +42,7 @@ def get_products(
         else:
             inherited_product = []
         
-        scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == current_user.scope_group_id)).first()
+        scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == current_user.scope_group)).first()
    
         if scope_group != None:
             existing_orgs = [organization.id for organization in scope_group.organizations ]
@@ -50,7 +50,7 @@ def get_products(
             existing_orgs= []
 
         organization_product = session.exec(
-            select(Product).where(Product.organization_id.in_(existing_orgs))
+            select(Product).where(Product.organization.in_(existing_orgs))
         ).all()
         organization_product.extend(inherited_product)
 
@@ -185,7 +185,7 @@ def create_product(
         organization_ids = get_organization_ids_by_scope_group(session, current_user)
         db_category_code = session.exec(
             select(Product)
-            .where(Product.organization_id.in_(organization_ids), Product.name == name, Product.sku == sku)
+            .where(Product.organization.in_(organization_ids), Product.name == name, Product.sku == sku)
             ).first()
         if db_category_code:
             raise HTTPException(status_code=400, 
@@ -203,7 +203,7 @@ def create_product(
             image=image,
             brand=brand,
             category_id=category_id,
-            organization_id=organization,
+            organization=organization,
             price=price,
             unit=unit,  
         )
@@ -247,7 +247,7 @@ def update_product(
         organization_ids = get_organization_ids_by_scope_group(session, current_user)
 
         selected_product = session.exec(
-            select(Product).where(Product.organization_id.in_(organization_ids), Product.id == id)
+            select(Product).where(Product.organization.in_(organization_ids), Product.id == id)
         ).first()
             
         if not selected_product  :
@@ -264,7 +264,7 @@ def update_product(
         selected_product.price = price
         selected_product.unit = unit
         selected_product.category_id = category
-        selected_product.organization_id = organization
+        selected_product.organization = organization
 
         
         session.add(selected_product)

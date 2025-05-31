@@ -21,7 +21,7 @@ class RoleLink(SQLModel, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     inheritance_group_id: int = Field(foreign_key="inheritance_group.id", index=True)
-    role_id: int = Field(foreign_key="role.id", index=True)
+    role: int = Field(foreign_key="role.id", index=True)
 
 class ClassificationLink(SQLModel, table=True):
     __tablename__ = "classification_link"
@@ -67,7 +67,7 @@ class Product(SQLModel, table=True):
     unit: Product_units = Field(default=None)
     category_id: Optional[int] = Field(default=None, foreign_key="category.id", index=True)
     category: Optional["Category"] = Relationship(back_populates="products")
-    organization_id: Optional[int] = Field(default=None, foreign_key="organization.id", index=True)
+    organization: Optional[int] = Field(default=None, foreign_key="organization.id", index=True)
     inheritance_groups: List["InheritanceGroup"] = Relationship(back_populates="products", link_model=ProductLink)
 
 
@@ -80,6 +80,6 @@ class Category(SQLModel, table=True):
     description: Optional[str] = Field(default=None)
     parent_category: Optional [int] = Field(foreign_key = "category.id")
     products: List["Product"] = Relationship(back_populates="category")
-    organization_id: Optional [int] = Field(default=None, foreign_key="organization.id", index=True)
+    organization: Optional [int] = Field(default=None, foreign_key="organization.id", index=True)
     inheritance_groups: List["InheritanceGroup"] = Relationship(back_populates="categories", link_model=CategoryLink)
 

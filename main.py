@@ -16,7 +16,9 @@ from routes.category import CategoryRouter
 from routes.inheritance import InheritanceRouter
 from routes.product import ProductRouter
 from routes.role import RoleRouter
-from routes.organizations import TenantRouter
+from routes.scopeGroup import ScopeGroupRouter
+from routes.organizations import OrganizationRouter
+from routes.tenant_managment import TenantRouter
 
 
 
@@ -76,9 +78,11 @@ app.include_router(AccountRouter, prefix="/{tenant}/account", tags=["account"])
 app.include_router(AddressRouter, prefix="/{tenant}/address", tags=["address"])
 app.include_router(CategoryRouter, prefix="/{tenant}/category", tags=["category"])
 app.include_router(InheritanceRouter, prefix="/{tenant}/inheritance", tags = ["inheritance"])
-app.include_router(TenantRouter, prefix="/{tenant}/organization", tags=["organization"])
+app.include_router(OrganizationRouter, prefix="/{tenant}/organization", tags=["organization"])
 app.include_router(ProductRouter, prefix="/{tenant}/product", tags=["product"])
 app.include_router(RoleRouter, prefix="/{tenant}/role", tags=["role"])
+app.include_router(ScopeGroupRouter, prefix="/{tenant}", tags=["Scope Group"])
 app.include_router(UtilRouter, prefix="/{tenant}/utility", tags=["utility"])
+app.include_router(TenantRouter, tags=["tenant management"])
 app.include_router(ServiceProvider, tags=["service provider"])
 #app.include_router(WarehouseRouter, prefix="/{tenant}/warehouse", tags=["warehouse"])

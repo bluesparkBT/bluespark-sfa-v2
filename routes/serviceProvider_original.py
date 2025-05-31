@@ -32,7 +32,7 @@ UserDep = Annotated[dict, Depends(get_current_user)]
 def has_superadmin_created(
     session: SessionDep
 ) ->bool:
-    existing_superadmin = session.exec(select(User).where(User.role_id == Role.id == "Super Admin")).first()
+    existing_superadmin = session.exec(select(User).where(User.role == Role.id == "Super Admin")).first()
     if existing_superadmin:
         print("Super admin and tenant already exisits")
         return True
@@ -60,7 +60,7 @@ def login(
             data={
                 "sub": user.username,
                 "user_id": user.id,
-                "organization": user.organization_id,
+                "organization": user.organization,
                 },
             expires_delta = access_token_expires,
         )
@@ -74,13 +74,13 @@ def login(
 @sp.post("/create-superadmin/")
 async def create_superadmin_user(
     session: SessionDep,
-    fullname: str = Body(...),
+    full_name: str = Body(...),
     username: str = Body(...),
     email: str = Body(...),
     password: str = Body(...),
 ):
     try:
-        existing_superadmin = session.exec(select(User).where(User.role_id == Role.id == "Super Admin")).first()
+        existing_superadmin = session.exec(select(User).where(User.role == Role.id == "Super Admin")).first()
         if existing_superadmin is not None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -115,8 +115,8 @@ async def create_superadmin_user(
 
         
         scope_group_link = ScopeGroupLink(
-            scope_group_id=service_provider_scope_group.id,
-            organization_id=service_provider.id,
+            scope_group=service_provider_scope_group.id,
+            organization=service_provider.id,
         )
         
         session.add(scope_group_link)
@@ -126,7 +126,7 @@ async def create_superadmin_user(
         #create role
         role = Role(
             name="Super Admin",
-            organization_id = service_provider.id
+            organization = service_provider.id
         )
         session.add(role)
         session.commit()
@@ -142,7 +142,7 @@ async def create_superadmin_user(
         ]
         for module in modules_to_grant: 
             role_module_permission= RoleModulePermission(
-                role_id=role.id,
+                role=role.id,
                 module=module,
                 access_policy=AccessPolicy.manage
             )
@@ -151,13 +151,13 @@ async def create_superadmin_user(
         
         stored_username = add_organization_path(username, service_provider.organization_name)
         super_admin_user = User(
-            fullname = fullname,
+            full_name = full_name,
             username= stored_username,
             email=email,
             hashedPassword=get_password_hash(password + stored_username),
-            organization_id=service_provider.id,
-            scope_group_id=service_provider_scope_group.id,
-            role_id = role.id,
+            organization=service_provider.id,
+            scope_group=service_provider_scope_group.id,
+            role = role.id,
             scope = Scope.managerial_scope.value
         )
         session.add(super_admin_user)
@@ -186,12 +186,12 @@ async def delete_superadmin_user(
             raise HTTPException(status_code=404, detail="Superadmin not found")
 
         # Fetch the ScopeGroup associated with the superadmin
-        scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == superadmin.scope_group_id)).first()
+        scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == superadmin.scope_group)).first()
         if not scope_group:
             raise HTTPException(status_code=404, detail="ScopeGroup not found for the superadmin")
 
         # cascade delete all attributes linked to superadmin.
-        scope_group_links = session.exec(select(ScopeGroupLink).where(ScopeGroupLink.scope_group_id == scope_group.id)).all()
+        scope_group_links = session.exec(select(ScopeGroupLink).where(ScopeGroupLink.scope_group == scope_group.id)).all()
         for link in scope_group_links:
             session.delete(link)
         
@@ -232,7 +232,7 @@ async def get_service_provider(
                 status_code=403, detail="You Do not have the required privilege"
             )
         # Query the organization associated with the logged-in user
-        organization = session.exec(select(Organization).where(Organization.id == current_user.organization_id)).first()
+        organization = session.exec(select(Organization).where(Organization.id == current_user.organization)).first()
 
         if not organization:
             raise HTTPException(
@@ -418,7 +418,7 @@ async def create_tenant(
         # ).first()
 
         print("current user of provide is:", current_user)
-        superadmin_id = session.exec(select(User.organization_id).where(User.role_id == Role.id == "Super Admin")).first()
+        superadmin_id = session.exec(select(User.organization).where(User.role == Role.id == "Super Admin")).first()
         
         hashed_tenant_name = get_tenant_hash(tenant_name) 
         tenant = Organization(
@@ -452,8 +452,8 @@ async def create_tenant(
 
         # Link the System Admin ScopeGroup to the tenant organization
         scope_group_link = ScopeGroupLink(
-            scope_group_id=system_admin_scope_group.id,
-            organization_id=tenant.id,
+            scope_group=system_admin_scope_group.id,
+            organization=tenant.id,
         )
         session.add(scope_group_link)
         session.commit()
@@ -464,15 +464,15 @@ async def create_tenant(
 
         existing_link = session.exec(
             select(ScopeGroupLink).where(
-                ScopeGroupLink.scope_group_id == super_admin_scope_group.id,
-                ScopeGroupLink.organization_id == tenant.id
+                ScopeGroupLink.scope_group == super_admin_scope_group.id,
+                ScopeGroupLink.organization == tenant.id
             )
         ).first()
         print("exisintg link", existing_link)
         if not existing_link:
             super_admin_scope_link = ScopeGroupLink(
-                scope_group_id=super_admin_scope_group.id,
-                organization_id= tenant.id
+                scope_group=super_admin_scope_group.id,
+                organization= tenant.id
             )
             session.add(super_admin_scope_link)
             session.commit()
@@ -481,7 +481,7 @@ async def create_tenant(
             
         role = Role(
             name=f"{tenant_name} System Admin",
-            organization_id=tenant.id,
+            organization=tenant.id,
         )
         session.add(role)
         session.commit()
@@ -508,7 +508,7 @@ async def create_tenant(
         ]
         for module in modules_to_grant: 
             role_module_permission= RoleModulePermission(
-                role_id=role.id,
+                role=role.id,
                 module=module,
                 access_policy=AccessPolicy.manage
             )
@@ -520,13 +520,13 @@ async def create_tenant(
 
         tenant_admin = User(
             username= add_organization_path("admin", tenant_name),
-            fullname= "System Admin",
+            full_name= "System Admin",
             email=f"{tenant_name.lower()}_admin@{tenant_name}.com",
             hashedPassword = hashed_password,
-            organization_id=tenant.id,
-            role_id=role.id,
+            organization=tenant.id,
+            role=role.id,
             scope=Scope.managerial_scope,
-            scope_group_id=system_admin_scope_group.id,
+            scope_group=system_admin_scope_group.id,
         )
         session.add(tenant_admin)
         session.commit()
@@ -589,11 +589,11 @@ async def update_tenant(
 
         # Update ScopeGroup name (if exists)
         scope_group_link = session.exec(
-            select(ScopeGroupLink).where(ScopeGroupLink.organization_id == existing_tenant.id)
+            select(ScopeGroupLink).where(ScopeGroupLink.organization == existing_tenant.id)
         ).first()
 
         if scope_group_link:
-            scope_group = session.get(ScopeGroup, scope_group_link.scope_group_id)
+            scope_group = session.get(ScopeGroup, scope_group_link.scope_group)
             if scope_group:
                 scope_group.scope_name = f"{tenant_name} Admin Scope"
                 session.add(scope_group)
@@ -601,7 +601,7 @@ async def update_tenant(
 
         # Update Role name (if exists)
         role = session.exec(
-            select(Role).where(Role.organization_id == existing_tenant.id)
+            select(Role).where(Role.organization == existing_tenant.id)
         ).first()
         if role:
             role.name = f"{tenant_name} System Admin"
@@ -657,28 +657,28 @@ async def update_tenant(
 
 #         # Soft-delete all users
 #         users = session.exec(
-#             select(User).where(User.organization_id == tenant.id)
+#             select(User).where(User.organization == tenant.id)
 #         ).all()
 #         for user in users:
 #             user.active = False
 
 #         # Soft-delete roles
 #         roles = session.exec(
-#             select(Role).where(Role.organization_id == tenant.id)
+#             select(Role).where(Role.organization == tenant.id)
 #         ).all()
 #         for role in roles:
 #             role.active = False
 
 #         # Soft-delete products (if applicable)
 #         products = session.exec(
-#             select(Product).where(Product.organization_id == tenant.id)
+#             select(Product).where(Product.organization == tenant.id)
 #         ).all()
 #         for product in products:
 #             product.active = False
 
 #         # Soft-delete warehouses (if applicable)
 #         warehouses = session.exec(
-#             select(Warehouse).where(Warehouse.organization_id == tenant.id)
+#             select(Warehouse).where(Warehouse.organization == tenant.id)
 #         ).all()
 #         for wh in warehouses:
 #             wh.active = False

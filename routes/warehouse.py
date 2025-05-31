@@ -92,7 +92,7 @@ async def create_warehouse(
         warehouse = Warehouse(
             id = None,
             warehouse_name = warehouse_name,
-            organization_id = organization,
+            organization = organization,
             location_id = location_db.id,
         )
         
@@ -224,8 +224,8 @@ async def get_warehouses(
             warehouse_list.append({
                 "id": warehouse.id,
                 "warehouse_name": warehouse.warehouse_name,
-                "organization": warehouse.organization.organization_name,
-                "store_admins": [store_admin.fullname for store_admin in warehouse.store_admins],
+                "organization": warehouse.organization.name,
+                "store_admins": [store_admin.full_name for store_admin in warehouse.store_admins],
             })
         
 
@@ -259,7 +259,7 @@ async def get_warehouse(
         return {
             "id": warehouse.id,
             "warehouse_name": warehouse.warehouse_name,
-            "organization": warehouse.organization_id,
+            "organization": warehouse.organization,
             "store_admins": [store_admin.id for store_admin in warehouse.store_admins],
             "location":location_str
         }
@@ -316,7 +316,7 @@ async def update_warehouse(
         session.refresh(location_db)
 
         existing_warehouse.warehouse_name = warehouse_name
-        existing_warehouse.organization_id = organization
+        existing_warehouse.organization = organization
         existing_warehouse.location_id = location_db.id
 
         
@@ -814,11 +814,11 @@ async def get_warehouse_stops(
                 "stock_type": stop.stock_type,
                 "quantity": stop.quantity,
                 "vehicle": stop.vehicle.name,
-                "requester": stop.requester.fullname,
+                "requester": stop.requester.full_name,
                 "request_status": stop.request_status,
                 "request_type": stop.request_type,
                 "request_date": format_date_for_input(stop.request_date),
-                "approver": stop.approver.fullname if stop.approver_id is not None else "",
+                "approver": stop.approver.full_name if stop.approver_id is not None else "",
                 "approved_date": format_date_for_input(stop.approve_date),
                 "confirmed_date": stop.confirm_date,
                 "confirmed": stop.confirmed
@@ -907,11 +907,11 @@ async def get_warehouse_stops_by_status(
                 "stock_type": stop.stock_type,
                 "quantity": stop.quantity,
                 "vehicle": stop.vehicle.name,
-                "requester": stop.requester.fullname,
+                "requester": stop.requester.full_name,
                 "request_status": stop.request_status,
                 "request_type": stop.request_type,
                 "request_date": format_date_for_input(stop.request_date),
-                "approver": stop.approver.fullname if stop.approver_id is not None else "",
+                "approver": stop.approver.full_name if stop.approver_id is not None else "",
                 "approved_date": format_date_for_input(stop.approve_date),
                 "confirmed_date": stop.confirm_date,
                 "confirmed": stop.confirmed
@@ -952,11 +952,11 @@ async def get_my_warehouse_stop_requests(
                 "stock_type": stop.stock_type,
                 "quantity": stop.quantity,
                 "vehicle": stop.vehicle.name,
-                "requester": stop.requester.fullname,
+                "requester": stop.requester.full_name,
                 "request_status": stop.request_status,
                 "request_type": stop.request_type,
                 "request_date": format_date_for_input(stop.request_date),
-                "approver": stop.approver.fullname if stop.approver_id is not None else "",
+                "approver": stop.approver.full_name if stop.approver_id is not None else "",
                 "approved_date": format_date_for_input(stop.approve_date),
                 "confirmed_date": format_date_for_input(stop.confirm_date),
                 "confirmed": stop.confirmed

@@ -49,11 +49,9 @@ async def get_form_fields_warehouse(current_user: UserDep, endpoint: str) -> lis
             "scope_groups"]
     elif endpoint == "Users":
         return ["id",
-                "scope_group_id",
                 "manager",
                 "phone_number",
-                "scope",
-                "scope_group"
+                "scope"
                 ]
     elif endpoint == "Role":
         return ["id"]

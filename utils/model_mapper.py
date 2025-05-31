@@ -2,12 +2,12 @@ MODEL_HTML_TYPES = {
 
     "organization": {
         "id": "hidden",
-        "organization_name": "text",
-        "tenant_name":"text",
+        "name": "text",
         "owner_name": "text",
         "description": "textarea",
         "logo_image": "file",
         "parent_organization": "select",
+        "parent_id": "select",
         "organization_type": "select",
         "inheritance_group": "select",
         "address": "select",
@@ -23,7 +23,7 @@ MODEL_HTML_TYPES = {
         "policy":"radio"
     },
     "policy":{
-        "role_id":"hidden",
+        "role":"hidden",
        
     },
     "scope_group":{
@@ -36,22 +36,24 @@ MODEL_HTML_TYPES = {
         "id": "hidden",
         "full_name": "text",
         "username": "text",
-        "phone_number": "text",
         "email": "text",
+        "phone_number": "text",
         "organization": "select",
         "role": "select",
         "scope": "select",
         "scope_group": "select",
+        "gender": "select",
+        "salary": "number",
+        "position": "text",        
         "date_of_birth": "date",
         "date_of_joining": "date",
-        "salary": "number",
-        "position": "text",
+        "manager": "select",
         "image": "file",
         "id_type": "select",
         "id_number": "text",
-        "gender": "select",
-        "password": "text",
-        "address" : "select"
+        "address" : "select",
+        "password": "text"
+
     },
     "address": {
         "id": "hidden",
