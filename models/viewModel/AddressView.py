@@ -7,6 +7,7 @@ from pydantic import AfterValidator, BaseModel, validator
 
 
 class AddressView(BaseModel):
+    id: Optional[int] = None
     country: Optional[str] = Field(default="Ethiopia", max_length=100)
     city: str 
     sub_city: str 

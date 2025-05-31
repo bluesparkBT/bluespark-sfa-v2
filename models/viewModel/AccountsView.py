@@ -6,7 +6,16 @@ from utils.util_functions import validate_name, validate_phone_number, validate_
 from pydantic import AfterValidator, BaseModel, ValidationError
 from datetime import datetime
 from models.Account import IdType, OrganizationType, AccessPolicy
+from starlette.requests import Request
+from starlette.responses import JSONResponse
+from pydantic import EmailStr, BaseModel
+from typing import List
 
+class SuperAdminView(BaseModel):
+    fullname: Annotated [ str, AfterValidator( validate_name) ]
+    username: Annotated [ str, AfterValidator( validate_name) ]
+    email: Annotated [ str, AfterValidator( validate_email) ] | None
+    password: str
 
 class UserAccountView(BaseModel):
     full_name: Annotated [ str, AfterValidator( validate_name) ]
@@ -50,3 +59,6 @@ class RoleModulePermissionCreation(BaseModel):
     role_id: int
     module: str | type
     access_policy: Optional[AccessPolicy] = None
+class EmailSchema(BaseModel):
+#    email: List[EmailStr]  
+     username: str

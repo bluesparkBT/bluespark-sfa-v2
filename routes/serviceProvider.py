@@ -1,18 +1,37 @@
-from typing import Annotated, List, Dict, Any, Optional, Union
-from db import SECRET_KEY, get_session
-from sqlmodel import Session, select
-from fastapi import APIRouter, HTTPException, Body, status, Depends
+
+from typing import Annotated, List, Dict, Any
+from datetime import timedelta, date, datetime
+from fastapi import APIRouter, HTTPException, Body, status, Depends, Path
+from sqlmodel import select, Session
 from db import get_session
-from utils.model_converter_util import get_html_types
-from models.Account import User, ScopeGroup,ScopeGroupLink, Organization, Role
-from utils.util_functions import validate_name
-from models.viewModel.AccountsView import UserAccountView as TemplateView
-from utils.auth_util import get_current_user, check_permission, check_permission_and_scope
-from utils.get_hierarchy import get_organization_ids_by_scope_group
-from utils.form_db_fetch import fetch_category_id_and_name, fetch_organization_id_and_name, fetch_id_and_name
 import traceback
+from utils.auth_util import verify_password, create_access_token, get_password_hash
+from utils.util_functions import validate_name, validate_email, validate_phone_number, parse_enum
+from utils.auth_util import (
+    get_current_user,
+    check_permission,
+    check_permission_and_scope,
+    generate_random_password,
+    get_password_hash,
+    add_organization_path,
+    verify_password,
+    create_access_token
+)
+from utils.model_converter_util import get_html_types
+from utils.form_db_fetch import get_organization_ids_by_scope_group
+from utils.domain_util import getPath
+from utils.auth_util import check_permission_and_scope
 
+from models.Account import User, ScopeGroup, ScopeGroupLink, Organization, OrganizationType, RoleModulePermission, Scope, Role, AccessPolicy
+from models.Account import ModuleName as modules
+from models.viewModel.AccountsView import SuperAdminView as TemplateView
+from models.viewModel.AccountsView import EmailSchema
+from models.viewModel.AccountsView import OrganizationView
 
+from fastapi_mail import FastMail, MessageSchema,ConnectionConfig
+from starlette.requests import Request
+from starlette.responses import JSONResponse
+from pydantic import EmailStr, BaseModel
 endpoint_name = "superadmin"
 
 db_model = User
@@ -34,10 +53,15 @@ role_modules = {
     "delete": ["Service Provider"],
 }
 
+# frontend domain
+Domain= getPath()
+
+service_provider_company = "Bluespark"
+ACCESS_TOKEN_EXPIRE_DAYS = 2
+
 ServiceProvider = c = APIRouter()
 
 SessionDep = Annotated[Session, Depends(get_session)]
-
 UserDep = Annotated[dict, Depends(get_current_user)]
 
 
@@ -62,9 +86,13 @@ def login(
 ):
     try:
         service_provider = session.exec(select(Organization).where(Organization.organization_type == "Service Provider")).first()
-        db_username = add_organization_path(username, service_provider.organization_name)
+        db_username = add_organization_path(username, service_provider.name)
 
         user = session.exec(select(db_model).where(db_model.username == db_username)).first()
+        if not user:
+            raise HTTPException(status_code=400, detail="User Not Found")
+
+        print("this are the credentials:", password, db_username, user.hashedPassword)
         if not user or not verify_password(password+db_username, user.hashedPassword):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
         
@@ -86,16 +114,14 @@ def login(
         
 #CRUD
 @c.get(endpoint['get'])
-def get_template(
+def get(
     session: SessionDep,
     current_user: UserDep,
     tenant: str
-
 ):
-    
-    try:  
+    try:
         orgs_in_scope = check_permission_and_scope(session, "Read", role_modules['get'], current_user)
-        
+
         entries_list = session.exec(
             select(db_model).where(db_model.organization_id.in_(orgs_in_scope["organization_ids"]))
         ).all()
@@ -106,26 +132,16 @@ def get_template(
         traceback.print_exc()
  
 @c.get(endpoint['get_by_id'] + "/{id}")
-def get_template(
+def get_by_Id_template(
     session: SessionDep, 
     current_user: UserDep,
     tenant: str,
     id: int,
-    # valid: TemplateView,
 ):
     try:
-        if not check_permission(
-            session, "Read",[ "Category", "Administrative"], current_user
-            ):
-            raise HTTPException(
-                status_code=403, detail="You Do not have the required privilege"
-            )
-
-        # Fetch categories based on organization IDs
-        organization_ids = get_organization_ids_by_scope_group(session, current_user)
-
+        orgs_in_scope = check_permission_and_scope(session, "Read", role_modules['Read'], current_user)
         entry = session.exec(
-            select(db_model).where(db_model.organization_id.in_(organization_ids), db_model.id == id)
+            select(db_model).where(db_model.organization_id.in_(orgs_in_scope["organization_ids"]), db_model.id == id)
         ).first()
 
         if not entry:
@@ -136,82 +152,241 @@ def get_template(
     
     except Exception as e:
         traceback.print_exc()
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong")
     
 @c.post(endpoint['create'])
 def create_template(
     session: SessionDep,
-    #tenant: str,
-    #current_user: UserDep,
     valid: TemplateView,
 ):
     try:
-        
-        #if not check_permission(
-        #    session, "Create", role_modules['create'], current_user
-        #    ):
-        #    raise HTTPException(
-        #        status_code=403, detail="You Do not have the required privilege"
-        #    )
-        #organization_ids = get_organization_ids_by_scope_group(session, current_user)
-
-        # Create a new category entry from validated input
-
-        new_entry = db_model.model_validate(valid)        
-        
-        session.add(new_entry)
-        session.commit()
-        session.refresh(new_entry)
-
-        return new_entry
-
-    except Exception as e:
-        traceback.print_exc()
-        raise HTTPException(status_code=400, detail=str(e))
- 
-# update a single category by ID
-@c.post(endpoint['update'])
-def update_template(
-    session: SessionDep, 
-    current_user: UserDep,
-    tenant: str,
-    valid: TemplateView,
-):
-    try:
-        # Check permission
-        if not check_permission(
-            session, "Update",role_modules['update'], current_user
-            ):
+        existing_superadmin = session.exec(select(User).where(User.role_id == Role.id == "Super Admin")).first()
+        if existing_superadmin is not None:
             raise HTTPException(
-                status_code=403, detail="You Do not have the required privilege"
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Superadmin already registered",
             )
 
-        # Fetch categories based on organization IDs
-        organization_ids = get_organization_ids_by_scope_group(session, current_user)
-
-        selected_entry = session.exec(
-            select(db_model).where(db_model.organization_id.in_(organization_ids), db_model.id == valid.id)
-        ).first()
-
-        if not selected_entry:
-            raise HTTPException(status_code=404, detail=f"{endpoint_name} not found")
-        
-        if valid.organization == organization_ids:
-            selected_entry.organization_id = valid.organization
-        else:
-            {"message": "invalid input select your own organization id"}    
- 
-        # Commit the changes and refresh the object
-        session.add(valid)
+        #create new service provider and super admin            
+        service_provider = Organization(
+            name="Blue Spark Business Technology",
+            owner_name= "Mekonen",
+            organization_type=OrganizationType.service_provider,
+            description="Service Provider and owner of this Sales Force Automation system",
+        )
+        session.add(service_provider)
         session.commit()
-        session.refresh(valid)
+        session.refresh(service_provider)
 
-        return {"message": f"{endpoint_name} Updated successfully"}
+        # Check if Super Admin Scope group exists
+        existing_scope_group = session.exec(
+            select(ScopeGroup).where(ScopeGroup.name == "Super Admin Scope")
+        ).first()
+        if existing_scope_group:
+            service_provider_scope_group = existing_scope_group
+        else:
+            service_provider_scope_group = ScopeGroup(
+                name="Super Admin Scope",
+                tenant_id = service_provider.id
+                    )
+            session.add(service_provider_scope_group)
+            session.commit()
+            session.refresh(service_provider_scope_group)
 
+        scope_group_link = ScopeGroupLink(
+            scope_group_id=service_provider_scope_group.id,
+            organization_id=service_provider.id,
+        )
+        session.add(scope_group_link)
+        session.commit()
+        session.refresh(scope_group_link)
+        
+        #create role
+        role = Role(
+            name="Super Admin",
+            organization_id = service_provider.id
+        )
+        session.add(role)
+        session.commit()
+        session.refresh(role)
+
+        # List of modules the Super Admin should have access to
+        modules_to_grant = [
+            modules.service_provider.value,
+            modules.administrative.value,
+            modules.tenant_management.value,
+        ]
+        for module in modules_to_grant: 
+            role_module_permission= RoleModulePermission(
+                role_id=role.id,
+                module=module,
+                access_policy=AccessPolicy.manage
+            )
+            session.add(role_module_permission)
+        session.commit()
+        
+        stored_username = add_organization_path(valid.username, service_provider.name)
+        new_user = User(
+            full_name=valid.fullname,
+            username=stored_username,
+            email=valid.email,
+            hashedPassword=get_password_hash(valid.password + stored_username),
+            organization_id=service_provider.id,
+            role_id=role.id,
+            scope = Scope.managerial_scope.value,
+            scope_group_id=service_provider_scope_group.id,
+        )
+        session.add(new_user)
+        session.commit()
+        session.refresh(new_user)
+
+        return {"message": "Superadmin created successfully"}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Something went wrong")
+ 
+# @c.post(endpoint['update'])
+# def update_template(
+#     session: SessionDep, 
+#     current_user: UserDep,
+#     tenant: str,
+#     # valid: UpdateSuperAdminView,
+# ):
+#     try:
+#         orgs_in_scope = check_permission_and_scope(session, "Update", role_modules['update'], current_user)
+#         selected_entry = session.exec(
+#             select(db_model).where(db_model.organization_id.in_(orgs_in_scope["organization_ids"]), db_model.id == valid.id)
+#         ).first()
 
-# Delete a category by ID
+#         if not selected_entry:
+#             raise HTTPException(status_code=404, detail=f"{endpoint_name} not found")
+#         user_org = session.exec(select(Organization).where(Organization.id == selected_entry.organization_id)).first() 
+#         old_username = selected_entry.username
+#         new_username = add_organization_path(valid.username, user_org.name)
+        
+#         selected_entry.fullname = valid.fullname
+#         selected_entry.username = new_username
+#         selected_entry.email = valid.email
+#         selected_entry.phone_number = valid.phone_number
+#         if verify_password(valid.old_password + old_username, selected_entry.hashedPassword):
+#             selected_entry.hashedPassword = get_password_hash(valid.new_password + selected_entry.username)
+#         else:
+#             raise HTTPException(status_code=401, detail="Incorrect password")
+#         if valid.role_id:
+#             selected_entry.role_id = valid.role_id
+#         if valid.scope_group_id:
+#             selected_entry.scope_group_id = valid.scope_group_id       
+#         session.add(selected_entry)
+#         session.commit()
+#         session.refresh(selected_entry)
+
+#         return {"message": f"{endpoint_name} Updated successfully"}
+
+#     except Exception as e:
+#         traceback.print_exc()
+#         raise HTTPException(status_code=500, detail="Something went wrong")
+
+
+    
+
+conf = ConnectionConfig(
+    MAIL_USERNAME="sfapwr@bluespark.et",
+    MAIL_PASSWORD="Hard&test&work6756",
+    MAIL_PORT=465,  # Use 465 for SSL or 587 for STARTTLS
+    MAIL_SERVER="mail.bluespark.et",
+    MAIL_STARTTLS=False,  # Use True if port 587
+    MAIL_SSL_TLS=True,    # Set True for SSL (port 465)
+    MAIL_FROM="sfapwr@bluespark.et",  # Ensure this email is valid
+    USE_CREDENTIALS=True,
+    VALIDATE_CERTS=True
+)
+
+@c.post("/forgot-Password")
+async def send_mail(data: EmailSchema, 
+                    db: Session = Depends(get_session),                        
+):
+    username = data.username
+
+    service_provider = db.exec(select(Organization).where(Organization.organization_type == "Service Provider")).first()
+
+    db_username = add_organization_path(username, service_provider.name)
+
+    # Check if the user exists
+    user = db.exec(select(db_model).where(db_model.username == db_username)).first()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    stored_username = add_organization_path(username, service_provider.name)
+    #Generate a new random password and hash it
+    new_password = generate_random_password()
+    hashed_password = get_password_hash(new_password + stored_username)
+
+    #Update user's password in the database
+    user.hashedPassword = hashed_password
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    # Build the email template with the generated password included
+    template = f"""
+<html>
+  <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
+    <div style="max-width: 600px; margin: auto; background-color: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);">
+      
+      <div style="text-align: center;">
+        <h2 style="color: #0047AB;">Sales Force Automation (SFA)</h2>
+        <h4 style="color: #008CBA;">Powered by BlueSpark Business Technology Solutions</h4>
+      </div>
+      
+      <hr style="border: none; height: 1px; background-color: #ddd; margin: 20px 0;">
+      
+      <p style="font-size: 16px; color: #333;">Hello,</p>
+      
+      <p style="font-size: 16px; color: #333;">
+        Thank you for using <strong>Sales for Automation (SFA)</strong>. We value your trust and are committed to delivering smart solutions for your business efficiency.
+      </p>
+      
+      <p style="font-size: 16px; color: #333;">
+        Your New Password is: 
+        <span style="font-weight: bold; color: #d9534f; font-size: 18px;">{new_password}</span>
+      </p>
+      
+      <p style="font-size: 16px; color: #333;">
+        Please use this password to log in and make sure to update it immediately for security reasons.
+      </p>
+      
+      <hr style="border: none; height: 1px; background-color: #ddd; margin: 20px 0;">
+      
+      <div style="text-align: center;">
+        <p style="font-size: 14px; color: #888;">
+          If you have any questions or need assistance, please contact 
+          <strong>BlueSpark Business Technology Solutions Support</strong>.
+        </p>
+      </div>
+      
+    </div>
+  </body>
+</html>
+"""
+
+    # Prepare the email message. The recipient is now static.
+    message = MessageSchema(
+        subject="Your New Password",
+        recipients=["yalew.tenna@bluespark.et"],
+        body=template,
+        subtype="html"
+    )
+
+    # Send the email
+    fm = FastMail(conf)
+
+    await fm.send_message(message)
+  
+    print(f"New password generated for user : {new_password}")
+
+    return JSONResponse(status_code=200, content={"message": "Email with new password has been sent"})
+
+
 @c.delete(endpoint['delete']+ "/{id}")
 def delete_template(
     session: SessionDep, 
@@ -220,29 +395,17 @@ def delete_template(
     id: int
 ) :
     try:
-        # Check permission
-        if not check_permission(
-            session, "Delete",role_modules['delete'], current_user
-            ):
-            raise HTTPException(
-                status_code=403, detail="You Do not have the required privilege"
-            )
-        # Fetch categories based on organization IDs
-        organization_ids = get_organization_ids_by_scope_group(session, current_user)
-
+        orgs_in_scope = check_permission_and_scope(session, "Delete", role_modules['delete'], current_user) 
         selected_entry = session.exec(
-            select(db_model).where(db_model.organization_id.in_(organization_ids), db_model.id == id)
+            select(db_model).where(db_model.organization_id.in_(orgs_in_scope["organization_ids"]), db_model.id == id)
         ).first()
 
         if not selected_entry:
             raise HTTPException(status_code=404, detail=f"{endpoint_name} not found")
 
-    
-        # Delete category after validation
         session.delete(selected_entry)
         session.commit()
 
         return {"message": f"{endpoint_name} deleted successfully"}
-
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong")
