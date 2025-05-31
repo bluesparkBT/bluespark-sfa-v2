@@ -49,6 +49,57 @@ SessionDep = Annotated[Session, Depends(get_session)]
 UserDep = Annotated[dict, Depends(get_current_user)]
 
 
+@ar.get("/get-my-user/")
+async def get_my_user(
+    session: SessionDep,
+    current_user: UserDep,
+    tenant: Optional[str] = None,  # Make tenant optional
+):
+    try:
+        if not check_permission(
+            session, "Read",["Administrative"], current_user
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
+
+        user = session.exec(select(User).where(User.id == current_user.id)).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        if not tenant or tenant.lower() == "provider":
+            service_provider = session.exec(select(Organization).where(Organization.organization_type == "Service Provider")).first()
+            superadmin_user = session.exec(select(User).where(User.id == current_user.id)).first()
+            print("super admin user:", superadmin_user)
+
+            username_display = extract_username(superadmin_user.username, service_provider.organization_name)
+            organization_name = service_provider.organization_name
+        else:
+            current_tenant = session.exec(
+                select(Organization).where(Organization.tenant_hashed == tenant)
+            ).first()
+            if not current_tenant:
+                raise HTTPException(status_code=404, detail="Tenant not found")
+
+            organization_name = current_tenant.organization_name
+            username_display = extract_username(user.username, organization_name)
+
+        return {
+            "id": user.id,
+            "fullname": user.fullname,
+            "username": username_display,
+            "phone_number": user.phone_number,
+            "organization": organization_name,
+            "role_id": user.role_id,
+            "manager_id": user.manager_id,
+            "scope": user.scope,
+            "scope_group_id": user.scope_group_id,
+        }
+
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 #Authentication Related
 @c.post("/login/")
 def login(
