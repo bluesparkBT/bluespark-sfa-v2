@@ -13,7 +13,8 @@ from utils.auth_util import (get_current_user,
                              check_permission_and_scope,
                             generate_random_password,
                             get_password_hash,add_organization_path,
-                            verify_password
+                            verify_password,
+                            extract_username
                             )
 from utils.get_hierarchy import get_organization_ids_by_scope_group
 from utils.form_db_fetch import fetch_category_id_and_name, fetch_organization_id_and_name, fetch_id_and_name
@@ -71,7 +72,7 @@ async def get_my_user(
             superadmin_user = session.exec(select(User).where(User.id == current_user.id)).first()
             print("super admin user:", superadmin_user)
 
-            username_display = user.username
+            username_display = extract_username(user.username, service_provider.name)
             organization_name = service_provider.name
         else:
             current_tenant = session.exec(
@@ -81,7 +82,7 @@ async def get_my_user(
                 raise HTTPException(status_code=404, detail="Tenant not found")
 
             organization_name = current_tenant.name
-            username_display = user.username
+            username_display = extract_username(user.username, organization_name)
 
         return {
             "id": user.id,
