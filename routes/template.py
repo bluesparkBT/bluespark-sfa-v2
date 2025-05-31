@@ -6,14 +6,14 @@ from db import get_session
 from utils.model_converter_util import get_html_types
 from models.Account import User, ScopeGroup,ScopeGroupLink, Organization, Role
 from utils.util_functions import validate_name
-from models.viewModel.AccountsView import UserAccountView as TemplateView #Update this
+from models.viewModel.CategoryyView import CategoryView as TemplateView #Update this
 from utils.auth_util import get_current_user, check_permission, check_permission_and_scope
 from utils.get_hierarchy import get_organization_ids_by_scope_group
 from utils.form_db_fetch import fetch_category_id_and_name, fetch_organization_id_and_name, fetch_id_and_name
 import traceback
 
 
-endpoint_name = "superadmin" #Update this
+endpoint_name = "category" #Update this
 db_model = User #Update this
 
 endpoint = {
@@ -27,15 +27,15 @@ endpoint = {
 
 #Update role_modules
 role_modules = {   
-    "get": ["Service Provider", "Tenant Management"],
-    "get_form": ["Service Provider", "Tenant Management"],
-    "create": ["Service Provider", "Tenant Management"],
-    "update": ["Service Provider", "Tenant Management"],
-    "delete": ["Service Provider"],
+    "get": ["Category", "Administrative"],
+    "get_form": ["Category", "Administrative"],
+    "create": ["Administrative"],
+    "update": ["Administrative"],
+    "delete": ["Administrative"],
 }
 
 #Update router name
-ServiceProvider = c = APIRouter()
+CategoryProvider = c = APIRouter()
 
 SessionDep = Annotated[Session, Depends(get_session)]
 
@@ -57,6 +57,9 @@ def get_template(
         entries_list = session.exec(
             select(db_model).where(db_model.organization.in_(orgs_in_scope["organization_ids"]))
         ).all()
+        
+        
+        #Business Logic
 
         return entries_list
 
@@ -76,12 +79,13 @@ def get_template(
 
         entry = session.exec(
             select(db_model).where(db_model.organization.in_(organization_ids), db_model.id == id)
+
         ).first()
 
         if not entry:
             raise HTTPException(status_code=404, detail="Category not found")
         
-
+        #Business Logic
         return entry
     
     except Exception as e:
@@ -101,6 +105,11 @@ def create_template(
         # Create a new category entry from validated input
 
         new_entry = db_model.model_validate(valid)        
+        
+        #Business Logic
+        #TODO
+        
+        
         
         session.add(new_entry)
         session.commit()
@@ -126,6 +135,7 @@ def update_template(
 
         selected_entry = session.exec(
             select(db_model).where(db_model.organization.in_(organization_ids), db_model.id == valid.id)
+
         ).first()
 
         if not selected_entry:
