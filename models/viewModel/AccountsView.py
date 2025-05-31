@@ -12,7 +12,7 @@ from pydantic import EmailStr, BaseModel
 from typing import List
 
 class SuperAdminView(BaseModel):
-    fullname: Annotated [ str, AfterValidator( validate_name) ]
+    full_name: Annotated [ str, AfterValidator( validate_name) ]
     username: Annotated [ str, AfterValidator( validate_name) ]
     email: Annotated [ str, AfterValidator( validate_email) ] | None
     password: str

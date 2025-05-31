@@ -85,7 +85,7 @@ def login(
     password: str = Body(...)
 ):
     try:
-        service_provider = session.exec(select(Organization).where(Organization.organization_type == "Service Provider")).first()
+        service_provider = session.exec(select(Organization).where(Organization.organization_type == OrganizationType.service_provider)).first()
         db_username = add_organization_path(username, service_provider.name)
 
         user = session.exec(select(db_model).where(db_model.username == db_username)).first()
@@ -227,7 +227,7 @@ def create_template(
         
         stored_username = add_organization_path(valid.username, service_provider.name)
         new_user = User(
-            full_name=valid.fullname,
+            full_name=valid.full_name,
             username=stored_username,
             email=valid.email,
             hashedPassword=get_password_hash(valid.password + stored_username),

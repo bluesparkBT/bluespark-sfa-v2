@@ -12,7 +12,7 @@ from db import create_db_and_tables
 from routes.serviceProvider import ServiceProvider
 from routes.accounts import AccountRouter
 from routes.address import AddressRouter
-from routes.category import CategoryRouter
+from routes.template import CategoryRouter
 from routes.inheritance import InheritanceRouter
 from routes.product import ProductRouter
 from routes.role import RoleRouter

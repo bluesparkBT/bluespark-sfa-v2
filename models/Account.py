@@ -99,10 +99,14 @@ class AccessPolicy(str, Enum):
     manage = "manage"
     
 class ModuleName(str, Enum):
-    
+    #Service Provider
     service_provider = "Service Provider"
     tenant_management = "Tenant Management"
+    
+    #Common
     administrative = "Administrative"
+    
+    #Tenant
     address = "Address"
     category = "Category"
     dashboard = "Dashboard"
