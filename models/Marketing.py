@@ -10,7 +10,7 @@ class ClassificationGroup(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True)
     description: Optional[str] = Field(default=None)
-    organization: int = Field(foreign_key="organization.id")  # Reference to Organization
+    organization: int = Field(foreign_key="organization.id", ondelete="CASCADE")  # Reference to Organization
     point_of_sale_id: Optional[int] = Field(default=None, foreign_key="point_of_sale.id")
     territory_id: Optional[int] = Field(default=None, foreign_key="territory.id")
     route_id: Optional[int] = Field(default=None, foreign_key="route.id")

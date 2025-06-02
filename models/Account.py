@@ -83,8 +83,8 @@ class ScopeGroupLink(SQLModel, table=True):
     __tablename__ = "scope_group_link"
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    scope_group: int = Field(foreign_key="scope_group.id", index=True)
-    organization: int = Field(foreign_key="organization.id", index=True)
+    scope_group: int = Field(foreign_key="scope_group.id", ondelete="CASCADE" ,index=True)
+    organization: int = Field(foreign_key="organization.id", ondelete="CASCADE", index=True)
 
 
 class ScopeGroup(SQLModel, table=True):
@@ -92,7 +92,7 @@ class ScopeGroup(SQLModel, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True, unique=True)
-    tenant_id: int = Field(foreign_key="organization.id", index=True)
+    tenant_id: int = Field(foreign_key="organization.id", ondelete="CASCADE", index=True)
     organizations: List["Organization"] = Relationship(back_populates="scope_groups", link_model=ScopeGroupLink)
 
 
@@ -114,7 +114,7 @@ class Organization(SQLModel, table=True):
     description: Optional[str] = Field(default=None, index=True)
     organization_type: OrganizationType = Field(default=OrganizationType.company)
     tenant_hashed: Optional[str] = Field(index=True)
-    parent_organization: Optional[int] = Field(default=None,  foreign_key="organization.id")
+    parent_organization: Optional[int] = Field(default=None,  foreign_key="organization.id", ondelete="CASCADE")
     address: Optional[int] = Field(default=None, foreign_key="address.id")
     landmark: Optional[str] = Field(default=None, index=True)
     geolocation: Optional[int] = Field(foreign_key="geolocation.id")
@@ -127,14 +127,12 @@ class Organization(SQLModel, table=True):
     )
 
 
-
-
 class Role(SQLModel, table=True):
     __tablename__ = "role"
 
     id: int = Field(primary_key=True)
     name: str
-    organization: int = Field(foreign_key="organization.id")
+    organization: int = Field(foreign_key="organization.id", ondelete="CASCADE")
     permissions: List["RoleModulePermission"] = Relationship(back_populates="roles")
     inheritance_groups: List["InheritanceGroup"] = Relationship(back_populates="roles", link_model=RoleLink)
 
@@ -142,7 +140,7 @@ class RoleModulePermission(SQLModel, table=True):
     __tablename__ = "role_module_permission"
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    role: int = Field(foreign_key="role.id")
+    role: int = Field(foreign_key="role.id", ondelete="CASCADE")
     module: str 
     access_policy: Optional[AccessPolicy] = Field(default=AccessPolicy.deny)
 
@@ -156,7 +154,7 @@ class User(SQLModel, table=True):
     username: str = Field(unique=True, index=True)
     email: Optional[str] = Field(index=True)
     phone_number: Optional[str] = Field(default=None,index=True)
-    organization: Optional[int] = Field(default=None, foreign_key="organization.id", index=True)
+    organization: Optional[int] = Field(default=None, foreign_key="organization.id", ondelete="CASCADE", index=True)
     role: Optional[int] = Field(default=None, foreign_key="role.id")
     scope: Scope = Field(default=Scope.personal_scope)
     scope_group: Optional[int] = Field(default=None, foreign_key="scope_group.id")

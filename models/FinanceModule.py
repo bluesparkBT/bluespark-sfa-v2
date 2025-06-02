@@ -37,7 +37,7 @@ class BankAccount(SQLModel, table=True):
     bank_name: str = Field(index=True)
     account: str = Field(index=True)
     account_holder: Optional[str] = Field(default=None)
-    organization: Optional[int] = Field(foreign_key="organization.id", index=True)
+    organization: Optional[int] = Field(foreign_key="organization.id", ondelete="CASCADE", index=True)
 
 
 class Cheque(SQLModel, table=True):
@@ -120,4 +120,4 @@ class Deposit(SQLModel, table=True):
     approval_status: DepositStatus = Field(default=DepositStatus.Pending)
     deposit_slip: Optional[Base64Bytes] = Field(default=None)
     transaction_number: Optional[str] = Field(default=None)
-    organization: Optional[int] = Field(foreign_key="organization.id", index=True)
+    organization: Optional[int] = Field(foreign_key="organization.id", ondelete="CASCADE", index=True)

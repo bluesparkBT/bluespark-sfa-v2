@@ -17,8 +17,14 @@ from models.Account import User, ScopeGroup, ScopeGroupLink, Organization, Organ
 from models.Account import ModuleName as modules
 from models.viewModel.AccountsView import TenantView as TemplateView
 
-endpoint_name = "tenant"
+# frontend domain
+Domain= getPath()
 
+TenantRouter = tr = APIRouter()
+SessionDep = Annotated[Session, Depends(get_session)]
+UserDep = Annotated[dict, Depends(get_current_user)]
+ 
+endpoint_name = "tenant"
 db_model = Organization
 
 endpoint = {
@@ -32,50 +38,13 @@ endpoint = {
 }
 
 role_modules = {   
-    "read": ["Service Provider", "Tenant Management"],
+    "get": ["Service Provider", "Tenant Management"],
     "get_form": ["Service Provider", "Tenant Management"],
     "create": ["Service Provider", "Tenant Management"],
     "update": ["Service Provider", "Tenant Management"],
     "archive": "Service Provider",
     "delete": "Service Provider",
 }
-
-# frontend domain
-Domain= getPath()
-TenantRouter = tr = APIRouter()
-
-SessionDep = Annotated[Session, Depends(get_session)]
-UserDep = Annotated[dict, Depends(get_current_user)]
- 
-#Form endpoints
-@tr.get("/tenant-form/")
-async def get_tenant_form_fields(
-    session: SessionDep,
-    current_user: UserDep
-):
-    try:
-        if not check_permission(
-            session, "Read", role_modules['read'], current_user
-            ):
-            raise HTTPException(
-                status_code=403, detail="You Do not have the required privilege"
-            )
-        parent_org =  session.exec(select(Organization.id))
-        tenant_data = {
-            "id": "",
-            "name": "",
-            "owner_name": "",
-            "description": "",
-            "logo_image": "",
-            "parent_organization": fetch_organization_id_and_name(session, current_user)
-            
-            }
-        
-
-        return {"data": tenant_data, "html_types": get_html_types('organization')}
-    except Exception as e:
-        traceback.print_exc()
-        raise HTTPException(status_code=400, detail=str(e))   
 
 @tr.get("/{tenant}/get-my-tenant/")
 async def get_my_tenant(
@@ -118,6 +87,7 @@ async def get_my_tenant(
     except Exception:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Something went wrong")
+
 #CRUD
 @tr.get(endpoint['get'])
 def get(
@@ -126,7 +96,7 @@ def get(
 ):
     try:
         if not check_permission(
-            session, "Read", role_modules['read'], current_user
+            session, "Read", role_modules['get'], current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
@@ -165,15 +135,20 @@ def get_by_Id_template(
     id: int,
 ):
     try:
-        orgs_in_scope = check_permission_and_scope(session, "Update", role_modules['update'], current_user)
+        if not check_permission(
+            session, "Create",role_modules['get_form'], current_user
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            ) 
+        organization_ids = get_organization_ids_by_scope_group(session, current_user)
         entry = session.exec(
-            select(db_model).where(db_model.organization.in_(orgs_in_scope["organization_ids"]), db_model.id == id)
+            select(db_model).where(db_model.organization.in_(organization_ids), db_model.id == id)
         ).first()
 
         if not entry:
-            raise HTTPException(status_code=404, detail="Category not found")
+            raise HTTPException(status_code=404, detail= f"{endpoint_name} not found")
         
-
         return entry
     
     except HTTPException as http_exc:
@@ -181,7 +156,38 @@ def get_by_Id_template(
     except Exception:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Something went wrong")
-    
+
+@tr.get("/tenant-form/")
+async def get_tenant_form_fields(
+    session: SessionDep,
+    current_user: UserDep
+):
+    try:
+        if not check_permission(
+            session, "Read", role_modules['get'], current_user
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
+        parent_org =  session.exec(select(Organization.id))
+        tenant_data = {
+            "id": "",
+            "name": "",
+            "owner_name": "",
+            "description": "",
+            "logo_image": "",
+            "parent_organization": fetch_organization_id_and_name(session, current_user)
+            
+            }
+        
+
+        return {"data": tenant_data, "html_types": get_html_types('organization')}
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Something went wrong")  
+
 @tr.post(endpoint['create'])
 def create_template(
     session: SessionDep,
@@ -328,7 +334,7 @@ def create_template(
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Something went wrong")
  
-@tr.post(endpoint['update'])
+@tr.put(endpoint['update'])
 def update_template(
     session: SessionDep, 
     current_user: UserDep,
@@ -367,11 +373,11 @@ def update_template(
     
     except HTTPException as http_exc:
         raise http_exc
-    except Exception as e:
+    except Exception:
         traceback.print_exc()
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong")
 
-@tr.post(endpoint['archive']+ "/{id}")
+@tr.put(endpoint['archive']+ "/{id}")
 def archive_template(
     session: SessionDep, 
     current_user: UserDep,
@@ -405,68 +411,35 @@ def archive_template(
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Something went wrong")
     
-# @tr.delete(endpoint['delete']+ "/{id}")
-# async def archive_tenant(
-#     session: SessionDep,
-#     current_user: UserDep,
-#     id: int
-# ):
-#     try:
-#         if not check_permission(
-#             session, "Delete", role_modules['delete'], current_user
-#             ):
-#             raise HTTPException(
-#                 status_code=403, detail="You Do not have the required privilege"
-#             )
-#         # Fetch the tenant/organization
-#         tenant = session.get(Organization, id)
-#         if not tenant:
-#             raise HTTPException(
-#                 status_code=status.HTTP_404_NOT_FOUND,
-#                 detail="Organization not found",
-#             )
+@tr.delete(endpoint['delete']+ "/{id}")
+async def delete_tenant(
+    session: SessionDep,
+    current_user: UserDep,
+    id: int
+):
+    try:
+        if not check_permission(
+            session, "Delete", role_modules['delete'], current_user
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
+        # Fetch the tenant/organization
+        tenant = session.get(Organization, id)
+        if not tenant:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Organization not found",
+            )
 
-#         # Soft-delete the organization
-#         tenant.active = False
+        # Soft-delete the organization
+        tenant.active = False
+        session.delete(tenant)
+        session.commit()
+        return {"message": "Tenant and all related data deleted successfully"}
 
-#         # Soft-delete all related child organizations
-#         child_orgs = session.exec(
-#             select(Organization).where(Organization.parent_organization == tenant.id)
-#         ).all()
-#         for child in child_orgs:
-#             child.active = False
-
-#         # Soft-delete all users
-#         users = session.exec(
-#             select(User).where(User.organization == tenant.id)
-#         ).all()
-#         for user in users:
-#             user.active = False
-
-#         # Soft-delete roles
-#         roles = session.exec(
-#             select(Role).where(Role.organization == tenant.id)
-#         ).all()
-#         for role in roles:
-#             role.active = False
-
-#         # Soft-delete products (if applicable)
-#         products = session.exec(
-#             select(Product).where(Product.organization == tenant.id)
-#         ).all()
-#         for product in products:
-#             product.active = False
-
-#         # Soft-delete warehouses (if applicable)
-#         warehouses = session.exec(
-#             select(Warehouse).where(Warehouse.organization == tenant.id)
-#         ).all()
-#         for wh in warehouses:
-#             wh.active = False
-
-#         session.commit()
-#         return {"message": "Tenant organization archived successfully"}
-
-#     except Exception as e:
-#         traceback.print_exc()
-#         raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Something went wrong")

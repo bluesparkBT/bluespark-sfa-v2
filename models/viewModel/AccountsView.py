@@ -68,7 +68,9 @@ class UpdateUserAccountView(BaseModel):
     # id_type: Optional[IdType] = None
     # id_number: Optional[str] = None
     address : Optional[int| str| None]
-
+    # old_password: Optional[str]
+    # password: Optional[str]
+    
 class OrganizationView(BaseModel):
     id: Optional[int | None]
     name: Annotated [ str, AfterValidator( validate_name) ]
@@ -100,15 +102,20 @@ class UpdateScopeGroupView(BaseModel):
     name: Annotated [ str, AfterValidator( validate_name) ]
     hidden: List[int]
     
-class RoleCreation(BaseModel):
+class RoleView(BaseModel):
+    id: int | str
     name: Annotated [ str, AfterValidator( validate_name) ]
-    organization: int
-
-
-class RoleModulePermissionCreation(BaseModel):
-    role: int
     module: str | type
-    access_policy: Optional[AccessPolicy] = None
+    policy: Optional[AccessPolicy] = None
+    
+class UpdateRoleView(BaseModel):
+    id: Optional[int]
+    name: Annotated [ str, AfterValidator( validate_name) ]
+    # organization: int
+    module: str
+    policy: Optional[AccessPolicy] = None
+
+
 class EmailSchema(BaseModel):
 #    email: List[EmailStr]  
      username: str

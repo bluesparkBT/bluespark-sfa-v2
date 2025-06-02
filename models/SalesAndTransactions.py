@@ -423,5 +423,5 @@ class Invoice(SQLModel, table=True):
     remark: Optional[str] = Field(default=None)
     date: datetime = Field(default=datetime.now(), index=True)
     sales: int = Field(foreign_key="sale.id", index=True)
-    organization: Optional[int] = Field(foreign_key="organization.id", index=True)
+    organization: Optional[int] = Field(foreign_key="organization.id", ondelete="CASCADE", index=True)
 

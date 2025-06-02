@@ -15,6 +15,9 @@ from utils.form_db_fetch import fetch_category_id_and_name, fetch_organization_i
 from utils.get_hierarchy import get_child_organization, get_organization_ids_by_scope_group, get_heirarchy
 import traceback
 
+ScopeGroupRouter = sgr = APIRouter()
+SessionDep = Annotated[Session, Depends(get_session)]
+UserDep = Annotated[dict, Depends(get_current_user)]
 
 endpoint_name = "scope-group"
 db_model = ScopeGroup
@@ -28,17 +31,12 @@ endpoint = {
     "delete": f"/delete-{endpoint_name}",
 }
 role_modules = {   
-    "read": ["Administrative"],
+    "get": ["Administrative"],
     "get_form": ["Administrative"],
     "create": ["Administrative"],
     "update": ["Administrative"],
     "delete": ["Administrative"],
 }
-
-ScopeGroupRouter = sgr = APIRouter()
-
-SessionDep = Annotated[Session, Depends(get_session)]
-UserDep = Annotated[dict, Depends(get_current_user)]
 
 @sgr.get(endpoint['get'])
 def get_template(
@@ -48,7 +46,7 @@ def get_template(
 ):
     try:  
         if not check_permission(
-            session, "Read", role_modules['read'], current_user
+            session, "Read", role_modules['get'], current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
@@ -96,20 +94,20 @@ async def get_template(
 ):
     try:
         if not check_permission(
-            session, "Read", role_modules['read'], current_user
+            session, "Read", role_modules['get'], current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-        organization_ids = get_organization_ids_by_scope_group(session, current_user)
-        entry = session.exec(
-            select(db_model).where(db_model.id.in_(organization_ids), db_model.id == id)
-        ).first()  
-        print("is entry found::", entry)
+        entry = session.exec(select(db_model).where(db_model.id == id)).first()  
         if not entry:
             raise HTTPException(status_code=404, detail="Scope Group not found")
               
-        return entry
+        return {
+                "id": entry.id,
+                "name": entry.name,
+                "hidden": [org.id for org in entry.organizations],
+            }
     except HTTPException as http_exc:
         raise http_exc
     except Exception:
@@ -124,18 +122,20 @@ async def form_scope_organization(
 ):
     try:
         if not check_permission(
-            session, "Read", role_modules['read'], current_user
+            session, "Read", role_modules['get'], current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-        heirarchy = get_heirarchy(session,current_user.organization, None, current_user, children_key="children")
+        heirarchy = get_heirarchy(session, current_user.organization, None, current_user, children_key="children")
         
         return {"data": {'id': "", 'name': "", "hidden": [heirarchy]} , "html_types": get_html_types("scope_group")}
         
+    except HTTPException as http_exc:
+        raise http_exc
     except Exception as e:
         traceback.print_exc()
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong")
     
 @sgr.post("/create-scope-group/")
 async def add_organization_to_scope(
@@ -184,10 +184,13 @@ async def add_organization_to_scope(
             session.refresh(scope_group_link_add)
            
 
-        return "Organization in Scope Group updated successfully"
+        return {"Scope Group created successfully"}
+    
+    except HTTPException as http_exc:
+        raise http_exc
     except Exception as e:
         traceback.print_exc()
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong")
     
 @sgr.put("/update-scope-group/")
 async def update_scope_group(
@@ -203,7 +206,7 @@ async def update_scope_group(
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )        
-        scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == id)).first()
+        scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == valid.id)).first()
         if not scope_group:
             raise HTTPException(status_code=404, detail="Role not found")
         
@@ -227,7 +230,7 @@ async def update_scope_group(
         # Add new entries
         to_add = new_org_ids_set - existing_org_ids
         for org_id in to_add:
-            scope_group_link_add = ScopeGroupLink(scope_group=id, organization=org_id)
+            scope_group_link_add = ScopeGroupLink(scope_group= valid.id, organization=org_id)
             session.add(scope_group_link_add)
             session.commit()
             session.refresh(scope_group_link_add)
@@ -238,7 +241,7 @@ async def update_scope_group(
         if to_remove:
             links_to_remove = session.exec(
                 select(ScopeGroupLink)
-                .where(ScopeGroupLink.scope_group == id)
+                .where(ScopeGroupLink.scope_group == valid.id)
                 .where(ScopeGroupLink.organization.in_(to_remove))
             ).all()
 
@@ -248,11 +251,12 @@ async def update_scope_group(
 
         return scope_group.id
         
+    except HTTPException as http_exc:
+        raise http_exc
     except Exception as e:
         traceback.print_exc()
-        raise HTTPException(status_code=400, detail=str(e))
-    
-    
+        raise HTTPException(status_code=500, detail="Something went wrong")
+     
 @sgr.delete("/delete-scope-group/{id}")
 async def delete_scope_group(
     session: SessionDep,
@@ -282,14 +286,13 @@ async def delete_scope_group(
 
         # Delete the scope group
         session.delete(scope_group)
-
-        # Commit all changes at once
         session.commit()
-        
-        session.refresh()
+        session.refresh(scope_group)
 
-        return {"message": "Scope group deleted successfully"}
+        return {"message": f"{endpoint_name} deleted successfully"}
     
+    except HTTPException as http_exc:
+        raise http_exc
     except Exception as e:
         traceback.print_exc()
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong")

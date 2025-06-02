@@ -14,9 +14,14 @@ from utils.auth_util import get_current_user, check_permission, check_permission
 
 from utils.get_hierarchy import get_organization_ids_by_scope_group
 from utils.form_db_fetch import fetch_user_id_and_name, fetch_organization_id_and_name, fetch_role_id_and_name, fetch_scope_group_id_and_name, fetch_address_id_and_name
-
 import traceback
 
+Domain= "http://172.10.10.203:3000"
+ACCESS_TOKEN_EXPIRE_DAYS = 2
+
+AccountRouter = ar = APIRouter()
+SessionDep = Annotated[Session, Depends(get_session)]
+UserDep = Annotated[dict, Depends(get_current_user)]
 
 endpoint_name = "account"
 db_model = User
@@ -37,66 +42,6 @@ role_modules = {
     "delete": ["Administrative"],
 }
 
-AccountRouter = ar = APIRouter()
-
-
-Domain= "http://172.10.10.203:5000"
-ACCESS_TOKEN_EXPIRE_DAYS = 2
-SessionDep = Annotated[Session, Depends(get_session)]
-UserDep = Annotated[dict, Depends(get_current_user)]
-
-
-@c.get("/get-my-user/")
-async def get_my_user(
-    session: SessionDep,
-    current_user: UserDep,
-    tenant: Optional[str] = None,  # Make tenant optional
-):
-    try:
-        if not check_permission(
-            session, "Read",["Administrative"], current_user
-            ):
-            raise HTTPException(
-                status_code=403, detail="You Do not have the required privilege"
-            )
-
-        user = session.exec(select(User).where(User.id == current_user.id)).first()
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-        if not tenant or tenant.lower() == "provider":
-            service_provider = session.exec(select(Organization).where(Organization.organization_type == "Service Provider")).first()
-            superadmin_user = session.exec(select(User).where(User.id == current_user.id)).first()
-            print("super admin user:", superadmin_user)
-
-            username_display = extract_username(user.username, service_provider.name)
-            organization_name = service_provider.name
-        else:
-            current_tenant = session.exec(
-                select(Organization).where(Organization.tenant_hashed == tenant)
-            ).first()
-            if not current_tenant:
-                raise HTTPException(status_code=404, detail="Tenant not found")
-
-            organization_name = current_tenant.name
-            username_display = extract_username(user.username, organization_name)
-
-        return {
-            "id": user.id,
-            "fullname": user.fullname,
-            "username": username_display,
-            "phone_number": user.phone_number,
-            "organization": organization_name,
-            "role_id": user.role_id,
-            "manager_id": user.manager_id,
-            "scope": user.scope,
-            "scope_group_id": user.scope_group_id,
-        }
-
-    except Exception as e:
-        traceback.print_exc()
-        raise HTTPException(status_code=400, detail=str(e))
-
-
 #Authentication Related
 @ar.post("/login/")
 def login(
@@ -107,6 +52,7 @@ def login(
 ):
     try:
         current_tenant = session.exec(select(Organization).where(Organization.tenant_hashed == tenant)).first()
+        print("current tenant found", current_tenant)
         if not current_tenant:
             raise HTTPException(status_code=404, detail="Tenant not found")
         
@@ -138,7 +84,6 @@ def login(
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Something went wrong")
-
 
 @ar.get("/get-my-user/")
 async def get_my_user(
@@ -315,8 +260,6 @@ def get_template_form(
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             ) 
-        print(fetch_organization_id_and_name(session, current_user))  
-        print(fetch_user_id_and_name(session, current_user))
         form_structure = {
             "id": "", 
             "full_name": "", 
@@ -405,7 +348,6 @@ def create_template(
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Something went wrong")
  
- 
 @ar.get("/update-account-form/")
 async def update_user_form(
     session: SessionDep,
@@ -420,7 +362,6 @@ async def update_user_form(
                 status_code=403, detail="You Do not have the required privilege"
             )
      
-
         user_data = {
             "id": "", 
             "full_name": "", 
@@ -431,15 +372,18 @@ async def update_user_form(
             "role": fetch_role_id_and_name(session, current_user),
             "scope": {scope.value: scope.value for scope in Scope},
             "scope_group": fetch_scope_group_id_and_name(session, current_user),
-            "gender": {gender.value: gender.value for gender in Gender},
-            "date_of_birth": "",
-            "date_of_joining": "",
-            "salary": 0,
-            "position": "",
-            "image": "",
-            "id_type": {i.value: i.value for i in IdType},
-            "id_number": "",
-            "address": fetch_address_id_and_name(session, current_user)
+            "gender": {i.value: i.value for i in Gender},
+            # "salary": 0,
+            # "position": "",            
+            # "date_of_birth": "",
+            # "date_of_joining": "",
+            "manager": fetch_user_id_and_name(session, current_user),
+            # "image": "",
+            # "id_type": {i.value: i.value for i in IdType},
+            # "id_number": "",
+            "address": fetch_address_id_and_name(session, current_user),
+            # "old_password": "",
+            # "password": ""
 
 
         }
@@ -451,7 +395,6 @@ async def update_user_form(
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Something went wrong")
     
-# update a single category by ID
 @ar.put(endpoint['update'])
 def update_template(
     session: SessionDep, 
@@ -468,16 +411,22 @@ def update_template(
                 status_code=403, detail="You Do not have the required privilege"
             )
         organization_ids = get_organization_ids_by_scope_group(session, current_user)
-
         selected_entry = session.exec(
             select(db_model).where(db_model.organization.in_(organization_ids), db_model.id == valid.id)
         ).first()
+        user_org = session.exec(select(Organization).where(Organization.id == selected_entry.organization)).first() 
+        old_username = selected_entry.username
+        new_username = add_organization_path(valid.username, user_org.name)
         
         selected_entry.full_name = valid.full_name
-        selected_entry.username = valid.username
+        selected_entry.username = new_username
         selected_entry.email = valid.email
         selected_entry.phone_number = valid.phone_number
         selected_entry.organization = valid.organization
+        # if verify_password(valid.old_password + old_username, selected_entry.hashedPassword):
+        #     selected_entry.hashedPassword = get_password_hash(valid.password + selected_entry.username)
+        # else:
+        #     raise HTTPException(status_code=401, detail="Incorrect password")
         if valid.gender:
             selected_entry.gender = parse_enum(Gender, valid.gender, "Gender")
         # if valid.salary is not None:
@@ -507,12 +456,16 @@ def update_template(
         session.commit()
         session.refresh(selected_entry)
 
-        return {"message": f"{endpoint_name} Updated successfully"}
+        return {
+            "message": "User registered successfully",
+            "domain" : f"{Domain}/signin" if tenant == "provider" else f"{Domain}/{tenant}/signin",
+            "username": selected_entry.username,
+            # "password": "password not changed" if valid.password == None else valid.password
+            }
 
     except Exception as e:
         raise HTTPException(status_code=500, detail="Something went wrong")
 
-# Delete a category by ID
 @ar.delete(endpoint['delete']+ "/{id}")
 def delete_template(
     session: SessionDep, 

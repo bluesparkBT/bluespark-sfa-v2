@@ -20,11 +20,11 @@ UserDep = Annotated[dict, Depends(get_current_user)]
 
 AddressRouter = ar = APIRouter()
 
-endpoint_name = "addresses"
+endpoint_name = "address"
 db_model = Address
 
 endpoint = {
-    "get": f"/get-{endpoint_name}",
+    "get": f"/get-{endpoint_name}es",
     "get_by_id": f"/get-{endpoint_name}",
     "get_form": f"/{endpoint_name}-form/",
     "create": f"/create-{endpoint_name}",
@@ -66,7 +66,7 @@ async def get_addresses(
             )
 
         # Fetch categories based on organization IDs
-        organization_ids = get_organization_ids_by_scope_group(session, current_user)
+        # organization_ids = get_organization_ids_by_scope_group(session, current_user)
         # orgs_address_id = [
         #     address_id for address_id in session.exec(
         #         select(Organization.address_id).where(Organization.id.in_(organization_ids))
@@ -76,20 +76,26 @@ async def get_addresses(
         # entries_list = session.exec(
         #     select(db_model).where(db_model.id.in_(orgs_address_id))
         # ).all()
-        entry = session.exec(
-            select(db_model)).all()    
+        entry = session.exec(select(db_model)).all()    
 
         if not entry:
             raise HTTPException(status_code=404, detail="Address not found")
         
         return entry
 
-    except Exception as e:
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Something went wrong")
 
 @ar.get(endpoint['get_by_id'] + "/{id}")
-async def get_address_by_id(session: SessionDep, current_user: UserDep, tenant: str, id: int):
+async def get_address_by_id(
+    session: SessionDep,
+    current_user: UserDep,
+    tenant: str,
+    id: int
+):
     """
     Retrieve a specific address by its ID.
 
@@ -116,26 +122,40 @@ async def get_address_by_id(session: SessionDep, current_user: UserDep, tenant: 
             raise HTTPException(status_code=404, detail="Address not found")
         return entry
     
-    except Exception as e:
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Something went wrong")
     
-
 @ar.get(endpoint['get_form'])
-async def get_form_fields_address(session: SessionDep, current_user: UserDep, tenant: str):
-    address = Address(
-        id="",
-        country="Ethiopia",
-        city="",
-        sub_city="",
-        woreda="",
-    )
+async def get_form_fields_address(
+    session: SessionDep,
+    current_user: UserDep,
+    tenant: str
+):
+    try:
+        if not check_permission(
+            session, "Create",role_modules['get_form'], current_user
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            ) 
+        address = {
+            "id": None,
+            "country":"Ethiopia",
+            "city":"",
+            "sub_city":"",
+            "woreda":"",
+        }
 
-    return {
-        "data": address,
-        "html_types": get_html_types('address'),
-    }
-
+        return {"data": address, "html_types": get_html_types('address')}
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Something went wrong")
+    
 @ar.post(endpoint['create'])
 async def create_template(
     session: SessionDep,
@@ -174,18 +194,18 @@ async def create_template(
 
         return new_entry
 
-    except Exception as e:
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception:
         traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Something went wrong")
       
 @ar.put(endpoint['update'])
 async def update_address(
     session: SessionDep,
     current_user: UserDep,
     tenant: str,
-
     valid: TemplateView,
-
-    
 ):
     """
     Update an existing address by ID.
@@ -198,11 +218,6 @@ async def update_address(
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-        # Fetch address
-        #orgs_in_scope = check_permission_and_scope(session, "Update", role_modules['update'], current_user)
-        # selected_entry = session.exec(
-        #     select(db_model).where(db_model.organization_id.in_(orgs_in_scope["organization_ids"]), db_model.id == valid.id)
-        # ).first()
         selected_entry = session.exec(
             select(db_model).where( db_model.id == valid.id)
         ).first()
@@ -222,17 +237,18 @@ async def update_address(
 
         return {"message": f"{endpoint_name} Updated successfully"}
 
-    except Exception as e:
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception:
         traceback.print_exc()
-        raise HTTPException(status_code=400, detail=f"Update failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="Something went wrong")
 
 @ar.delete(endpoint['delete']+ "/{id}")
 async def delete_address(
-    id: int,
     session: SessionDep,
     current_user: UserDep,
     tenant: str,
-
+    id: int,
 ):
     """
     Delete an address from the database.
@@ -258,11 +274,6 @@ async def delete_address(
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-        # Fetch address
-        #orgs_in_scope = check_permission_and_scope(session, "Update", role_modules['update'], current_user)
-        # selected_entry = session.exec(
-        #     select(db_model).where(db_model.organization_id.in_(orgs_in_scope["organization_ids"]), db_model.id == valid.id)
-        # ).first()
         selected_entry = session.exec(
             select(db_model).where( db_model.id == id)
         ).first()
@@ -274,9 +285,12 @@ async def delete_address(
         session.commit()
         return {"message": f"{endpoint_name} deleted successfully"}
     
-    except Exception as e:
-        traceback.print.exc()
-        raise HTTPException(status_code=400, detail=f"Deletion failed: {str(e)}")
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Something went wrong")
+
 
 
 # @ar.get("/form-location")
@@ -392,28 +406,28 @@ async def delete_address(
 
 # @ar.delete("/delete-location/{id}")
 # async def delete_location(session: SessionDep, current_user: UserDep, id: int):
-    """
-    Delete a location from the database.
+    # """
+    # Delete a location from the database.
 
-    Args:
-        session (SessionDep): Database session.
-        id (int): The ID of the location to delete.
+    # Args:
+    #     session (SessionDep): Database session.
+    #     id (int): The ID of the location to delete.
 
-    Returns:
-        dict: A message indicating successful deletion.
+    # Returns:
+    #     dict: A message indicating successful deletion.
 
-    Raises:
-        HTTPException: 404 if the location is not found.
-        HTTPException: 400 if there is an error during deletion.
-    """
+    # Raises:
+    #     HTTPException: 404 if the location is not found.
+    #     HTTPException: 400 if there is an error during deletion.
+    # """
 
-    location = session.exec(select(Location).where(Location.id == id)).first()
-    if not location:
-        raise HTTPException(status_code=404, detail="Location not found")
-    try:
-        session.delete(location)
-        session.commit()
-        return {"message": "Location deleted successfully"}
-    except Exception as e:
-        traceback.print.exc()
-        raise HTTPException(status_code=400, detail=str(e))
+    # location = session.exec(select(Location).where(Location.id == id)).first()
+    # if not location:
+    #     raise HTTPException(status_code=404, detail="Location not found")
+    # try:
+    #     session.delete(location)
+    #     session.commit()
+    #     return {"message": "Location deleted successfully"}
+    # except Exception as e:
+    #     traceback.print.exc()
+    #     raise HTTPException(status_code=400, detail=str(e))
