@@ -15,13 +15,13 @@ MODEL_HTML_TYPES = {
         "latitude": "text",
         "longitude": "text",
         "hidden": "text",
-        "geolocation":"select",
     },
     "role":{
         "id":"hidden",
         "name":"text",
         "module":"select",
-        "policy":"radio"
+        "policy":"radio",
+        "permissions": "hidden"
     },
     "policy":{
         "role":"hidden",
@@ -123,8 +123,12 @@ MODEL_HTML_TYPES = {
     "inheritance": {
         "id": "hidden",
         "name": "text",
+        "organization": "select",
         "category": "select",
-        "product": "select"
+        "product": "select",
+        "role": "select",
+        "classification": "select",
+        "point_of_sale": "select"
     }
 
 }

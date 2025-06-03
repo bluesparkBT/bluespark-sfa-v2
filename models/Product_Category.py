@@ -41,6 +41,7 @@ class InheritanceGroup(SQLModel, table=True):
     __tablename__ = "inheritance_group"
     id: int = Field(default=None, primary_key=True)
     name: str = Field(index=True)
+    organization: Optional[int] = Field(default=None, foreign_key="organization.id", ondelete="CASCADE", index=True)
     products: List["Product"] = Relationship(back_populates="inheritance_groups", link_model=ProductLink)
     categories: List["Category"] = Relationship(back_populates="inheritance_groups", link_model=CategoryLink)
     classifications: List["ClassificationGroup"] = Relationship(back_populates="inheritance_groups", link_model=ClassificationLink)
