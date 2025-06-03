@@ -122,6 +122,17 @@ MODEL_HTML_TYPES = {
         "name": "text",
         "category": "select",
         "product": "select"
+        # "classification":"select"
+    },
+    "classification":{
+        "id": "hidden",
+        "name": "",
+        "organization": "select",
+        "point_of_sale": "select",
+        "territory":"",
+        "description": "",
+        "route":"",
+        "customer discount": "select",
     }
 
 }
