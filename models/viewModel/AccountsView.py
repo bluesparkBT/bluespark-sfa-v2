@@ -70,20 +70,35 @@ class UpdateUserAccountView(BaseModel):
     address : Optional[int| str| None]
     # old_password: Optional[str]
     # password: Optional[str]
-    
+
 class OrganizationView(BaseModel):
+    name: Annotated [ str, AfterValidator( validate_name) ]
+    owner_name: Annotated [ str, AfterValidator( validate_name) ]
+    description: Optional [Annotated [ str, AfterValidator( validate_name) ] ]   
+    logo_image: Optional[str]
+    parent_organization: Optional[int] = None
+    organization_type: OrganizationType
+    inheritance_group: Optional[int] = None
+    address:Optional[int] = None
+    landmark:Optional[str] = None
+    latitude: Optional[float | str | None] = None
+    longitude: Optional[float | str | None] = None
+
+class UpdateOrganizationView(BaseModel):
     id: Optional[int | None]
     name: Annotated [ str, AfterValidator( validate_name) ]
     owner_name: Annotated [ str, AfterValidator( validate_name) ]
-    organization_type: OrganizationType
-    logo_image: Optional[str]
     description: Optional [Annotated [ str, AfterValidator( validate_name) ] ]   
+    logo_image: Optional[str]
     parent_organization: Optional[int] = None
-    address:Optional[int] = None
-    latitude: Optional[int] = None
-    longitude: Optional[int] = None
+    organization_type: OrganizationType
     inheritance_group: Optional[int] = None
-    
+    address:Optional[int] = None
+    landmark:Optional[str] = None
+    latitude: Optional[int | str] = None
+    longitude: Optional[int | str] = None
+    geolocation: Optional[int] = None
+
 class TenantView(BaseModel):
     name: Annotated [ str, AfterValidator( validate_name) ]
     owner_name: Annotated [ str, AfterValidator( validate_name) ]

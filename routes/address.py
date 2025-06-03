@@ -9,10 +9,9 @@ from models.Utils import ErrorLog
 from utils.address_util import check_address
 from utils.auth_util import get_current_user
 from models.viewModel.AddressView import AddressView as TemplateView
-
 from utils.model_converter_util import get_html_types
 from utils.auth_util import check_permission, check_permission_and_scope
-from utils.form_db_fetch import get_organization_ids_by_scope_group
+from utils.form_db_fetch import get_organization_ids_by_scope_group, fetch_organization_id_and_name
 from models.Account import Organization
 
 SessionDep = Annotated[Session, Depends(get_session)]
@@ -65,23 +64,27 @@ async def get_addresses(
                 status_code=403, detail="You Do not have the required privilege"
             )
 
-        # Fetch categories based on organization IDs
-        # organization_ids = get_organization_ids_by_scope_group(session, current_user)
-        # orgs_address_id = [
-        #     address_id for address_id in session.exec(
-        #         select(Organization.address_id).where(Organization.id.in_(organization_ids))
-        #     ).all()
-        # ]
+        organization_ids = get_organization_ids_by_scope_group(session, current_user)
 
-        # entries_list = session.exec(
-        #     select(db_model).where(db_model.id.in_(orgs_address_id))
-        # ).all()
-        entry = session.exec(select(db_model)).all()    
+        entries_list = session.exec(
+            select(db_model).where(db_model.organization.in_(organization_ids))
+        ).all()
 
-        if not entry:
+        if not entries_list:
             raise HTTPException(status_code=404, detail="Address not found")
-        
-        return entry
+        address_list = []
+        for address in entries_list:
+            temp = {
+                "id": address.id,
+                "country": address.country,
+                "city": address.city,
+                "sub_city": address.sub_city,
+                "woreda": address.woreda,
+            }
+            if temp not in address_list:
+                address_list.append(temp)
+
+        return address_list
 
     except HTTPException as http_exc:
         raise http_exc
@@ -147,6 +150,7 @@ async def get_form_fields_address(
             "city":"",
             "sub_city":"",
             "woreda":"",
+            "organization": fetch_organization_id_and_name(session, current_user)
         }
 
         return {"data": address, "html_types": get_html_types('address')}

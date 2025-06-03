@@ -6,6 +6,7 @@ from models.Account import (Organization, User, Role, ScopeGroup, ScopeGroupLink
 from models.Address import Address, Geolocation
 from models.Product_Category import Category, Product, InheritanceGroup, ProductLink, CategoryLink
 from models.Marketing import ClassificationGroup
+from models.PointOfSale import PointOfSale, Outlet, WalkInCustomer
 #from models.Warehouse import Stock, StockType, Warehouse, Vehicle
 from utils.get_hierarchy import get_organization_ids_by_scope_group
 from utils.auth_util import get_current_user
@@ -85,7 +86,7 @@ def fetch_product_id_and_name(session: SessionDep, current_user: UserDep):
 
     product_row = session.exec(
         select(Product.id, Product.name)
-        .where(Role.organization.in_(organization_ids))
+        .where(Product.organization.in_(organization_ids))
         ).all()
     products = {row[0]: row[1] for row in product_row}
     return products
@@ -101,7 +102,6 @@ def fetch_category_id_and_name(session: SessionDep, current_user: UserDep):
     return categories
 
 def fetch_inheritance_group_id_and_name(session: SessionDep, current_user: UserDep):
-    # Step 1: Get the list of organization IDs the current user has access to
     organization_ids = get_organization_ids_by_scope_group(session, current_user)
 
     # Step 2: Get distinct inheritance_group IDs from those organizations
@@ -125,23 +125,22 @@ def fetch_inheritance_group_id_and_name(session: SessionDep, current_user: UserD
 def fetch_address_id_and_name(session: SessionDep, current_user: UserDep):
     organization_ids = get_organization_ids_by_scope_group(session, current_user)
 
-    address_ids = session.exec(
-        select(Organization.address)
-        .where(Organization.id.in_(organization_ids))
-    ).all()
-    
-    address_ids = [
-        aid[0] for aid in address_ids if aid is not None and aid[0] is not None
-    ] 
-    if not address_ids:
-        return {}
+    address_row = session.exec(
+        select(Address.id, Address.sub_city)
+        .where(Address.organization.in_(organization_ids))
+        ).all()
+    products = {row[0]: row[1] for row in address_row}
+    return products
+
+def fetch_geolocation_id_and_name(session: SessionDep, current_user: UserDep):
+    organization_ids = get_organization_ids_by_scope_group(session, current_user)
 
     address_row = session.exec(
-        select(Address.id, Address.name)
-        .where(Address.id.in_(address_ids))
-    ).all()
-
-    return {row[0]: row[1] for row in address_row}
+        select(Geolocation.id, Geolocation.name)
+        .where(Geolocation.organization.in_(organization_ids))
+        ).all()
+    products = {row[0]: row[1] for row in address_row}
+    return products
 
 def fetch_classification_id_and_name(session: SessionDep, current_user: UserDep):
     organization_ids = get_organization_ids_by_scope_group(session, current_user)
@@ -156,14 +155,21 @@ def fetch_classification_id_and_name(session: SessionDep, current_user: UserDep)
 
 def fetch_point_of_sale_id_and_name(session: SessionDep, current_user: UserDep):
     organization_ids = get_organization_ids_by_scope_group(session, current_user)
-
     pos_row = session.exec(
-        select(Organization.point_of_sale_id, Organization.point_of_sale_name)
-        .where(Organization.id.in_(organization_ids))
-    ).all()
-
-    pos = {row[0]: row[1] for row in pos_row if row[0] is not None}
+        select(PointOfSale.id, PointOfSale.outlet_id)
+        .where(PointOfSale.organization.in_(organization_ids))
+        ).all()
+    pos = {row[0]: row[1] for row in pos_row}
     return pos 
+
+def fetch_outlet_id_and_name(session: SessionDep, current_user: UserDep):
+    organization_ids = get_organization_ids_by_scope_group(session, current_user)
+    outlet_row = session.exec(
+        select(Outlet.id, Outlet.name)
+        .where(PointOfSale.organization.in_(organization_ids))
+        ).all()
+    outlet = {row[0]: row[1] for row in outlet_row}
+    return outlet 
 
 # def fetch_warehouse_id_and_name(session: SessionDep, current_user: UserDep):
 #     organization_ids = get_organization_ids_by_scope_group(session, current_user)

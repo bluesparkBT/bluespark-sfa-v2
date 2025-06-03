@@ -58,16 +58,16 @@ class Product(SQLModel, table=True):
     __tablename__ = "product"
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    sku: str = Field(default=None)
     name: str = Field(default=None, index=True)
+    sku: str = Field(default=None)
+    organization: Optional[int] = Field(default=None, foreign_key="organization.id", ondelete="CASCADE", index=True)
+    category_id: Optional[int] = Field(default=None, foreign_key="category.id", index=True)
     description: Optional[str] = Field(default=None)
     image: Optional[str] = Field(default=None)
     brand: Optional[str] = Field(default=None, index=True)
     price: float = Field(default=None)
     unit: Product_units = Field(default=None)
-    category_id: Optional[int] = Field(default=None, foreign_key="category.id", index=True)
     category: Optional["Category"] = Relationship(back_populates="products")
-    organization: Optional[int] = Field(default=None, foreign_key="organization.id", ondelete="CASCADE", index=True)
     inheritance_groups: List["InheritanceGroup"] = Relationship(back_populates="products", link_model=ProductLink)
 
 
@@ -79,7 +79,7 @@ class Category(SQLModel, table=True):
     code: str = Field(default=None, index=True)
     description: Optional[str] = Field(default=None)
     parent_category: Optional [int] = Field(foreign_key = "category.id")
-    products: List["Product"] = Relationship(back_populates="category")
     organization: Optional [int] = Field(default=None, foreign_key="organization.id", ondelete="CASCADE", index=True)
     inheritance_groups: List["InheritanceGroup"] = Relationship(back_populates="categories", link_model=CategoryLink)
+    products: List["Product"] = Relationship(back_populates="category")
 

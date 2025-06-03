@@ -14,7 +14,8 @@ MODEL_HTML_TYPES = {
         "landmark": "text",
         "latitude": "text",
         "longitude": "text",
-        "hidden": "text"
+        "hidden": "text",
+        "geolocation":"select",
     },
     "role":{
         "id":"hidden",
@@ -62,6 +63,7 @@ MODEL_HTML_TYPES = {
         "city": "text",
         "sub_city": "text",
         "woreda": "text",
+        "organization": "select"
     },
     "location": {
         "id": "hidden",
@@ -107,15 +109,16 @@ MODEL_HTML_TYPES = {
     },
     "product": {
         "id": "hidden",
-        "sku": "text",
         "name": "text",
+        "sku": "text",
+        "organization": "select",
+        "category_id": "select",        
         "description": "textarea",
         "image": "file",
         "brand": "text",
         "price": "number",
         "unit": "select",
-        "category": "select",
-        "organization": "select"
+
     },
     "inheritance": {
         "id": "hidden",

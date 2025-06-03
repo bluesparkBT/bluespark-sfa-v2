@@ -6,7 +6,7 @@ from db import get_session
 from utils.model_converter_util import get_html_types
 from models.Product_Category import Category, InheritanceGroup
 from models.Account import Organization, ScopeGroup
-from models.viewModel.ProductCategoryView import CategoryView as TemplateView
+from models.viewModel.ProductCategoryView import CategoryView as TemplateView, UpdateCategoryView as UpdateTemplateView
 from utils.auth_util import get_current_user, check_permission, check_permission_and_scope
 from utils.get_hierarchy import get_organization_ids_by_scope_group
 from utils.form_db_fetch import fetch_category_id_and_name, fetch_organization_id_and_name, fetch_id_and_name
@@ -80,13 +80,14 @@ def get_template(
 
         category_list = []
         for category in organization_categories:
-
+            parent_category = session.exec(select(Category.name).where(Category.id == category.parent_category)).first()
             category_temp = {
                 "id": category.id,
-                "Category Name": category.name,
-                "Parent Category": category.parent_category,
-                "UNSPC Code": category.code,
+                "name": category.name,
+                "UNSPC code": category.code,
                 "description": category.description,
+                "parent_category": parent_category,
+                # "organization": category.organization
             }
             if category_temp not in category_list:
                 category_list.append(category_temp)
@@ -114,9 +115,7 @@ def get_template(
                 status_code=403, detail="You Do not have the required privilege"
             )
 
-        # Fetch categories based on organization IDs
         organization_ids = get_organization_ids_by_scope_group(session, current_user)
-
         db_category = session.exec(
             select(Category).where(Category.organization.in_(organization_ids), Category.id == id)
         ).first()
@@ -124,8 +123,18 @@ def get_template(
         if not db_category:
             raise HTTPException(status_code=404, detail="Category not found")
         
-
-        return db_category
+        category_list = {
+            
+            "id": db_category.id,
+            "name": db_category.name,
+            "code": db_category.code,
+            "description": db_category.description,
+            "parent_category": db_category. parent_category,   
+            "organization": db_category.organization,
+            
+        }
+        
+        return category_list
     
     except HTTPException as http_exc:
         raise http_exc
@@ -139,19 +148,13 @@ def get_template_form(
     session: SessionDep,
     current_user: UserDep,
 ) :
-    """   Retrieves the form structure for creating a new category.
-    """
     try:
-        # Check permission
         if not check_permission(
             session, "Create",role_modules['get_form'], current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )   
-
-          # This will display a list of category names
-
         form_structure = {
             "id": "",
             "name": "",
@@ -192,7 +195,7 @@ def create_template(
         if existing_category is not None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail= f" {endpoint_name} already registered",
+                detail= f" {endpoint_name} with the same name and code already registered",
             )
             
         # Create a new category entry from validated input
@@ -209,13 +212,12 @@ def create_template(
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Something went wrong")
  
-# update a single category by ID
 @c.put(endpoint['update'])
 def update_template(
     session: SessionDep, 
     current_user: UserDep,
     tenant: str,
-    valid: TemplateView,
+    valid: UpdateTemplateView,
 ):
     try:
         if not check_permission(
@@ -239,14 +241,12 @@ def update_template(
         selected_category.code = valid.code
         selected_category.parent_category = valid.parent_category
 
-        
         selected_category.description = valid.description
         if valid.organization == organization_ids:
             selected_category.organization = valid.organization
         else:
-            {"message": "invalid input select your owen organization id"}    
+            {"message": "invalid input select your own organization id"}    
  
-        # Commit the changes and refresh the object
         session.add(selected_category)
         session.commit()
         session.refresh(selected_category)
