@@ -52,7 +52,8 @@ MODEL_HTML_TYPES = {
         "id_type": "select",
         "id_number": "text",
         "address" : "select",
-        "password": "text"
+        # "old_password": "text",
+        # "password": "text"
 
     },
     "address": {
@@ -101,7 +102,6 @@ MODEL_HTML_TYPES = {
         "name": "text",
         "code": "text",
         "description": "textarea",
-        "image": "file",
         "parent_category": "select",
         "organization": "select"
     },

@@ -4,21 +4,22 @@ from sqlmodel import Session, select
 from fastapi import APIRouter, HTTPException, Body, status, Depends
 from db import get_session
 from utils.model_converter_util import get_html_types
-from models.Product_Category import Product, Category, InheritanceGroup
-from models.Account import ScopeGroup,ScopeGroupLink 
-from utils.util_functions import validate_name
-from models.viewModel.CategoryView import CategoryView as TemplateView
-from models.Account import Organization
+from models.Product_Category import Category, InheritanceGroup
+from models.Account import Organization, ScopeGroup
+from models.viewModel.ProductCategoryView import CategoryView as TemplateView
 from utils.auth_util import get_current_user, check_permission, check_permission_and_scope
 from utils.get_hierarchy import get_organization_ids_by_scope_group
 from utils.form_db_fetch import fetch_category_id_and_name, fetch_organization_id_and_name, fetch_id_and_name
 import traceback
 
+CategoryRouter = c = APIRouter()
+SessionDep = Annotated[Session, Depends(get_session)]
+UserDep = Annotated[dict, Depends(get_current_user)]
 
 endpoint_name = "category"
-
+db_model = Category
 endpoint = {
-    "get": f"/get-{endpoint_name}",
+    "get": f"/get-categories",
     "get_by_id": f"/get-{endpoint_name}",
     "get_form": f"/{endpoint_name}-form/",
     "create": f"/create-{endpoint_name}",
@@ -34,12 +35,6 @@ role_modules = {
     "delete": ["Administrative", "Category"],
 }
 
-CategoryRouter = c = APIRouter()
-
-SessionDep = Annotated[Session, Depends(get_session)]
-
-UserDep = Annotated[dict, Depends(get_current_user)]
-
 @c.get(endpoint['get'])
 def get_template(
     session: SessionDep,
@@ -47,10 +42,13 @@ def get_template(
     tenant: str
 
 ):
-    
     try:  
-        orgs_in_scope = check_permission_and_scope(session, "Read", role_modules['get'], current_user)
-        
+        if not check_permission(
+            session, "Read",role_modules['get'], current_user
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )        
         inherited_group_id = session.exec(
             select(Organization.inheritance_group).where(Organization.id == current_user.organization)
         ).first()
@@ -66,22 +64,23 @@ def get_template(
             inherited_categories = []
         
         # organization_ids = get_organization_ids_by_scope_group(session, current_user)
-        # scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == current_user.scope_group)).first()
+        scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == current_user.scope_group)).first()
    
-        # if scope_group != None:
-        #     existing_orgs = [organization.id for organization in scope_group.organizations ]
-        # if scope_group == None:
-        #     existing_orgs= []
+        if scope_group != None:
+            existing_orgs = [organization.id for organization in scope_group.organizations ]
+        if scope_group == None:
+            existing_orgs= []
 
-        categories = session.exec(
-            select(Category).where(Category.organization.in_(orgs_in_scope["organization_ids"]))
+        organization_categories = session.exec(
+            select(Category).where(Category.organization.in_(existing_orgs))
         ).all()
         # categories = organization_group.categories
 
-        categories.extend(inherited_categories)
+        organization_categories.extend(inherited_categories)
 
         category_list = []
-        for category in categories:
+        for category in organization_categories:
+
             category_temp = {
                 "id": category.id,
                 "Category Name": category.name,
@@ -94,8 +93,11 @@ def get_template(
 
         return category_list
 
-    except Exception as e:
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception:
         traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Something went wrong")
  
 @c.get(endpoint['get_by_id'] + "/{id}")
 def get_template(
@@ -103,7 +105,6 @@ def get_template(
     current_user: UserDep,
     tenant: str,
     id: int,
-    # valid: TemplateView,
 ):
     try:
         if not check_permission(
@@ -126,9 +127,11 @@ def get_template(
 
         return db_category
     
-    except Exception as e:
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception:
         traceback.print_exc()
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong")
     
 @c.get(endpoint['get_form'])
 def get_template_form(
@@ -160,9 +163,11 @@ def get_template_form(
 
         return {"data": form_structure, "html_types": get_html_types("category")}
 
-    except Exception as e:
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception:
         traceback.print_exc()
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong")
 
 @c.post(endpoint['create'])
 def create_template(
@@ -179,8 +184,17 @@ def create_template(
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-        organization_ids = get_organization_ids_by_scope_group(session, current_user)
-
+        existing_category = session.exec(
+            select(db_model).where(
+            (db_model.code == valid.code) & (db_model.name == valid.name)
+            )
+        ).first()
+        if existing_category is not None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail= f" {endpoint_name} already registered",
+            )
+            
         # Create a new category entry from validated input
         new_category = Category.model_validate(valid)
         session.add(new_category)
@@ -189,9 +203,11 @@ def create_template(
 
         return new_category
 
-    except Exception as e:
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception:
         traceback.print_exc()
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong")
  
 # update a single category by ID
 @c.put(endpoint['update'])
@@ -199,11 +215,9 @@ def update_template(
     session: SessionDep, 
     current_user: UserDep,
     tenant: str,
-   
     valid: TemplateView,
 ):
     try:
-        # Check permission
         if not check_permission(
             session, "Update",role_modules['update'], current_user
             ):
@@ -221,9 +235,6 @@ def update_template(
         if not selected_category:
             raise HTTPException(status_code=404, detail="Category not found")
 
-
-       
-       
         selected_category.name = valid.name
         selected_category.code = valid.code
         selected_category.parent_category = valid.parent_category
@@ -242,9 +253,12 @@ def update_template(
 
         return {"message": "Category Updated successfully"}
 
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Something went wrong")
+    
 # Delete a category by ID
 @c.delete(endpoint['delete']+ "/{id}")
 def delete_template(
@@ -254,14 +268,12 @@ def delete_template(
     id: int
 ) :
     try:
-        # Check permission
         if not check_permission(
             session, "Delete",role_modules['delete'], current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-        # Fetch categories based on organization IDs
         organization_ids = get_organization_ids_by_scope_group(session, current_user)
 
         selected_category = session.exec(
@@ -278,5 +290,8 @@ def delete_template(
 
         return {"message": "Category deleted successfully"}
 
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Something went wrong")

@@ -8,19 +8,41 @@ import traceback
 from utils.auth_util import verify_password, create_access_token, get_password_hash
 from utils.util_functions import validate_name, validate_email, validate_phone_number, parse_enum
 from utils.auth_util import get_current_user, check_permission, generate_random_password, get_tenant_hash, extract_username, add_organization_path
-
 from utils.model_converter_util import get_html_types
 from utils.form_db_fetch import get_organization_ids_by_scope_group
 from utils.domain_util import getPath
-from utils.auth_util import check_permission_and_scope
+from utils.auth_util import (
+    get_current_user,
+    check_permission,
+    check_permission_and_scope,
+    generate_random_password,
+    get_password_hash,
+    add_organization_path,
+    verify_password,
+    create_access_token
+)
 
 from models.Account import User, ScopeGroup, ScopeGroupLink, Organization, OrganizationType, RoleModulePermission, Scope, Role, AccessPolicy
 from models.Account import ModuleName as modules
 from models.viewModel.AccountsView import SuperAdminView as TemplateView
-from models.viewModel.AccountsView import OrganizationView, UpdateSuperAdminView
+from models.viewModel.AccountsView import UpdateSuperAdminView, EmailSchema
+
+from fastapi_mail import FastMail, MessageSchema,ConnectionConfig
+from starlette.requests import Request
+from starlette.responses import JSONResponse
+from pydantic import EmailStr, BaseModel
+
+# frontend domain
+Domain= getPath()
+
+service_provider_company = "Bluespark"
+ACCESS_TOKEN_EXPIRE_DAYS = 2
+
+ServiceProvider = sr = APIRouter()
+SessionDep = Annotated[Session, Depends(get_session)]
+UserDep = Annotated[dict, Depends(get_current_user)]
 
 endpoint_name = "superadmin"
-
 db_model = User
 
 endpoint = {
@@ -40,20 +62,8 @@ role_modules = {
     "delete": ["Service Provider"],
 }
 
-# frontend domain
-Domain= getPath()
-
-service_provider_company = "Bluespark"
-ACCESS_TOKEN_EXPIRE_DAYS = 2
-
-ServiceProvider = c = APIRouter()
-
-SessionDep = Annotated[Session, Depends(get_session)]
-UserDep = Annotated[dict, Depends(get_current_user)]
-
-
 #Authentication Related
-@c.get("/has-superadmin")
+@sr.get("/has-superadmin")
 def has_superadmin_created(
     session: SessionDep
 ) -> bool:
@@ -74,7 +84,7 @@ def has_superadmin_created(
         print("No super admin found")
         return False
 
-@c.post("/login/")
+@sr.post("/login/")
 def login(
     session: SessionDep,
     
@@ -82,7 +92,7 @@ def login(
     password: str = Body(...)
 ):
     try:
-        service_provider = session.exec(select(Organization).where(Organization.organization_type == OrganizationType.service_provider)).first()
+        service_provider = session.exec(select(Organization).where(Organization.organization_type == "Service Provider")).first()
         db_username = add_organization_path(username, service_provider.name)
 
         user = session.exec(select(db_model).where(db_model.username == db_username)).first()
@@ -110,8 +120,9 @@ def login(
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Something went wrong")
+
 #CRUD
-@c.get(endpoint['get'])
+@sr.get(endpoint['get'])
 def get(
     session: SessionDep,
     current_user: UserDep,
@@ -132,7 +143,7 @@ def get(
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Something went wrong")
  
-@c.get(endpoint['get_by_id'] + "/{id}")
+@sr.get(endpoint['get_by_id'] + "/{id}")
 def get_by_Id_template(
     session: SessionDep, 
     current_user: UserDep,
@@ -140,14 +151,13 @@ def get_by_Id_template(
     id: int,
 ):
     try:
-
         orgs_in_scope = check_permission_and_scope(session, "Update", role_modules['update'], current_user)
         entry = session.exec(
             select(db_model).where(db_model.organization.in_(orgs_in_scope["organization_ids"]), db_model.id == id)
         ).first()
 
         if not entry:
-            raise HTTPException(status_code=404, detail="Category not found")
+            raise HTTPException(status_code=404, detail= f"{endpoint_name} not found")
         
 
         return entry
@@ -158,14 +168,13 @@ def get_by_Id_template(
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Something went wrong")
     
-@c.post(endpoint['create'])
+@sr.post(endpoint['create'])
 def create_template(
     session: SessionDep,
     valid: TemplateView,
 ):
     try:
         existing_superadmin = session.exec(select(User).where(User.role == Role.id == "Super Admin")).first()
-
         if existing_superadmin is not None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -201,7 +210,6 @@ def create_template(
         scope_group_link = ScopeGroupLink(
             scope_group=service_provider_scope_group.id,
             organization=service_provider.id,
-
         )
         session.add(scope_group_link)
         session.commit()
@@ -211,7 +219,6 @@ def create_template(
         role = Role(
             name="Super Admin",
             organization = service_provider.id
-
         )
         session.add(role)
         session.commit()
@@ -242,7 +249,6 @@ def create_template(
             role=role.id,
             scope = Scope.managerial_scope.value,
             scope_group=service_provider_scope_group.id,
-
         )
         session.add(new_user)
         session.commit()
@@ -253,7 +259,7 @@ def create_template(
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Something went wrong")
  
-@c.post(endpoint['update'])
+@sr.put(endpoint['update'])
 def update_template(
     session: SessionDep, 
     current_user: UserDep,
@@ -288,7 +294,43 @@ def update_template(
         session.commit()
         session.refresh(selected_entry)
 
+        return {"message": f"{endpoint_name} Updated successfully"}
 
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Something went wrong")
+    
+@sr.delete(endpoint['delete']+ "/{id}")
+def delete_template(
+    session: SessionDep, 
+    current_user: UserDep,
+    tenant: str,
+    id: int
+) :
+    try:
+        orgs_in_scope = check_permission_and_scope(session, "Delete", role_modules['delete'], current_user) 
+        selected_entry = session.exec(
+            select(db_model).where(db_model.organization.in_(orgs_in_scope["organization_ids"]), db_model.id == id)
+        ).first()
+
+        if not selected_entry:
+            raise HTTPException(status_code=404, detail=f"{endpoint_name} not found")
+
+        session.delete(selected_entry)
+        session.commit()
+
+        return {"message": f"{endpoint_name} deleted successfully"}
+    
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Something went wrong")
+
+
+# forget password section
 conf = ConnectionConfig(
     MAIL_USERNAME="sfapwr@bluespark.et",
     MAIL_PASSWORD="Hard&test&work6756",
@@ -301,7 +343,7 @@ conf = ConnectionConfig(
     VALIDATE_CERTS=True
 )
 
-@c.post("/forgot-Password")
+@sr.post("/forgot-Password")
 async def send_mail(data: EmailSchema, 
                     db: Session = Depends(get_session),                        
 ):
@@ -385,34 +427,3 @@ async def send_mail(data: EmailSchema,
     print(f"New password generated for user : {new_password}")
 
     return JSONResponse(status_code=200, content={"message": "Email with new password has been sent"})
-
-    except HTTPException as http_exc:
-        raise http_exc
-    except Exception as e:
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail="Something went wrong")
-@c.delete(endpoint['delete']+ "/{id}")
-def delete_template(
-    session: SessionDep, 
-    current_user: UserDep,
-    tenant: str,
-    id: int
-) :
-    try:
-        orgs_in_scope = check_permission_and_scope(session, "Delete", role_modules['delete'], current_user) 
-        selected_entry = session.exec(
-            select(db_model).where(db_model.organization.in_(orgs_in_scope["organization_ids"]), db_model.id == id)
-        ).first()
-
-        if not selected_entry:
-            raise HTTPException(status_code=404, detail=f"{endpoint_name} not found")
-
-        session.delete(selected_entry)
-        session.commit()
-
-        return {"message": f"{endpoint_name} deleted successfully"}   
-    except HTTPException as http_exc:
-        raise http_exc
-    except Exception as e:
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail="Something went wrong")

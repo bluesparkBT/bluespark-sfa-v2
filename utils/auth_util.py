@@ -49,7 +49,6 @@ def add_organization_path(username: str, tenant_name: str) -> str:
 def extract_username(username: str, tenant_name: str) -> str:
     prefix = re.sub(r"\s+", "_", tenant_name.strip().lower()) + "_"
     # prefix = f"{tenant_name.lower()}_"
-    print("TENATN USER NAME",username, tenant_name)
     if username.startswith(prefix):
         return username[len(prefix):]
     raise ValueError("Username does not match the given tenant prefix.")

@@ -6,29 +6,51 @@ from db import get_session
 from utils.model_converter_util import get_html_types
 from models.Product_Category import Product, Product_units, InheritanceGroup, Category
 from models.Account import Organization, ScopeGroup
-from utils.util_functions import validate_name
+from models.viewModel.ProductCategoryView import ProductView as TemplateView, UpdateProductView as UpdateTemplateView
 from utils.auth_util import get_current_user, check_permission
 from utils.get_hierarchy import get_organization_ids_by_scope_group
 from utils.form_db_fetch import fetch_category_id_and_name, fetch_organization_id_and_name
 import traceback 
-ProductRouter = pr = APIRouter()
 
+ProductRouter = pr = APIRouter()
 SessionDep = Annotated[Session, Depends(get_session)]
 UserDep = Annotated[dict, Depends(get_current_user)]
 
-@pr.get("/get-products")
-def get_products(
-    session: SessionDep, 
+endpoint_name = "product"
+db_model = Product
+
+endpoint = {
+    "get": f"/get-{endpoint_name}s",
+    "get_by_id": f"/get-{endpoint_name}",
+    "get_form": f"/{endpoint_name}-form/",
+    "create": f"/create-{endpoint_name}",
+    "update": f"/update-{endpoint_name}",
+    "delete": f"/delete-{endpoint_name}",
+}
+role_modules = {   
+    "get": ["Administrative", "Product"],
+    "get_form": ["Administrative", "Product"],
+    "create": ["Administrative", "Product"],
+    "update": ["Administrative", "Product"],
+    "delete": ["Administrative", "Product"],
+}
+
+
+@pr.get(endpoint['get'])
+def get_template(
+    session: SessionDep,
     current_user: UserDep,
-    tenant: str,
-) :
+    tenant: str
+
+):
     try:
         if not check_permission(
-            session, "Read",  ["Administrative", "Product"], current_user
+            session, "Read",role_modules['get'], current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
+
         inherited_group_id = session.exec(
             select(Organization.inheritance_group).where(Organization.id == current_user.organization)
         ).first()
@@ -50,7 +72,7 @@ def get_products(
             existing_orgs= []
 
         organization_product = session.exec(
-            select(Product).where(Product.organization.in_(existing_orgs))
+            select(db_model).where(db_model.organization.in_(existing_orgs))
         ).all()
         organization_product.extend(inherited_product)
 
@@ -58,10 +80,8 @@ def get_products(
         for product in organization_product:
             product_category = session.exec(select(Category).where(Category.id == product.category_id)).first()
             product_temp = {
-                "id": product.id,
                 "Product Name": product.name,
                 "SKU": product.sku,
-                "description": product.description,
                 "Brand": product.brand,
                 "Price": product.price,
                 "Unit": product.unit,
@@ -116,28 +136,19 @@ def get_product(
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
       
-@pr.get("/product-form")
-def get_product_form(
+@pr.get(endpoint['get_form'])
+def get_template_form(
     tenant: str,
-    session: SessionDep, 
+    session: SessionDep,
     current_user: UserDep,
 ) :
     try:
-        # Check permission
         if not check_permission(
-            session, "Read",["Administrative", "Product"], current_user
+            session, "Create",role_modules['get'], current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
-            )  
-        
-        # product_data = fetch_product_id_and_name(session)
-
-        # # product_name = product_data.get("name")
-
-        # product_name = list(product_data.values())
-
-
+            )
         form_structure = {
             "id": "",
             "sku": "",
@@ -154,117 +165,84 @@ def get_product_form(
 
         return {"data": form_structure, "html_types": get_html_types("product")}
 
-    except Exception as e:
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception:
         traceback.print_exc()
-        raise HTTPException(status_code=400, detail=str(e))
-            
-@pr.post("/create-product")
+        raise HTTPException(status_code=500, detail="Something went wrong")
+
+@pr.post(endpoint['create'])
 def create_product(
     session: SessionDep, 
     current_user: UserDep,
     tenant: str,
-    category_id: int = Body(...),
-    organization: int = Body(...),
-    sku: str = Body(...),
-    name: str = Body(...),
-    description: str= Body(...),
-    image: str = Body(...),
-    brand: str = Body(...),  
-    price: float = Body(...),
-    unit: str = Body(...)
+    valid: TemplateView,
 ):
     try:
         if not check_permission(
-            session, "Create",["Administrative", "Product"], current_user
-            ):
-            raise HTTPException(
-                status_code=403, detail="You Do not have the required privilege"
-            )  
-            
-            # Validate SKU and Code uniqueness
-        organization_ids = get_organization_ids_by_scope_group(session, current_user)
-        db_category_code = session.exec(
-            select(Product)
-            .where(Product.organization.in_(organization_ids), Product.name == name, Product.sku == sku)
-            ).first()
-        if db_category_code:
-            raise HTTPException(status_code=400, 
-                                detail="Product  already exists")
-        # Validate the name
-        if not validate_name(name):
-            raise HTTPException(status_code=400, detail="Invalid product name")
-        
-
-        # Create a new product entry from validated input
-        new_product = Product(        
-            sku=sku,
-            name=name,
-            description=description,
-            image=image,
-            brand=brand,
-            category_id=category_id,
-            organization=organization,
-            price=price,
-            unit=unit,  
-        )
-
-        session.add(new_product)
-        session.commit()
-        session.refresh(new_product)
-        return new_product
-    
-    except Exception as e:
-        traceback.print_exc()
-        raise HTTPException(status_code=400, detail=str(e))
-
-@pr.put("/update-product/") 
-def update_product(
-    session: SessionDep, 
-    current_user: UserDep,
-    tenant: str,
-    
-    id: int = Body(...),
-    category: int = Body(...),
-    organization: int = Body(...),
-    sku: str = Body(...),
-    name: str = Body(...),
-    description: str= Body(...),
-    image: str = Body(...),
-    brand: str = Body(...),  
-    price: float = Body(...),
-    unit: str = Body(...)
-):
-    try:
-        if not check_permission(
-            session, "Update", "Product", current_user
+            session, "Create",role_modules['create'], current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-            
 
-        # Fetch categories based on organization IDs
+            # Validate SKU and Code uniqueness
         organization_ids = get_organization_ids_by_scope_group(session, current_user)
-
         selected_product = session.exec(
-            select(Product).where(Product.organization.in_(organization_ids), Product.id == id)
+            select(db_model)
+            .where(db_model.organization.in_(organization_ids), db_model.name == valid.name, db_model.sku == valid.sku)
+            ).first()
+        if selected_product:
+            raise HTTPException(status_code=400, 
+                                detail="Product  already exists")
+        
+        # Create a new product entry from validated input
+        new_entry = db_model.model_validate(valid)
+        session.add(new_entry)
+        session.commit()
+        session.refresh(new_entry)
+
+        return new_entry
+
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Something went wrong")
+   
+@pr.put(endpoint['update'])
+def update_template(
+    session: SessionDep, 
+    current_user: UserDep,
+    tenant: str,
+    valid: UpdateTemplateView,
+):
+    try:
+        if not check_permission(
+            session, "Update",role_modules['update'], current_user
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
+        organization_ids = get_organization_ids_by_scope_group(session, current_user)
+        selected_product = session.exec(
+            select(db_model).where(db_model.organization.in_(organization_ids), db_model.id == valid.id)
         ).first()
             
         if not selected_product  :
             raise HTTPException(status_code=400, 
-                                detail="Product is not found.")
-        # Update the product entry
-        selected_product.sku = sku
-        selected_product.name = name
-        if description:
-            selected_product.description = description
-        if image:
-            selected_product.image = image
-        selected_product.brand = brand
-        selected_product.price = price
-        selected_product.unit = unit
-        selected_product.category_id = category
-        selected_product.organization = organization
+                                detail= f"{endpoint_name} is not found.")
+        selected_product.sku = valid.sku
+        selected_product.name = valid.name
+        if valid.description:
+            selected_product.description = valid.description
+        if valid.image:
+            selected_product.image = valid.image
+        selected_product.brand = valid.brand
+        selected_product.price = valid.price
+        selected_product.unit = valid.unit
+        selected_product.category_id = valid.category_id
+        selected_product.organization = valid.organization
 
         
         session.add(selected_product)
@@ -272,42 +250,42 @@ def update_product(
         session.refresh(selected_product)
 
         
-        return {
-                "message": "Product updated successfully",
-        }   
-    except Exception as e:
+        return {"message": "Product updated successfully"}   
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception:
         traceback.print_exc()
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong")
+    
 
-@pr.delete("/delete-product/{id}")
-def delete_product(
+@pr.delete(endpoint['delete']+ "/{id}")
+def delete_template(
     session: SessionDep, 
     current_user: UserDep,
     tenant: str,
-    id: int,
- 
-) :
+    id: int
+)  :
     try:
         if not check_permission(
-            session, "Delete", "Product", current_user
+            session, "Delete",role_modules['delete'], current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-            
-        # Fetch categories based on organization IDs
         selected_product = session.exec(
             select(Product).where(Product.id == id)
         ).first()
 
         if not selected_product:
-            raise HTTPException(status_code=404, detail="Product not found")
+            raise HTTPException(status_code=404, detail= f"{endpoint_name} not found")
         
         session.delete(selected_product)
         session.commit()
         
-        return {
-                "message": "Product deleted successfully",
-        }
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        return {"message": f"{endpoint_name} deleted successfully"}
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Something went wrong")
+    
