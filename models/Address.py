@@ -11,10 +11,7 @@ class Address(SQLModel, table=True):
     city: str = Field(index=True)
     sub_city: str = Field(index=True)
     woreda: str = Field(index=True)
-    geolocation: Optional["Geolocation"] = Relationship(back_populates="address")
-
-
-
+    organization: Optional[int] = Field(default=None, foreign_key="organization.id", ondelete="CASCADE", index=True)
 
 
 class Geolocation(SQLModel, table=True):
@@ -26,13 +23,5 @@ class Geolocation(SQLModel, table=True):
     latitude: float
     longitude: float
     address_id: Optional[int] = Field(default=None, foreign_key="address.id", index=True)
-    address: Optional[Address] = Relationship(back_populates="geolocation")
-   
+    organization: Optional[int] = Field(default=None, foreign_key="organization.id", ondelete="CASCADE", index=True)
 
-    @model_validator(mode="after")
-    def check(self) -> Self:
-        if self.name == "null" or self.name == "":
-            self.name = None
-        if self.address == "null" or self.address == "":
-            self.address = None
-        return self

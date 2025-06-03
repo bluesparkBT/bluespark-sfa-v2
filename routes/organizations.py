@@ -8,13 +8,34 @@ from models.Address import Address, Geolocation
 from utils.auth_util import get_current_user, check_permission
 from utils.model_converter_util import get_html_types
 from utils.util_functions import validate_name, validate_image
+from models.viewModel.AccountsView import OrganizationView as TemplateView, UpdateOrganizationView as UpdateTemplateView 
 from utils.get_hierarchy import get_organization_ids_by_scope_group, get_child_organization, get_heirarchy
-from utils.form_db_fetch import fetch_organization_id_and_name, fetch_inheritance_group_id_and_name, fetch_address_id_and_name
+from utils.form_db_fetch import fetch_organization_id_and_name, fetch_inheritance_group_id_and_name, fetch_address_id_and_name, fetch_geolocation_id_and_name
 import traceback
 
 OrganizationRouter =tr= APIRouter()
 SessionDep = Annotated[Session, Depends(get_session)]
 UserDep = Annotated[dict, Depends(get_current_user)]
+
+endpoint_name = "organization"
+db_model = Organization
+
+endpoint = {
+    "get": f"/get-{endpoint_name}s",
+    "get_by_id": f"/get-{endpoint_name}",
+    "get_form": f"/{endpoint_name}-form/",
+    "create": f"/create-{endpoint_name}",
+    "update": f"/update-{endpoint_name}",
+    "delete": f"/delete-{endpoint_name}",
+}
+
+role_modules = {   
+    "get": ["Administrative"],
+    "get_form": ["Administrative"],
+    "create": ["Administrative"],
+    "update": ["Administrative"],
+    "delete": ["Administrative"],
+}
 
 @tr.get("/get-my-tenant/")
 async def get_my_tenant(
@@ -58,50 +79,14 @@ async def get_my_tenant(
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Something went wrong")
 
-@tr.get("/get-organizations/")
-async def get_organizations(
-    session: SessionDep,
-    current_user: UserDep,    
-    tenant: str,
-
-):
-    """
-    Retrieve all organizations with their associated scope groups.
-    """
-    try:
-        if not check_permission(
-            session, "Read", "Organization", current_user
-            ):
-            raise HTTPException(
-                status_code=403, detail="You Do not have the required privilege"
-            )
-        organization_ids = get_organization_ids_by_scope_group(session, current_user)
-        if tenant == "provider":
-            current_tenant = session.exec(select(Organization).where(Organization.id == current_user.organization)).first()
-        else :
-            current_tenant = session.exec(select(Organization).where(Organization.tenant_hashed == tenant)).first()
-        
-        organizations = get_heirarchy(session, current_tenant.id, None, current_user)
-        if not organizations:
-            raise HTTPException(status_code=404, detail="No organizations found")
-
-        return organizations
-        
-    except HTTPException as http_exc:
-        raise http_exc
-    except Exception as e:
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail="Something went wrong")
-    
+ 
 @tr.get("/get-children-organizations/{id}")
 async def get_children_organizations(
     session: SessionDep,
     current_user: UserDep,    
     tenant: str,
     id: int
-
 ):
-    
     """
     Retrieve children organizations of the given organization id.
     """
@@ -125,11 +110,11 @@ async def get_children_organizations(
                 "id": org.id,
                 "organization": org.name,
                 "owner": org.owner_name,
+                "description": org.description,         
                 "logo": org.logo_image,
-                "description": org.description,
+                "parent_organization": org.parent_organization,
                 "organization_type": org.organization_type,
                 "inheritance_group": org.inheritance_group,
-                "parent_organization": org.parent_organization,
                 "scope_groups": [
                     {"id": sg.id, "name": sg.name}
                     for sg in org.scope_groups
@@ -165,7 +150,7 @@ async def get_my_organization(
     """
     try:
         if not check_permission(
-            session, "Read", ["Organization", "Administrative"], current_user
+            session, "Read", role_modules['get'], current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
@@ -192,33 +177,71 @@ async def get_my_organization(
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Something went wrong")
     
-@tr.get("/get-organization/{id}")
-async def get_organization(
+@tr.get(endpoint['get'])
+def get_template(
     session: SessionDep,
-    id: int,
+    current_user: UserDep,
+    tenant: str
+):
+    """
+    Retrieve all organizations with their associated scope groups.
+    """
+    try:
+        if not check_permission(
+            session, "Read", role_modules['get'], current_user
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
+        if tenant == "provider":
+            current_tenant = session.exec(select(db_model).where(db_model.id == current_user.organization)).first()
+        else :
+            current_tenant = session.exec(select(db_model).where(db_model.tenant_hashed == tenant)).first()
+        
+        organizations = get_heirarchy(session, current_tenant.id, None, current_user)
+        if not organizations:
+            raise HTTPException(status_code=404, detail="No organizations found")
+
+        return organizations
+        
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Something went wrong")
+       
+@tr.get(endpoint['get_by_id'] + "/{id}")
+def get_template(
+    session: SessionDep, 
     current_user: UserDep,
     tenant: str,
+    id: int,
 ):
     try:
         if not check_permission(
-            session, "Read", "Organization", current_user
+            session, "Read", role_modules['get'], current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
             
-        organization = session.exec(select(Organization).where(Organization.id == id)).first()
+        organization = session.exec(select(db_model).where(db_model.id == id)).first()
         if not organization:
-            raise HTTPException(status_code=404, detail="Role not found")
+            raise HTTPException(status_code=404, detail= f"{endpoint_name} not found")
   
         return {
             "id": organization.id,
             "name": organization.name,
-            "description": organization.description,
             "owner_name": organization.owner_name,
+            "description": organization.description,
             "logo_image": organization.logo_image,
+            "parent_organization": organization.parent_organization,
             "organization_type": organization.organization_type,
-            "parent_organization": organization.parent_organization
+            "inheritance_group": organization.inheritance_group,
+            "address": organization.address,
+            "landmark": organization.landmark,
+            "geolocation":organization.geolocation
+
         }
     except HTTPException as http_exc:
         raise http_exc
@@ -226,16 +249,18 @@ async def get_organization(
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Something went wrong")
      
-@tr.get("/organization-form/")
-async def get_form_fields_organization(
-    session: SessionDep,
+@tr.get(endpoint['get_form'])
+def get_template_form(
     tenant: str,
-    current_user: UserDep
-):
-
+    session: SessionDep,
+    current_user: UserDep,
+) :
+    """   Retrieves the form structure for creating a new user account.
+    """
     try:
+        # Check permission
         if not check_permission(
-            session, "Read", "Organization", current_user
+            session, "Create",role_modules['get_form'], current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
@@ -252,11 +277,11 @@ async def get_form_fields_organization(
             "inheritance_group": fetch_inheritance_group_id_and_name(session, current_user),
             "address" : fetch_address_id_and_name(session, current_user),
             "landmark" : "",
+            "geolocation": fetch_geolocation_id_and_name(session, current_user),
             "latitude" : "",
-            "longitude" : ""
+            "longitude" : "",
             }
         
-
         return {"data": organization_data, "html_types": get_html_types('organization')}
     except HTTPException as http_exc:
         raise http_exc
@@ -264,96 +289,65 @@ async def get_form_fields_organization(
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Something went wrong")
 
-@tr.post("/create-organization/")
-async def create_organization(
+@tr.post(endpoint['create'])
+def create_template(
     session: SessionDep,
-    current_user: UserDep,
     tenant: str,
-    name: str = Body(...),
-    owner_name: str = Body(...),
-    description: str = Body(...),
-    logo_image: str = Body(...),
-    parent_organization : int = Body(...),
-    organization_type: str = Body(...),
-    inheritance_group: Union[int, str, None] = Body(default=None),
-    address : Optional[int| str| None] = Body(default=None),
-    landmark : Optional[str] = Body(None),
-    latitude : Optional[Union[float, str, None]] = Body(default=None),
-    longitude: Optional[Union[float, str, None]] =Body(default=None)
+    current_user: UserDep,
+    valid: TemplateView,
 ):
     try:
         if not check_permission(
-            session, "Create", "Organization", current_user
+            session, "Create", role_modules['create'], current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-        # existing_tenant = session.exec(select(Organization).where(Organization.name == name)).first()
-
-        # if existing_tenant is not None:
-        #     raise HTTPException(
-        #         status_code=404,
-        #         detail="Company already registered",
-        # )
-        
-        #Check Validity
-        if inheritance_group == "":
-            inheritance_group = None
-        if validate_name(name) == False:
+        existing_entry = session.exec(
+            select(db_model).where(
+            (db_model.name == valid.name) & (db_model.parent_organization == valid.parent_organization)
+            )
+        ).first()
+        if existing_entry is not None:
             raise HTTPException(
                 status_code=404,
-                detail="Company name is not valid",
-        )     
-
-        if validate_name(owner_name) == False:
-            raise HTTPException(
-                status_code=404,
-                detail="Company owner name is not valid",
+                detail= f"{endpoint_name} already registered",
         )
-        elif validate_image(logo_image) == False and logo_image is None:
-            raise HTTPException(
-                status_code=404,
-                detail="Logo image is not valid",
-        )
-            
-        if address == "" or address is None:
-            address = None
-            
-        if latitude in ("", None):
-            latitude = None
-        else:
-            latitude = float(latitude)
-
-        if longitude in ("", None):
-            longitude = None
-        else:
-            longitude = float(longitude)
-
+        def parse_float(val):
+            if val == "":
+                return None
+            if isinstance(val, float):
+                return val
+            try:
+                return float(val)
+            except (TypeError, ValueError):
+                raise HTTPException(status_code=400, detail="Latitude/Longitude must be a float or null.")
         org_geolocation = None
+        latitude = parse_float(valid.latitude)
+        longitude = parse_float(valid.longitude)
         if latitude is not None and longitude is not None:
             org_geolocation = Geolocation(
-                name=f"{name} location",
-                address=address,
-                latitude=latitude,
-                longitude=longitude
+                name=f"{valid.name} location",
+                address_id=valid.address,
+                latitude = latitude,
+                longitude =  longitude,
             )
             session.add(org_geolocation)
             session.commit()
             session.refresh(org_geolocation)
 
-
         organization = Organization(
             id = None,
-            name = name,
-            owner_name = owner_name,
-            description = description,
-            logo_image = logo_image,
-            parent_organization = parent_organization,
-            organization_type = organization_type,
-            inheritance_group = inheritance_group,
-            address = address,
-            landmark= landmark,
-            location_id=org_geolocation.id if org_geolocation else None
+            name = valid.name,
+            owner_name = valid.owner_name,
+            description = valid.description,
+            logo_image = valid.logo_image,
+            parent_organization = valid.parent_organization,
+            organization_type = valid.organization_type,
+            inheritance_group = valid.inheritance_group,
+            address = valid.address,
+            landmark= valid.landmark,
+            geolocation=org_geolocation.id if org_geolocation else None
 
         )
         
@@ -368,7 +362,7 @@ async def create_organization(
         session.add(scope_group_link)
         session.commit()
         
-        return {"message": "Organization created successfully", "organization": name}
+        return {"message": "Organization created successfully"}
     
     except HTTPException as http_exc:
         raise http_exc
@@ -376,91 +370,81 @@ async def create_organization(
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Something went wrong")           
 
-@tr.put("/update-organization/")
-async def create_organization(
-    session: SessionDep,
-    current_user: UserDep,    
+@tr.put(endpoint['update'])
+def update_template(
+    session: SessionDep, 
+    current_user: UserDep,
     tenant: str,
-
-    id: int = Body(...),
-    name: str = Body(...),
-    owner_name: str = Body(...),
-    description: str = Body(...),
-    logo_image: str = Body(...),
-    organization_type: str = Body(...),    
-    parent_organization: int | str = Body(...),
-    inheritance_group: Union[int, str, None] = Body(default=None),
-    address: Optional[str] = Body(default=None),
-    landmark : Optional[str] = Body(None),
-    latitude : Optional[str] = Body(None),
-    longitude: Optional[str] =Body(None)
+    valid: UpdateTemplateView,
 ):
 
     try:
         if not check_permission(
-            session, "Update", "Organization", current_user
+            session, "Update",role_modules['update'], current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-            
-        existing_organization = session.exec(select(Organization).where(Organization.id == id)).first()
+        existing_organization = session.exec(select(Organization).where(Organization.id == valid.id)).first()
         if existing_organization is None:
             raise HTTPException(
                 status_code=404,
                 detail="Organization not found",
-        )
-        #Check Validity
-        
-        if validate_name(owner_name) == False:
-            raise HTTPException(
-                status_code=404,
-                detail="Company owner name is not valid",
-        )
-        elif validate_image(logo_image) == False and logo_image is None:
-            raise HTTPException(
-                status_code=404,
-                detail="Logo image is not valid",
-        )
-        exisitng_org_geolocation = session.exec(select(Geolocation).where(Geolocation.id == existing_organization.address)).first()    
-        if exisitng_org_geolocation:
-            if latitude:
-                exisitng_org_geolocation.latitude = latitude,
-            if longitude:
-                exisitng_org_geolocation.longitude = longitude
-                
-            session.add(exisitng_org_geolocation)
-            session.commit()            
-        else:
-            org_geolocation = Geolocation(
-                name = f"{name} location",
-                address = address,
-                latitude = latitude,
-                longitude = longitude
-            )
-            session.add(org_geolocation)
-            session.commit()
+        )     
+        # def parse_float(val):
+        #     if val == "":
+        #         return None
+        #     if isinstance(val, float):
+        #         return val
+        #     try:
+        #         return float(val)
+        #     except (TypeError, ValueError):
+        #         raise HTTPException(status_code=400, detail="Latitude/Longitude must be a float or null.")
+
+        # exisitng_org_geolocation = session.exec(select(Geolocation).where(Geolocation.id == existing_organization.address)).first()  
+        # latitude = parse_float(valid.latitude)
+        # longitude = parse_float(valid.longitude)
+        # if latitude is not None and longitude is not None:  
+        #     if exisitng_org_geolocation:
+        #         if valid.latitude:
+        #             exisitng_org_geolocation.latitude = latitude,
+        #         if valid.longitude:
+        #             exisitng_org_geolocation.longitude = longitude
+                    
+        #         session.add(exisitng_org_geolocation)
+        #         session.commit()            
+        #     else:
+        #         org_geolocation = Geolocation(
+        #             name = f"{valid.name} location",
+        #             address = valid.address,
+        #             latitude = latitude,
+        #             longitude = longitude
+        #         )
+        #         session.add(org_geolocation)
+        #         session.commit()
 
         
-        existing_organization.name = name
-        existing_organization.owner_name = owner_name
-        existing_organization.description = description
-        if inheritance_group:
-            existing_organization.inheritance_group= inheritance_group
-        existing_organization.logo_image = logo_image
-        existing_organization.organization_type = organization_type
-        if parent_organization:
-            existing_organization.parent_organization = parent_organization
-        if address:
-            existing_organization.address = address
-        if landmark:
-            existing_organization.landmark = landmark,
+        existing_organization.name = valid.name
+        existing_organization.owner_name = valid.owner_name
+        existing_organization.description = valid.description
+        if valid.inheritance_group:
+            existing_organization.inheritance_group= valid.inheritance_group
+        existing_organization.logo_image = valid.logo_image
+        existing_organization.organization_type = valid.organization_type
+        if valid.parent_organization:
+            existing_organization.parent_organization = valid.parent_organization
+        if valid.address:
+            existing_organization.address = valid.address
+        if valid.landmark:
+            existing_organization.landmark = valid.landmark,
+        if valid.geolocation:
+            existing_organization.geolocation = valid.geolocation
             
         session.add(existing_organization)
         session.commit()
         session.refresh(existing_organization)
         
-        return {"message": "Organization updated successfully", "organization": name}
+        return {"message": f"{endpoint_name} updated successfully"}
     
     except Exception as e:
         traceback.print_exc()
