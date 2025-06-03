@@ -1,7 +1,7 @@
 from typing import Annotated
 from db import SECRET_KEY, get_session
 from sqlmodel import Session, select
-from fastapi import APIRouter, HTTPException, Body, Depends
+from fastapi import APIRouter, HTTPException, status, Depends
 from db import get_session
 from utils.model_converter_util import get_html_types
 from models.Product_Category import Product, Product_units, InheritanceGroup, Category
@@ -41,7 +41,6 @@ def get_template(
     session: SessionDep,
     current_user: UserDep,
     tenant: str
-
 ):
     try:
         if not check_permission(
@@ -80,12 +79,14 @@ def get_template(
         for product in organization_product:
             product_category = session.exec(select(Category).where(Category.id == product.category_id)).first()
             product_temp = {
-                "Product Name": product.name,
-                "SKU": product.sku,
-                "Brand": product.brand,
-                "Price": product.price,
-                "Unit": product.unit,
-                "Category": product_category.name if product_category else "N/A",
+                "id": product.id,
+                "name": product.name,
+                "price": f"{product.price} ETB",
+                "sku": product.sku,
+                "brand": product.brand,
+                "image": product.image
+                # "unit": product.unit,
+                # "category": product_category.name if product_category else "N/A",
             }
             if product_temp not in product_list:
                 product_list.append(product_temp)
@@ -110,27 +111,26 @@ def get_product(
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-            
- 
-        # Fetch categories based on organization IDs
+        organization_ids = get_organization_ids_by_scope_group(session, current_user)
         db_product = session.exec(
-            select(Product).where(Product.id == id)
+            select(Product).where(Product.id == id, Product.organization.in_(organization_ids))
         ).first()
-
-        #validate the retrived products
         if not db_product:
             raise HTTPException(status_code=404, detail="No products found")
         
-        product_list = []
-        product_list.append({
+        product_list = {
+            
             "id": db_product.id,
-            "Product Name": db_product.name,
-            "SKU": db_product.sku,
+            "name": db_product.name,
+            "sku": db_product.sku,
+            "organization": db_product.organization,
+            "category": db_product. category_id,   
             "description": db_product.description,
-            "Brand": db_product.brand,
-            "Price": db_product.price,
-            "Unit": db_product.unit,
-        })
+            "image": db_product.image,
+            "brand": db_product.brand,
+            "price": db_product.price,
+            "unit": db_product.unit,
+        }
         
         return product_list
     except Exception as e:
@@ -151,16 +151,15 @@ def get_template_form(
             )
         form_structure = {
             "id": "",
-            "sku": "",
             "name": "",
+            "sku": "",
+            "organization": fetch_organization_id_and_name(session, current_user),
+            "category_id": fetch_category_id_and_name(session, current_user),
             "description": "",
             "image": "",
             "brand": "",
             "price": "",
             "unit": {i.value: i.value for i in Product_units},
-            "category": fetch_category_id_and_name(session, current_user) ,
-            "organization": fetch_organization_id_and_name(session, current_user),
-
         }
 
         return {"data": form_structure, "html_types": get_html_types("product")}
@@ -185,8 +184,17 @@ def create_product(
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-
-            # Validate SKU and Code uniqueness
+        existing_entry = session.exec(
+            select(db_model).where(
+            (db_model.name == valid.name) & (db_model.sku == valid.sku)
+            )
+        ).first()
+        if existing_entry is not None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail= f" {endpoint_name} with the same name and sku already registered",
+            )
+            
         organization_ids = get_organization_ids_by_scope_group(session, current_user)
         selected_product = session.exec(
             select(db_model)
@@ -194,7 +202,7 @@ def create_product(
             ).first()
         if selected_product:
             raise HTTPException(status_code=400, 
-                                detail="Product  already exists")
+                                detail= f"{endpoint_name}  already exists")
         
         # Create a new product entry from validated input
         new_entry = db_model.model_validate(valid)

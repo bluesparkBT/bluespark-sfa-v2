@@ -32,7 +32,7 @@ class CategoryView(BaseModel):
     code:  Annotated [ str,  AfterValidator( validate_name) ] 
     description: Optional[str] = None
     parent_category: Optional[int] = None
-    organization: int 
+    organization: Optional[int] 
 
 class UpdateCategoryView(BaseModel):
     id: Optional[int] = None
@@ -40,4 +40,4 @@ class UpdateCategoryView(BaseModel):
     code:  Annotated [ str,  AfterValidator( validate_name) ] 
     description: Optional[str] = None
     parent_category: Optional[int] = None
-    organization: int 
+    organization: Optional[int] 
