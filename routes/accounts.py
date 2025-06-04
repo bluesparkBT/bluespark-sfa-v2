@@ -286,8 +286,9 @@ def get_template_form(
         html_types = copy.deepcopy(get_html_types("user"))
         if tenant == "provider":
             html_types['organization'] = "hidden"
-            html_types['scope'] = "hidden"
             html_types['manager'] = "hidden"
+            del html_types['scope']
+            del form_structure['scope']
 
         return {"data": form_structure, "html_types": html_types}
 
