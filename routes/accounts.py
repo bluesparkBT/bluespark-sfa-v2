@@ -286,6 +286,7 @@ def get_template_form(
             "phone_number": "",
             "role": fetch_role_id_and_name(session, current_user),
             "scope_group": fetch_scope_group_id_and_name(session, current_user),
+            "organization": fetch_organization_id_and_name(session, current_user),
             "gender": {i.value: i.value for i in Gender},
             # "salary": 0,
             # "position": "",            
@@ -304,6 +305,7 @@ def get_template_form(
             del html_types['organization']
             del html_types['scope']
             del html_types['manager']
+            del form_structure['organization']
 
         return {"data": form_structure, "html_types": html_types}
 
