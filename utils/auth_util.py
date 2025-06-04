@@ -9,7 +9,7 @@ from db import get_session
 
 from typing import Annotated, Union, List
 from sqlmodel import Session
-from models.Account import AccessPolicy, RoleModulePermission, Role, User, ModuleName
+from models.Account import Organization, RoleModulePermission, Role, User, ModuleName, ActiveStatus
 from sqlmodel import select
 from typing import Literal
 import hashlib
@@ -152,6 +152,14 @@ def check_permission(
             print("User not found or has no role")
             return False
 
+        if not user.organization:
+            print("User has no organization")
+            return False
+        org = session.exec(select(Organization).where(Organization.id == user.organization)).first()
+        if not org or org.active != ActiveStatus.active:
+            print("Organization is not active")
+            return False
+
         role = session.exec(select(Role).where(Role.id == user.role)).first()
         if not role:
             print("Role not found")
@@ -199,7 +207,9 @@ def check_permission(
 
         # If none of the modules matched
         return False
-
+    
+    except HTTPException as http_exc:
+        raise http_exc
     except Exception as e:
         print(f"Error in check_permission: {e}")
         traceback.print_exc()

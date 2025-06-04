@@ -4,6 +4,7 @@ from datetime import  datetime
 from typing import List, Optional, Self
 from models.Address import Address, Geolocation
 from models.Product_Category import RoleLink
+
 class AccessPolicy(str, Enum):
     deny = "deny"
     view = "view"
@@ -11,6 +12,10 @@ class AccessPolicy(str, Enum):
     contribute = "contribute"
     manage = "manage"
     
+class ActiveStatus(str, Enum):
+    active = "active"
+    inactive = "inactive"  
+     
 class ModuleName(str, Enum):
     #Service Provider
     service_provider = "Service Provider"
@@ -118,7 +123,7 @@ class Organization(SQLModel, table=True):
     address: Optional[int] = Field(default=None, foreign_key="address.id")
     landmark: Optional[str] = Field(default=None, index=True)
     geolocation: Optional[int] = Field(foreign_key="geolocation.id")
-    active:Optional[bool] = Field(default= True, index=True)
+    active:Optional[ActiveStatus] = Field(default= ActiveStatus.active, index=True)
     
     inheritance_group: Optional[int] = Field(default=None, foreign_key='inheritance_group.id')
     scope_groups: List["ScopeGroup"] = Relationship(

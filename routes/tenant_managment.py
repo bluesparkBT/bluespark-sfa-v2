@@ -12,8 +12,18 @@ from utils.model_converter_util import get_html_types
 from utils.form_db_fetch import get_organization_ids_by_scope_group, fetch_organization_id_and_name, fetch_inheritance_group_id_and_name, fetch_address_id_and_name
 from utils.domain_util import getPath
 from utils.auth_util import check_permission_and_scope
+from models.Account import (
+    User, ScopeGroup,
+    ScopeGroupLink,
+    Organization,
+    OrganizationType,
+    RoleModulePermission,
+    Scope,
+    Role,
+    AccessPolicy,
+    ActiveStatus
+    )
 
-from models.Account import User, ScopeGroup, ScopeGroupLink, Organization, OrganizationType, RoleModulePermission, Scope, Role, AccessPolicy
 from models.Account import ModuleName as modules
 from models.viewModel.AccountsView import TenantView as TemplateView
 
@@ -34,6 +44,7 @@ endpoint = {
     "create": f"/create-{endpoint_name}",
     "update": f"/update-{endpoint_name}",
     "archive": f"/archive-{endpoint_name}",
+    "activate": f"/activate-{endpoint_name}",
     "delete": f"/delete-{endpoint_name}",
 }
 
@@ -43,6 +54,7 @@ role_modules = {
     "create": ["Service Provider", "Tenant Management"],
     "update": ["Service Provider", "Tenant Management"],
     "archive": "Service Provider",
+    "activate": "Service Provider",
     "delete": "Service Provider",
 }
 
@@ -117,7 +129,9 @@ def get(
                 "owner": tenant.owner_name,
                 "description": tenant.description,
                 "logo": tenant.logo_image,
-                "domain": f"{Domain}/{tenant.tenant_hashed}"                }
+                "domain": f"{Domain}/{tenant.tenant_hashed}",
+                "Status": tenant.active                
+                }
             )
 
         return tenant_list
@@ -182,7 +196,6 @@ async def get_tenant_form_fields(
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-        parent_org =  session.exec(select(Organization.id))
         tenant_data = {
             "id": "",
             "name": "",
@@ -200,7 +213,7 @@ async def get_tenant_form_fields(
         html_types = copy.deepcopy(get_html_types('organization'))
         del html_types['parent_organization']
         del html_types['parent_id']
-        del html_types['geolocation']
+        # del html_types['location']
         return {"data": tenant_data, "html_types": html_types}
     except HTTPException as http_exc:
         raise http_exc
@@ -418,12 +431,14 @@ def archive_template(
         selected_entry = session.exec(
             select(db_model).where(db_model.id.in_(organization_ids), db_model.id == id)
         ).first()
+        print("tennat is found and have the status of:::::::", selected_entry.active)
 
         if not selected_entry:
             raise HTTPException(status_code=404, detail=f"{endpoint_name} not found")
         
-        selected_entry.active = False
-        session.commit()
+        if selected_entry.active == "active":
+            selected_entry.active = ActiveStatus.inactive
+            session.commit()
 
         return {"message": f"{endpoint_name} archived successfully"}
     except HTTPException as http_exc:
@@ -431,7 +446,42 @@ def archive_template(
     except Exception:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Something went wrong")
-    
+
+@tr.put(endpoint['activate']+ "/{id}")
+def active_template(
+    session: SessionDep, 
+    current_user: UserDep,
+    id: int
+) :
+    """
+    Soft delete/ archive (inactive) a tenant organization and all its related records.
+    """
+    try:
+        if not check_permission(
+            session, "Update", role_modules['activate'], current_user
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
+        organization_ids = get_organization_ids_by_scope_group(session, current_user)
+        selected_entry = session.exec(
+            select(db_model).where(db_model.id.in_(organization_ids), db_model.id == id)
+        ).first()
+        print("tennat is found and have the status of:::::::", selected_entry.active)
+
+        if not selected_entry:
+            raise HTTPException(status_code=404, detail=f"{endpoint_name} not found")
+        if selected_entry.active == "active":
+            selected_entry.active = ActiveStatus.inactive
+            session.commit()
+
+        return {"message": f"{endpoint_name} activated successfully"}
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Something went wrong")
+
 @tr.delete(endpoint['delete']+ "/{id}")
 async def delete_tenant(
     session: SessionDep,
