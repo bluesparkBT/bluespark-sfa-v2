@@ -7,7 +7,7 @@ from utils.model_converter_util import get_html_types
 from models.Account import User, ScopeGroup,ScopeGroupLink, Organization, Role
 from models.Marketing import CustomerDiscount
 from utils.util_functions import validate_name
-from models.viewModel.ClassificationView import CustomerDiscountView as TemplateView #Update this
+from models.viewModel.ClassificationView import CustomerDiscountView as TemplateView ,  UpdateCustomerDiscountView as TemplateViews 
 from utils.auth_util import get_current_user, check_permission, check_permission_and_scope
 from utils.get_hierarchy import get_organization_ids_by_scope_group
 from utils.form_db_fetch import fetch_category_id_and_name, fetch_organization_id_and_name, fetch_id_and_name
@@ -16,7 +16,7 @@ from datetime import date
 import traceback
 
 # Update router name
-CustomerDiscountProvider = c = APIRouter()
+CustomerDiscountRouter = c = APIRouter()
 SessionDep = Annotated[Session, Depends(get_session)]
 UserDep = Annotated[dict, Depends(get_current_user)]
 
@@ -33,12 +33,12 @@ endpoint = {
 }
 
 # Update role_modules
-role_modules = {
-    "get": ["Administrative"],
-    "get_form": ["Administrative"],
-    "create": ["Administrative"],
-    "update": ["Administrative"],
-    "delete": ["Administrative"],
+role_modules = {   
+    "get": ["Administrative", "Classification"],
+    "get_form": ["Administrative", "Classification"],
+    "create": ["Administrative", "Classification"],
+    "update": ["Administrative", "Classification"],
+    "delete": ["Administrative", "Classification"],
 }
 
 # CRUD Operations
@@ -53,7 +53,7 @@ def get_customer_discounts(
         orgs_in_scope = check_permission_and_scope(session, "Read", role_modules['get'], current_user)
 
         entries_list = session.exec(
-            select(db_model).where(db_model.organization.in_(orgs_in_scope["organization_ids"]))
+            select(db_model)
         ).all()
 
         return entries_list
@@ -78,7 +78,7 @@ def get_customer_discount_by_id(
 
         organization_ids = get_organization_ids_by_scope_group(session, current_user)
         entry = session.exec(
-            select(db_model).where(db_model.organization.in_(organization_ids), db_model.id == id)
+            select(db_model).where( db_model.id == id)
         ).first()
 
         if not entry:
@@ -98,7 +98,7 @@ def create_customer_discount(
     session: SessionDep,
     tenant: str,
     current_user: UserDep,
-    valid: CustomerDiscount
+    valid: TemplateView
 ):
     try:
         # Ensure required fields are present
@@ -126,7 +126,7 @@ def update_customer_discount(
     tenant: str,
     current_user: UserDep,
     id: int,
-    valid: CustomerDiscount
+    valid: TemplateViews
 ):
     try:
         if not check_permission(session, "Update", role_modules['update'], current_user):

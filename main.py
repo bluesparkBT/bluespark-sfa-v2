@@ -20,6 +20,7 @@ from routes.scopeGroup import ScopeGroupRouter
 from routes.organizations import OrganizationRouter
 from routes.tenant_managment import TenantRouter
 from routes.classification import ClassificationRouter
+from routes.customerDiscount import CustomerDiscountRouter
 
 
 
@@ -82,6 +83,7 @@ app.include_router(InheritanceRouter, prefix="/{tenant}/inheritance", tags = ["i
 app.include_router(OrganizationRouter, prefix="/{tenant}/organization", tags=["organization"])
 app.include_router(ProductRouter, prefix="/{tenant}/product", tags=["product"])
 app.include_router(ClassificationRouter, prefix="/{tenant}/classification", tags=["classification"])
+app.include_router(CustomerDiscountRouter, prefix="/{tenant}/customer-discount", tags=["customer Discount"])
 
 app.include_router(RoleRouter, prefix="/{tenant}/role", tags=["role"])
 app.include_router(ScopeGroupRouter, prefix="/{tenant}", tags=["Scope Group"])
