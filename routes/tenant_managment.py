@@ -148,8 +148,22 @@ def get_by_Id_template(
 
         if not entry:
             raise HTTPException(status_code=404, detail= f"{endpoint_name} not found")
+            
+        entry_data = {
+            "id": entry.id,
+            "name": entry.name,
+            "owner_name": entry.owner_name,
+            "description": entry.description,
+            "logo_image": entry.logo_image,
+            "organization_type": entry.organization_type,
+            "inheritance_group": entry.inheritance_group,
+            "address": entry.address,
+            "landmark": entry.landmark,
+            "latitude": entry.latitude,
+            "longitude": entry.longitude,
+            }
         
-        return entry
+        return entry_data
     
     except HTTPException as http_exc:
         raise http_exc
