@@ -281,9 +281,9 @@ def get_template_form(
         } 
         
         html_types = copy.deepcopy(get_html_types("user"))
-        del html_types['organization']
-        del html_types['scope']
-        del html_types['manager']
+        html_types['organization'] = "hidden"
+        html_types['scope'] = "hidden"
+        html_types['manager'] = "hidden"
 
         return {"data": form_structure, "html_types": html_types}
 

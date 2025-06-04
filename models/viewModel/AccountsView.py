@@ -36,7 +36,7 @@ class UserAccountView(BaseModel):
     scope: Optional[str]
     scope_group: Optional[int]
     organization: Optional[int]
-    gender: Optional[str] 
+    gender: Optional[str]
     address : Optional[int| str| None]
     # salary: Optional[float] = None
     # position: Optional[str] = None
