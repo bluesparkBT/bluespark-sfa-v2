@@ -223,10 +223,22 @@ def get_template(
         if not entry:
             raise HTTPException(status_code=404, detail="User not found")
               
+        if not tenant or tenant.lower() == "provider":
+            service_provider = session.exec(select(Organization).where(Organization.organization_type == "Service Provider")).first()
+            tenant_name = service_provider.name
+        else:
+            current_tenant = session.exec(
+                select(Organization).where(Organization.tenant_hashed == tenant)
+            ).first()
+            if not current_tenant:
+                raise HTTPException(status_code=404, detail="Tenant not found")
+
+            tenant_name = current_tenant.name
+            
         data =  {
             "id": entry.id,
             "full_name": entry.full_name,
-            "username": extract_username(entry.username),
+            "username": extract_username(entry.username, tenant_name),
             "email": entry.email,
             "phone_number": entry.phone_number,
             "organization": entry.organization,
