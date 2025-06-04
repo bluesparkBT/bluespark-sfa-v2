@@ -191,7 +191,7 @@ async def get_tenant_form_fields(
             "owner_name": "",
             "description": "",
             "logo_image": "",
-            "organization_type": {i.value: i.value for i in OrganizationType},
+            "organization_type": {i.value: i.value for i in OrganizationType if i.value != OrganizationType.service_provider.value},
             "inheritance_group": fetch_inheritance_group_id_and_name(session,current_user),
             "address": fetch_address_id_and_name(session,current_user),
             "landmark": "",
