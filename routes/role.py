@@ -11,6 +11,7 @@ from models.Account import (
     ScopeGroup)
 from models.viewModel.AccountsView import RoleView as TemplateView
 from models.Account import ModuleName as modules
+from models.Account import SuperAdminModuleName as superAdminModules
 from utils.auth_util import get_tenant, get_current_user, check_permission
 from utils.model_converter_util import get_html_types
 from utils.util_functions import validate_name, parse_enum
@@ -81,12 +82,7 @@ async def get_my_role(
     current_user: UserDep,
 ):
     try:
-        if not check_permission(
-            session, "Read", ["Administrative", "Role", "Service Provider"], current_user
-            ):
-            raise HTTPException(
-                status_code=403, detail="You Do not have the required privilege"
-            )
+        
         user = session.exec(select(User).where(User.id ==current_user.id)).first()
         if not user or not user.role:
             raise HTTPException(status_code=404, detail="User or assigned role not found")
@@ -210,7 +206,7 @@ def get_template_form(
         user_scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == current_user.scope_group)).first()
          
         if user_scope_group.name == "Super Admin Scope":
-            modules_dict = {i.value: i.value for i in modules}
+            modules_dict = {i.value: i.value for i in superAdminModules}
         else:
             modules_dict = {
                 i.value: i.value for i in modules if i.value != "Service Provider"

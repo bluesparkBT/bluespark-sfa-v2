@@ -33,10 +33,10 @@ class UserAccountView(BaseModel):
     email: Annotated [ str, AfterValidator( validate_email) ] | None
     phone_number: Optional [Annotated [ str, AfterValidator( validate_phone_number) ] | None] 
     role: Optional[int]
-    scope: str
+    scope: Optional[str] = None
     scope_group: Optional[int]
-    organization: Optional[int]
-    gender: Optional[str] 
+    organization: Optional[int] = None
+    gender: Optional[str]
     address : Optional[int| str| None]
     # salary: Optional[float] = None
     # position: Optional[str] = None
@@ -54,11 +54,12 @@ class UpdateUserAccountView(BaseModel):
     username: Annotated [ str, AfterValidator( validate_name) ]
     email: Annotated [ str, AfterValidator( validate_email) ] | None
     phone_number: Optional [Annotated [ str, AfterValidator( validate_phone_number) ] | None] 
-    organization: Optional[int]
     role: Optional[int]
-    scope: str
+    scope: Optional[str] = None
     scope_group: Optional[int]
-    gender: Optional[str] 
+    organization: Optional[int] = None
+    gender: Optional[str]
+    address : Optional[int| str| None]
     # salary: Optional[float] = None
     # position: Optional[str] = None
     # date_of_birth: Optional[datetime] = None
@@ -67,7 +68,6 @@ class UpdateUserAccountView(BaseModel):
     # image: Optional[str] = None
     # id_type: Optional[IdType] = None
     # id_number: Optional[str] = None
-    address : Optional[int| str| None]
     # old_password: Optional[str]
     # password: Optional[str]
 
@@ -77,7 +77,7 @@ class OrganizationView(BaseModel):
     description: Optional [Annotated [ str, AfterValidator( validate_name) ] ]   
     logo_image: Optional[str]
     parent_organization: Optional[int] = None
-    organization_type: OrganizationType
+    organization_type: Optional[OrganizationType] = OrganizationType.company
     inheritance_group: Optional[int] = None
     address:Optional[int] = None
     landmark:Optional[str] = None
