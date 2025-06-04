@@ -103,7 +103,7 @@ class TenantView(BaseModel):
     owner_name: Annotated [ str, AfterValidator( validate_name) ]
     logo_image: Optional[str]
     description: Annotated [ str, AfterValidator( validate_name) ]    
-    parent_organization: int
+    parent_organization: Optional[int] = None
     address: Optional[int] = None
     # geolocation_id: Optional[int] = None
 

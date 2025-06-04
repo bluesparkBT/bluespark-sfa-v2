@@ -1,4 +1,4 @@
-
+import copy
 from typing import Annotated, List, Dict, Any
 from datetime import timedelta, date, datetime
 from fastapi import APIRouter, HTTPException, Body, status, Depends, Path
@@ -9,7 +9,7 @@ from utils.auth_util import verify_password, create_access_token, get_password_h
 from utils.util_functions import validate_name, validate_email, validate_phone_number, parse_enum
 from utils.auth_util import get_current_user, check_permission, generate_random_password, get_tenant_hash, extract_username, add_organization_path
 from utils.model_converter_util import get_html_types
-from utils.form_db_fetch import get_organization_ids_by_scope_group, fetch_organization_id_and_name
+from utils.form_db_fetch import get_organization_ids_by_scope_group, fetch_organization_id_and_name, fetch_inheritance_group_id_and_name, fetch_address_id_and_name
 from utils.domain_util import getPath
 from utils.auth_util import check_permission_and_scope
 
@@ -107,7 +107,7 @@ def get(
         ).all()
         
         if not entries_list or entries_list is None:
-            raise HTTPException(status_code=400, detail="No Tenants Found")
+            raise HTTPException(status_code=400, detail="No Tenants Created")
         tenant_list = []
 
         for tenant in  entries_list:
@@ -143,19 +143,34 @@ def get_by_Id_template(
             ) 
         organization_ids = get_organization_ids_by_scope_group(session, current_user)
         entry = session.exec(
-            select(db_model).where(db_model.organization.in_(organization_ids), db_model.id == id)
+            select(db_model).where(db_model.id.in_(organization_ids), db_model.id == id)
         ).first()
 
         if not entry:
             raise HTTPException(status_code=404, detail= f"{endpoint_name} not found")
+            
+        entry_data = {
+            "id": entry.id,
+            "name": entry.name,
+            "owner_name": entry.owner_name,
+            "description": entry.description,
+            "logo_image": entry.logo_image,
+            "organization_type": entry.organization_type,
+            "inheritance_group": entry.inheritance_group,
+            "address": entry.address,
+            "landmark": entry.landmark,
+            "latitude": entry.geolocation.latitude if entry.geolocation else "",
+            "longitude": entry.geolocation.longitude if entry.geolocation else ""
+            }
         
-        return entry
+        return entry_data
     
     except HTTPException as http_exc:
         raise http_exc
     except Exception:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Something went wrong")
+
 
 @tr.get("/tenant-form/")
 async def get_tenant_form_fields(
@@ -176,17 +191,25 @@ async def get_tenant_form_fields(
             "owner_name": "",
             "description": "",
             "logo_image": "",
-            "parent_organization": fetch_organization_id_and_name(session, current_user)
-            
+            "organization_type": {i.value: i.value for i in OrganizationType},
+            "inheritance_group": fetch_inheritance_group_id_and_name(session,current_user),
+            "address": fetch_address_id_and_name(session,current_user),
+            "landmark": "",
+            "latitude": "",
+            "longitude": "",
             }
         
-
-        return {"data": tenant_data, "html_types": get_html_types('organization')}
+        html_types = copy.deepcopy(get_html_types('organization'))
+        del html_types['parent_organization']
+        del html_types['parent_id']
+        del html_types['geolocation']
+        return {"data": tenant_data, "html_types": html_types}
     except HTTPException as http_exc:
         raise http_exc
     except Exception:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Something went wrong")  
+
 
 @tr.post(endpoint['create'])
 def create_template(
