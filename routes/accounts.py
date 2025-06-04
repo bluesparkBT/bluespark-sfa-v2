@@ -226,7 +226,7 @@ def get_template(
         data =  {
             "id": entry.id,
             "full_name": entry.full_name,
-            "username": entry.username,
+            "username": extract_username(entry.username),
             "email": entry.email,
             "phone_number": entry.phone_number,
             "organization": entry.organization,
