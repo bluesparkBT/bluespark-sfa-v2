@@ -9,7 +9,7 @@ from utils.auth_util import verify_password, create_access_token, get_password_h
 from utils.util_functions import validate_name, validate_email, validate_phone_number, parse_enum
 from utils.auth_util import get_current_user, check_permission, generate_random_password, get_tenant_hash, extract_username, add_organization_path
 from utils.model_converter_util import get_html_types
-from utils.form_db_fetch import get_organization_ids_by_scope_group, fetch_organization_id_and_name, fetch_inheritance_group_id_and_name
+from utils.form_db_fetch import get_organization_ids_by_scope_group, fetch_organization_id_and_name, fetch_inheritance_group_id_and_name, fetch_address_id_and_name
 from utils.domain_util import getPath
 from utils.auth_util import check_permission_and_scope
 
@@ -177,8 +177,6 @@ async def get_tenant_form_fields(
             "owner_name": "",
             "description": "",
             "logo_image": "",
-            "parent_organization": {},
-            "parent_id": {},,
             "organization_type": {i.value: i.value for i in OrganizationType},
             "inheritance_group": fetch_inheritance_group_id_and_name(session,current_user),
             "address": fetch_address_id_and_name(session,current_user),
@@ -187,7 +185,11 @@ async def get_tenant_form_fields(
             "longitude": "",
             }
         
-        return {"data": tenant_data, "html_types": get_html_types('organization')}
+        html_types = get_html_types('organization')
+        del html_types['parent_organization']
+        del html_types['parent_id']
+        
+        return {"data": tenant_data, "html_types": html_types}
     except HTTPException as http_exc:
         raise http_exc
     except Exception:
