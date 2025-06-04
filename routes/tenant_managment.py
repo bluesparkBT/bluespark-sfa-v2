@@ -143,7 +143,7 @@ def get_by_Id_template(
             ) 
         organization_ids = get_organization_ids_by_scope_group(session, current_user)
         entry = session.exec(
-            select(db_model).where(db_model.organization.in_(organization_ids), db_model.id == id)
+            select(db_model).where(db_model.id.in_(organization_ids), db_model.id == id)
         ).first()
 
         if not entry:
