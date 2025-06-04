@@ -210,7 +210,7 @@ def get_template_form(
         user_scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == current_user.scope_group)).first()
          
         if user_scope_group.name == "Super Admin Scope":
-            modules_dict = {i.value: i.value for i in modules}
+            modules_dict = {i.value: i.value for i in modules[:3]}
         else:
             modules_dict = {
                 i.value: i.value for i in modules if i.value != "Service Provider"
