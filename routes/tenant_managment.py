@@ -1,4 +1,4 @@
-
+import copy
 from typing import Annotated, List, Dict, Any
 from datetime import timedelta, date, datetime
 from fastapi import APIRouter, HTTPException, Body, status, Depends, Path
@@ -185,7 +185,7 @@ async def get_tenant_form_fields(
             "longitude": "",
             }
         
-        html_types = get_html_types('organization')
+        html_types = copy.deepcopy(get_html_types('organization'))
         del html_types['parent_organization']
         del html_types['parent_id']
         
