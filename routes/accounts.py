@@ -223,13 +223,13 @@ def get_template(
         if not entry:
             raise HTTPException(status_code=404, detail="User not found")
               
-        return {
+        data =  {
             "id": entry.id,
             "full_name": entry.full_name,
             "username": entry.username,
             "email": entry.email,
             "phone_number": entry.phone_number,
-            "organization": entry.organization,
+            "organization": entry.organization 
             "role": entry.role,
             "scope": entry.scope,
             "scope_group": entry.scope_group,
@@ -237,6 +237,11 @@ def get_template(
             "manager_id": entry.manager,
             "address": entry.address
         }
+        
+        if tenant == "provider":
+            del data['organization']
+            del data['scope']
+            del data['manager_id']
     
     except HTTPException as http_exc:
         raise http_exc
