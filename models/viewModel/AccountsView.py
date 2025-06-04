@@ -77,7 +77,7 @@ class OrganizationView(BaseModel):
     description: Optional [Annotated [ str, AfterValidator( validate_name) ] ]   
     logo_image: Optional[str]
     parent_organization: Optional[int] = None
-    organization_type: OrganizationType
+    organization_type: Optional[OrganizationType] = OrganizationType.company
     inheritance_group: Optional[int] = None
     address:Optional[int] = None
     landmark:Optional[str] = None
