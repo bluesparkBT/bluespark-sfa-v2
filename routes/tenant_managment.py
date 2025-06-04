@@ -43,7 +43,6 @@ endpoint = {
     "get_form": f"/{endpoint_name}-form/",
     "create": f"/create-{endpoint_name}",
     "update": f"/update-{endpoint_name}",
-    "archive": f"/archive-{endpoint_name}",
     "activate": f"/activate-{endpoint_name}",
     "delete": f"/delete-{endpoint_name}",
 }
@@ -53,7 +52,6 @@ role_modules = {
     "get_form": ["Service Provider", "Tenant Management"],
     "create": ["Service Provider", "Tenant Management"],
     "update": ["Service Provider", "Tenant Management"],
-    "archive": "Service Provider",
     "activate": "Service Provider",
     "delete": "Service Provider",
 }
@@ -413,41 +411,41 @@ def update_template(
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Something went wrong")
 
-@tr.put(endpoint['archive']+ "/{id}")
-def archive_template(
-    session: SessionDep, 
-    current_user: UserDep,
-    id: int
-) :
-    """
-    Soft delete/ archive (inactive) a tenant organization and all its related records.
-    """
-    try:
-        if not check_permission(
-            session, "Update", role_modules['archive'], current_user
-            ):
-            raise HTTPException(
-                status_code=403, detail="You Do not have the required privilege"
-            )
-        organization_ids = get_organization_ids_by_scope_group(session, current_user)
-        selected_entry = session.exec(
-            select(db_model).where(db_model.id.in_(organization_ids), db_model.id == id)
-        ).first()
-        print("tennat is found and have the status of:::::::", selected_entry.active)
+# @tr.put(endpoint['archive']+ "/{id}")
+# def archive_template(
+#     session: SessionDep, 
+#     current_user: UserDep,
+#     id: int
+# ) :
+#     """
+#     Soft delete/ archive (inactive) a tenant organization and all its related records.
+#     """
+#     try:
+#         if not check_permission(
+#             session, "Update", role_modules['archive'], current_user
+#             ):
+#             raise HTTPException(
+#                 status_code=403, detail="You Do not have the required privilege"
+#             )
+#         organization_ids = get_organization_ids_by_scope_group(session, current_user)
+#         selected_entry = session.exec(
+#             select(db_model).where(db_model.id.in_(organization_ids), db_model.id == id)
+#         ).first()
+#         print("tennat is found and have the status of:::::::", selected_entry.active)
 
-        if not selected_entry:
-            raise HTTPException(status_code=404, detail=f"{endpoint_name} not found")
+#         if not selected_entry:
+#             raise HTTPException(status_code=404, detail=f"{endpoint_name} not found")
         
-        if selected_entry.active == "active":
-            selected_entry.active = ActiveStatus.inactive
-            session.commit()
+#         if selected_entry.active == "active":
+#             selected_entry.active = ActiveStatus.inactive
+#             session.commit()
 
-        return {"message": f"{endpoint_name} archived successfully"}
-    except HTTPException as http_exc:
-        raise http_exc
-    except Exception:
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail="Something went wrong")
+#         return {"message": f"{endpoint_name} archived successfully"}
+#     except HTTPException as http_exc:
+#         raise http_exc
+#     except Exception:
+#         traceback.print_exc()
+#         raise HTTPException(status_code=500, detail="Something went wrong")
 
 @tr.put(endpoint['activate']+ "/{id}")
 def active_template(
@@ -456,7 +454,7 @@ def active_template(
     id: int
 ) :
     """
-    Soft delete/ archive (inactive) a tenant organization and all its related records.
+    Active/ inactive a tenant organization and all its related records.
     """
     try:
         if not check_permission(
@@ -469,15 +467,22 @@ def active_template(
         selected_entry = session.exec(
             select(db_model).where(db_model.id.in_(organization_ids), db_model.id == id)
         ).first()
-        print("tennat is found and have the status of:::::::", selected_entry.active)
 
         if not selected_entry:
             raise HTTPException(status_code=404, detail=f"{endpoint_name} not found")
         if selected_entry.active == "active":
             selected_entry.active = ActiveStatus.inactive
             session.commit()
+            session.refresh(selected_entry)
+            print("Tenant has been Deactivated")
+        else:
+            selected_entry.active = ActiveStatus.active
+            session.commit()
+            session.refresh(selected_entry)
+            print("Tenant has been Activated")
 
-        return {"message": f"{endpoint_name} activated successfully"}
+    
+        return {"message": f"{endpoint_name} Status changed successfully"}
     except HTTPException as http_exc:
         raise http_exc
     except Exception:
