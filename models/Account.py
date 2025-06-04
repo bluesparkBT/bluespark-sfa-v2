@@ -1,4 +1,3 @@
-import sqlmodel
 from sqlmodel import SQLModel, Field, Relationship
 from enum import Enum
 from datetime import  datetime
