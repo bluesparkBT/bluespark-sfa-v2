@@ -266,10 +266,10 @@ def get_template_form(
             "username": "",
             "email": "",
             "phone_number": "",
+            "organization": current_user.organization,
             "role": fetch_role_id_and_name(session, current_user),
             "scope": {i.value: i.value for i in Scope},
             "scope_group": fetch_scope_group_id_and_name(session, current_user),
-            "organization": current_user.organization,
             "gender": {i.value: i.value for i in Gender},
             # "salary": 0,
             # "position": "",            
@@ -284,9 +284,10 @@ def get_template_form(
         } 
         
         html_types = copy.deepcopy(get_html_types("user"))
-        html_types['organization'] = "hidden"
-        html_types['scope'] = "hidden"
-        html_types['manager'] = "hidden"
+        if tenant == "provider":
+            html_types['organization'] = "hidden"
+            html_types['scope'] = "hidden"
+            html_types['manager'] = "hidden"
 
         return {"data": form_structure, "html_types": html_types}
 
