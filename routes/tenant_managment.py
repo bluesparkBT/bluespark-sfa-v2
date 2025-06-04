@@ -177,6 +177,8 @@ async def get_tenant_form_fields(
             "owner_name": "",
             "description": "",
             "logo_image": "",
+            "parent_organization": {},
+            "parent_id": {},,
             "organization_type": {i.value: i.value for i in OrganizationType},
             "inheritance_group": fetch_inheritance_group_id_and_name(session,current_user),
             "address": fetch_address_id_and_name(session,current_user),
@@ -185,10 +187,7 @@ async def get_tenant_form_fields(
             "longitude": "",
             }
         
-        tenant_html_types = get_html_types('organization')
-        del tenant_html_types['parent_organization']
-        del tenant_html_types['parent_id'] 
-        return {"data": tenant_data, "html_types": tenant_html_types}
+        return {"data": tenant_data, "html_types": get_html_types('organization')}
     except HTTPException as http_exc:
         raise http_exc
     except Exception:
