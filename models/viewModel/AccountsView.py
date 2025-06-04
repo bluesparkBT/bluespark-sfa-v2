@@ -97,7 +97,6 @@ class UpdateOrganizationView(BaseModel):
     landmark:Optional[str] = None
     latitude: Optional[int | str] = None
     longitude: Optional[int | str] = None
-    geolocation: Optional[int] = None
 
 class TenantView(BaseModel):
     name: Annotated [ str, AfterValidator( validate_name) ]
@@ -118,17 +117,17 @@ class UpdateScopeGroupView(BaseModel):
     hidden: List[int]
     
 class RoleView(BaseModel):
-    id: int | str
+    id: Optional [int ]
     name: Annotated [ str, AfterValidator( validate_name) ]
-    module: str | type
-    policy: Optional[AccessPolicy] = None
+    module: str 
+    policy: Optional[str] = None
     
-class UpdateRoleView(BaseModel):
-    id: Optional[int]
-    name: Annotated [ str, AfterValidator( validate_name) ]
-    # organization: int
-    module: str
-    policy: Optional[AccessPolicy] = None
+# class UpdateRoleView(BaseModel):
+#     id: Optional[int]
+#     name: Annotated [ str, AfterValidator( validate_name) ]
+#     # organization: int
+#     module: str
+#     policy: Optional[AccessPolicy] = None
 
 
 class EmailSchema(BaseModel):

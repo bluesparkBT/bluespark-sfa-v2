@@ -228,7 +228,9 @@ def get_template(
         organization = session.exec(select(db_model).where(db_model.id == id)).first()
         if not organization:
             raise HTTPException(status_code=404, detail= f"{endpoint_name} not found")
-  
+        
+        org_geolocation = session.exec(select(Geolocation).where(Geolocation.id == organization.geolocation)).first()
+
         return {
             "id": organization.id,
             "name": organization.name,
@@ -240,7 +242,8 @@ def get_template(
             "inheritance_group": organization.inheritance_group,
             "address": organization.address,
             "landmark": organization.landmark,
-            "geolocation":organization.geolocation
+            "latitude": org_geolocation.latitude,
+            "longitude": org_geolocation.longitude
 
         }
     except HTTPException as http_exc:
@@ -350,7 +353,6 @@ def create_template(
             geolocation=org_geolocation.id if org_geolocation else None
 
         )
-        
         session.add(organization)
         session.commit()
         session.refresh(organization)
@@ -362,6 +364,13 @@ def create_template(
         session.add(scope_group_link)
         session.commit()
         
+        #link the geolocation to the newly created organization
+        new_geolocation = session.exec(select(Geolocation).where(Geolocation.id == organization.geolocation)).first()
+        if new_geolocation:
+            new_geolocation.organization = organization.id
+            
+            session.add(new_geolocation)
+            session.commit()
         return {"message": "Organization created successfully"}
     
     except HTTPException as http_exc:
@@ -391,37 +400,39 @@ def update_template(
                 status_code=404,
                 detail="Organization not found",
         )     
-        # def parse_float(val):
-        #     if val == "":
-        #         return None
-        #     if isinstance(val, float):
-        #         return val
-        #     try:
-        #         return float(val)
-        #     except (TypeError, ValueError):
-        #         raise HTTPException(status_code=400, detail="Latitude/Longitude must be a float or null.")
+        def parse_float(val):
+            if val == "":
+                return None
+            if isinstance(val, float):
+                return val
+            try:
+                return float(val)
+            except (TypeError, ValueError):
+                raise HTTPException(status_code=400, detail="Latitude/Longitude must be a float or null.")
 
-        # exisitng_org_geolocation = session.exec(select(Geolocation).where(Geolocation.id == existing_organization.address)).first()  
-        # latitude = parse_float(valid.latitude)
-        # longitude = parse_float(valid.longitude)
-        # if latitude is not None and longitude is not None:  
-        #     if exisitng_org_geolocation:
-        #         if valid.latitude:
-        #             exisitng_org_geolocation.latitude = latitude,
-        #         if valid.longitude:
-        #             exisitng_org_geolocation.longitude = longitude
+        latitude = parse_float(valid.latitude)
+        longitude = parse_float(valid.longitude)
+        if latitude is not None and longitude is not None:  
+            exisitng_org_geolocation = session.exec(select(Geolocation).where(Geolocation.id == existing_organization.geolocation)).first()  
+            if exisitng_org_geolocation:
+                if valid.latitude:
+                    exisitng_org_geolocation.latitude = latitude,
+                if valid.longitude:
+                    exisitng_org_geolocation.longitude = longitude
                     
-        #         session.add(exisitng_org_geolocation)
-        #         session.commit()            
-        #     else:
-        #         org_geolocation = Geolocation(
-        #             name = f"{valid.name} location",
-        #             address = valid.address,
-        #             latitude = latitude,
-        #             longitude = longitude
-        #         )
-        #         session.add(org_geolocation)
-        #         session.commit()
+                session.add(exisitng_org_geolocation)
+                session.commit()            
+            else:
+                org_geolocation = Geolocation(
+                    name = f"{valid.name} location",
+                    address = valid.address,
+                    latitude = latitude,
+                    longitude = longitude
+                )
+                session.add(org_geolocation)
+                session.commit()
+                session.refresh(org_geolocation)
+                existing_organization.geolocation = org_geolocation.id
 
         
         existing_organization.name = valid.name
@@ -437,8 +448,7 @@ def update_template(
             existing_organization.address = valid.address
         if valid.landmark:
             existing_organization.landmark = valid.landmark,
-        if valid.geolocation:
-            existing_organization.geolocation = valid.geolocation
+
             
         session.add(existing_organization)
         session.commit()

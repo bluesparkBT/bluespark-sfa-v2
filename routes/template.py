@@ -21,7 +21,7 @@ endpoint_name = "category" #Update this
 db_model = User #Update this
 
 endpoint = {
-    "get": f"/get-{endpoint_name}",
+    "get": f"/get-{endpoint_name}s",
     "get_by_id": f"/get-{endpoint_name}",
     "get_form": f"/{endpoint_name}-form/",
     "create": f"/create-{endpoint_name}",
@@ -69,7 +69,6 @@ def get_template(
     current_user: UserDep,
     tenant: str,
     id: int,
-    # valid: TemplateView,
 ):
     try:
         if not check_permission(

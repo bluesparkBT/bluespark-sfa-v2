@@ -93,9 +93,11 @@ def get_template(
 
         return product_list
 
-    except Exception as e:
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception:
         traceback.print_exc()
-        raise HTTPException(status_code=400, detail=str(e))    
+        raise HTTPException(status_code=500, detail="Something went wrong")
 
 @pr.get("/get-product/{id}")            
 def get_product(
@@ -106,14 +108,15 @@ def get_product(
 ) :
     try:
         if not check_permission(
-            session, "Read", ["Administrative","Product"], current_user
+            session, "Read",role_modules['get'], current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
-            )
+            )  
+
         organization_ids = get_organization_ids_by_scope_group(session, current_user)
         db_product = session.exec(
-            select(Product).where(Product.id == id, Product.organization.in_(organization_ids))
+            select(db_model).where(db_model.id == id, db_model.organization.in_(organization_ids))
         ).first()
         if not db_product:
             raise HTTPException(status_code=404, detail="No products found")
@@ -133,9 +136,12 @@ def get_product(
         }
         
         return product_list
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-      
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Something went wrong")
+
 @pr.get(endpoint['get_form'])
 def get_template_form(
     tenant: str,

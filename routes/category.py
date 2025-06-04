@@ -109,15 +109,15 @@ def get_template(
 ):
     try:
         if not check_permission(
-            session, "Read",[ "Category", "Administrative"], current_user
+            session, "Read",role_modules['get'], current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
-            )
+            )  
 
         organization_ids = get_organization_ids_by_scope_group(session, current_user)
         db_category = session.exec(
-            select(Category).where(Category.organization.in_(organization_ids), Category.id == id)
+            select(db_model).where(db_model.id == id, db_model.organization.in_(organization_ids))
         ).first()
 
         if not db_category:
@@ -180,7 +180,6 @@ def create_template(
     valid: TemplateView,
 ):
     try:
-        
         if not check_permission(
             session, "Create", role_modules['create'], current_user
             ):
