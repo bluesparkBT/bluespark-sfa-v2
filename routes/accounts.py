@@ -11,7 +11,7 @@ from models.viewModel.AccountsView import UserAccountView as TemplateView, Updat
 from models.Account import User, ScopeGroup, ScopeGroupLink, Organization, Gender, Scope, Role, AccessPolicy, IdType
 from utils.util_functions import validate_name, validate_email, validate_phone_number, parse_datetime_field, format_date_for_input, parse_enum
 from utils.auth_util import get_current_user, check_permission, check_permission_and_scope, add_organization_path, verify_password, get_password_hash, create_access_token, generate_random_password, extract_username
-
+import copy
 from utils.get_hierarchy import get_organization_ids_by_scope_group
 from utils.form_db_fetch import fetch_user_id_and_name, fetch_organization_id_and_name, fetch_role_id_and_name, fetch_scope_group_id_and_name, fetch_address_id_and_name
 import traceback
@@ -266,24 +266,26 @@ def get_template_form(
             "username": "",
             "email": "",
             "phone_number": "",
-            "organization": fetch_organization_id_and_name(session, current_user),
             "role": fetch_role_id_and_name(session, current_user),
-            "scope": {scope.value: scope.value for scope in Scope},
             "scope_group": fetch_scope_group_id_and_name(session, current_user),
             "gender": {i.value: i.value for i in Gender},
             # "salary": 0,
             # "position": "",            
             # "date_of_birth": "",
             # "date_of_joining": "",
-            "manager": fetch_user_id_and_name(session, current_user),
             # "image": "",
             # "id_type": {i.value: i.value for i in IdType},
             # "id_number": "",
             "address": fetch_address_id_and_name(session, current_user)
 
         } 
+        
+        html_types = copy.deepcopy(get_html_types("user"))
+        del html_types['organization']
+        del html_types['scope']
+        del html_types['manager']
 
-        return {"data": form_structure, "html_types": get_html_types("user")}
+        return {"data": form_structure, "html_types": html_types}
 
     except HTTPException as http_exc:
         raise http_exc
@@ -322,12 +324,12 @@ def create_template(
             username= stored_username,
             email=valid.email,
             phone_number=valid.phone_number,
-            organization= valid.organization,   
+            organization= current_user.organization if tenant == "provider" else valid.organization,   
             role= valid.role, 
-            scope=parse_enum(Scope,valid.scope, "Scope"),
+            scope=Scope.personal_scope,
             scope_group=valid.scope_group,                  
             gender=parse_enum(Gender,valid.gender, "Gender"),
-            manager = valid.manager,
+            manager = None if tenant == "provider" else valid.organization,   
             address = valid.address,
             hashedPassword = hashed_password,
 
@@ -348,52 +350,6 @@ def create_template(
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Something went wrong")
  
-@ar.get("/update-account-form/")
-async def update_user_form(
-    session: SessionDep,
-    tenant: str,
-    current_user: UserDep,    
-):
-    try:
-        if not check_permission(
-            session, "Update", "Users", current_user
-            ):
-            raise HTTPException(
-                status_code=403, detail="You Do not have the required privilege"
-            )
-     
-        user_data = {
-            "id": "", 
-            "full_name": "", 
-            "username": "",
-            "email": "",
-            "phone_number": "",
-            "organization": fetch_organization_id_and_name(session, current_user),
-            "role": fetch_role_id_and_name(session, current_user),
-            "scope": {scope.value: scope.value for scope in Scope},
-            "scope_group": fetch_scope_group_id_and_name(session, current_user),
-            "gender": {i.value: i.value for i in Gender},
-            # "salary": 0,
-            # "position": "",            
-            # "date_of_birth": "",
-            # "date_of_joining": "",
-            "manager": fetch_user_id_and_name(session, current_user),
-            # "image": "",
-            # "id_type": {i.value: i.value for i in IdType},
-            # "id_number": "",
-            "address": fetch_address_id_and_name(session, current_user),
-            # "old_password": "",
-            # "password": ""
-
-
-        }
-
-        return {"data": user_data, "html_types": get_html_types("user")}
-    except HTTPException as http_exc:
-        raise http_exc
-    except Exception as e:
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail="Something went wrong")
     
 @ar.put(endpoint['update'])
 def update_template(

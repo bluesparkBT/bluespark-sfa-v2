@@ -33,7 +33,7 @@ class UserAccountView(BaseModel):
     email: Annotated [ str, AfterValidator( validate_email) ] | None
     phone_number: Optional [Annotated [ str, AfterValidator( validate_phone_number) ] | None] 
     role: Optional[int]
-    scope: str
+    scope: Optional[str]
     scope_group: Optional[int]
     organization: Optional[int]
     gender: Optional[str] 
