@@ -267,7 +267,7 @@ def get_template_form(
             "email": "",
             "phone_number": "",
             "role": fetch_role_id_and_name(session, current_user),
-            "scope": Scope.personal_scope,
+            "scope": {i.value: i.value for i in Scope},
             "scope_group": fetch_scope_group_id_and_name(session, current_user),
             "organization": current_user.organization,
             "gender": {i.value: i.value for i in Gender},
