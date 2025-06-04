@@ -10,6 +10,14 @@ class AccessPolicy(str, Enum):
     edit = "edit"
     contribute = "contribute"
     manage = "manage"
+
+class SuperAdminModuleName(str, Enum):
+    #Service Provider
+    service_provider = "Service Provider"
+    tenant_management = "Tenant Management"
+    
+    #Common
+    administrative = "Administrative"
     
 class ModuleName(str, Enum):
     #Service Provider
