@@ -107,7 +107,7 @@ def get(
         ).all()
         
         if not entries_list or entries_list is None:
-            raise HTTPException(status_code=400, detail="No Tenants Found")
+            raise HTTPException(status_code=400, detail="No Tenants Created")
         tenant_list = []
 
         for tenant in  entries_list:
