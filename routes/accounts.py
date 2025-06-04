@@ -229,7 +229,7 @@ def get_template(
             "username": entry.username,
             "email": entry.email,
             "phone_number": entry.phone_number,
-            "organization": entry.organization 
+            "organization": entry.organization,
             "role": entry.role,
             "scope": entry.scope,
             "scope_group": entry.scope_group,
