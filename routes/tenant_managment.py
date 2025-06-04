@@ -202,7 +202,7 @@ async def get_tenant_form_fields(
         html_types = copy.deepcopy(get_html_types('organization'))
         del html_types['parent_organization']
         del html_types['parent_id']
-        del html_types['geolocation']
+
         return {"data": tenant_data, "html_types": html_types}
     except HTTPException as http_exc:
         raise http_exc
