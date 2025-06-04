@@ -173,6 +173,8 @@ def get_by_Id_template(
             "inheritance_group": entry.inheritance_group,
             "address": entry.address,
             "landmark": entry.landmark,
+            "latitude": entry.geolocation.latitude if entry.geolocation else "",
+            "longitude": entry.geolocation.longitude if entry.geolocation else ""
             }
         
         return entry_data
@@ -202,7 +204,6 @@ async def get_tenant_form_fields(
             "owner_name": "",
             "description": "",
             "logo_image": "",
-            "organization_type": {i.value: i.value for i in OrganizationType},
             "inheritance_group": fetch_inheritance_group_id_and_name(session,current_user),
             "address": fetch_address_id_and_name(session,current_user),
             "landmark": "",
@@ -213,7 +214,8 @@ async def get_tenant_form_fields(
         html_types = copy.deepcopy(get_html_types('organization'))
         del html_types['parent_organization']
         del html_types['parent_id']
-        # del html_types['location']
+        del html_types['organization_type']
+
         return {"data": tenant_data, "html_types": html_types}
     except HTTPException as http_exc:
         raise http_exc
