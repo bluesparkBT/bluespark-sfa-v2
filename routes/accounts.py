@@ -386,7 +386,7 @@ def update_template(
         selected_entry.username = new_username
         selected_entry.email = valid.email
         selected_entry.phone_number = valid.phone_number
-        selected_entry.organization = valid.organization
+        selected_entry.organization = current_user.organization if tenant == "provider" else valid.organization
         # if verify_password(valid.old_password + old_username, selected_entry.hashedPassword):
         #     selected_entry.hashedPassword = get_password_hash(valid.password + selected_entry.username)
         # else:
@@ -405,7 +405,7 @@ def update_template(
         #     selected_entry.id_type = parse_enum(IdType, valid.id_type, "Id Type")
         # if valid.id_number:
         #     selected_entry.id_number = valid.id_number
-        if valid.scope:
+        if valid.scope and tenant != "provider":
             selected_entry.scope = parse_enum(Scope, valid.scope, "Scope")
         if valid.scope_group:
             selected_entry.scope_group = valid.scope_group
