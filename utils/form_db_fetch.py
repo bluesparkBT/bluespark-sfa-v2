@@ -5,7 +5,7 @@ from db import  get_session
 from models.Account import (Organization, User, Role, ScopeGroup, ScopeGroupLink)
 from models.Address import Address, Geolocation
 from models.Product_Category import Category, Product, InheritanceGroup, ProductLink, CategoryLink
-from models.Marketing import ClassificationGroup
+from models.Marketing import ClassificationGroup, CustomerDiscount
 #from models.Warehouse import Stock, StockType, Warehouse, Vehicle
 from utils.get_hierarchy import get_organization_ids_by_scope_group
 from utils.auth_util import get_current_user
@@ -153,6 +153,21 @@ def fetch_classification_id_and_name(session: SessionDep, current_user: UserDep)
 
     classifications = {row[0]: row[1] for row in classification_row if row[0] is not None}
     return classifications
+
+def fetch_customer_discount_id_and_name(session: SessionDep, current_user: UserDep):
+    organization_ids = get_organization_ids_by_scope_group(session, current_user)
+
+    classification_row = session.exec(
+        select(CustomerDiscount.id, CustomerDiscount.discount)).all()
+        # .where(CustomerDiscount.organization.in_(organization_ids))
+    # ).all()
+    print(classification_row)
+    # customer_discount = {row[0]: str(row[1]) for row in classification_row if row[0] is not None}
+    customer_discount = {row[0]: row[1] for row in classification_row if row[0] is not None}
+    print(customer_discount)
+
+    return customer_discount
+
 
 def fetch_point_of_sale_id_and_name(session: SessionDep, current_user: UserDep):
     organization_ids = get_organization_ids_by_scope_group(session, current_user)

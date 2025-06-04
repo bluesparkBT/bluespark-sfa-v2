@@ -129,10 +129,10 @@ MODEL_HTML_TYPES = {
         "name": "",
         "organization": "select",
         "point_of_sale": "select",
-        "territory":"",
-        "description": "",
-        "route":"",
-        "customer discount": "select",
+        "route":"select",
+        "territory":"select",
+        "description": "textarea",
+        "customer_discount": "select",
     }
 
 }

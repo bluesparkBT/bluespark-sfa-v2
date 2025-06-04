@@ -9,7 +9,6 @@ class ClassificationGroup(SQLModel, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True)
-    description: Optional[str] = Field(default=None)
     organization: int = Field(foreign_key="organization.id", ondelete="CASCADE")  # Reference to Organization
     point_of_sale_id: Optional[int] = Field(default=None, foreign_key="point_of_sale.id")
     territory_id: Optional[int] = Field(default=None, foreign_key="territory.id")
@@ -17,6 +16,7 @@ class ClassificationGroup(SQLModel, table=True):
     # A classification group can have many discount entries.
     customer_discounts: int = Field(foreign_key="customer_discount.id")  # Reference to Organization
     inheritance_groups: List["InheritanceGroup"] = Relationship(back_populates="classifications", link_model=ClassificationLink)
+    description: Optional[str] = Field(default=None)
 
 
 class CustomerDiscount(SQLModel, table=True):
