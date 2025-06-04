@@ -267,7 +267,9 @@ def get_template_form(
             "email": "",
             "phone_number": "",
             "role": fetch_role_id_and_name(session, current_user),
+            "scope": "",
             "scope_group": fetch_scope_group_id_and_name(session, current_user),
+            "organization": "",
             "gender": {i.value: i.value for i in Gender},
             # "salary": 0,
             # "position": "",            
@@ -276,6 +278,7 @@ def get_template_form(
             # "image": "",
             # "id_type": {i.value: i.value for i in IdType},
             # "id_number": "",
+            "manager": "",
             "address": fetch_address_id_and_name(session, current_user)
 
         } 
