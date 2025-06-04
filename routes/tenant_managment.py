@@ -176,7 +176,7 @@ async def get_tenant_form_fields(
             "owner_name": "",
             "description": "",
             "logo_image": "",
-            "parent_organization": fetch_organization_id_and_name(session, current_user)
+            #"parent_organization": fetch_organization_id_and_name(session, current_user)
             
             }
         
