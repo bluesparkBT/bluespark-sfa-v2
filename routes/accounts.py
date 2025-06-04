@@ -242,7 +242,8 @@ def get_template(
             del data['organization']
             del data['scope']
             del data['manager_id']
-    
+        
+        return data
     except HTTPException as http_exc:
         raise http_exc
     except Exception:
