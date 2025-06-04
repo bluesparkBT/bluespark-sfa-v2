@@ -159,8 +159,8 @@ def get_by_Id_template(
             "inheritance_group": entry.inheritance_group,
             "address": entry.address,
             "landmark": entry.landmark,
-            "latitude": entry.latitude,
-            "longitude": entry.longitude,
+            "latitude": entry.geolocation.latitude,
+            "longitude": entry.geolocation.longitude,
             }
         
         return entry_data
