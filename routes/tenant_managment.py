@@ -158,8 +158,8 @@ def get_by_Id_template(
         raise HTTPException(status_code=500, detail="Something went wrong")
 
 
-@tr.get("/update-tenant-form/")
-async def update_tenant_form_fields(
+@tr.get("/tenant-form/")
+async def get_tenant_form_fields(
     session: SessionDep,
     current_user: UserDep
 ):
@@ -195,37 +195,6 @@ async def update_tenant_form_fields(
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Something went wrong")  
 
-
-@tr.get("/tenant-form/")
-async def get_tenant_form_fields(
-    session: SessionDep,
-    current_user: UserDep
-):
-    try:
-        if not check_permission(
-            session, "Read", role_modules['get'], current_user
-            ):
-            raise HTTPException(
-                status_code=403, detail="You Do not have the required privilege"
-            )
-        parent_org =  session.exec(select(Organization.id))
-        tenant_data = {
-            "id": "",
-            "name": "",
-            "owner_name": "",
-            "description": "",
-            "logo_image": "",
-            #"parent_organization": fetch_organization_id_and_name(session, current_user)
-            
-            }
-        
-
-        return {"data": tenant_data, "html_types": get_html_types('organization')}
-    except HTTPException as http_exc:
-        raise http_exc
-    except Exception:
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail="Something went wrong")  
 
 @tr.post(endpoint['create'])
 def create_template(
