@@ -12,8 +12,6 @@ MODEL_HTML_TYPES = {
         "inheritance_group": "select",
         "address": "select",
         "landmark": "text",
-        "latitude": "text",
-        "longitude": "text",
         "hidden": "text",
         "geolocation":"select",
     },
