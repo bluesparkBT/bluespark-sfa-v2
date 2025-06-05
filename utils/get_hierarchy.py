@@ -92,6 +92,8 @@ def get_heirarchy(session: SessionDep, organization: int , max_depth, current_us
     
     print(scope_organizations)
     
+    scope_organizations.append(organization)
+    
     [[scope_organizations.append(org.id), scope_organizations.extend(get_parent_organizations(session, org.id))] for org in user_scope_group.organizations]
     
     print(scope_organizations)
