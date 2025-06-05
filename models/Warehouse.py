@@ -57,7 +57,9 @@ class Warehouse(SQLModel, table=True):
     location_id: int = Field(foreign_key="geolocation.id")
     warehouse_groups: List["WarehouseGroup"] = Relationship(back_populates="warehouses", link_model=WarehouseGroupLink)
     stocks: Optional[List["Stock"]] = Relationship(back_populates="warehouse")
-    organization: Optional["Organization"] = Relationship(back_populates="warehouses")
+    stock_logs: Optional[List["StockLog"]] = Relationship(back_populates="warehouse")
+    warehouse_stops: Optional[List["WarehouseStop"]] = Relationship(back_populates="warehouse")
+    # organization: Optional["Organization"] = Relationship(back_populates="warehouses")
 
 
 class Stock(SQLModel, table=True):
@@ -78,13 +80,16 @@ class StockLog(SQLModel, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     stock_id: str = Field(index=True)
+    warehouse_id: int = Field(foreign_key="warehouse.id")
     product_id: int = Field(foreign_key="product.id")
     quantity: int = Field(default=1)
     stock_in_date: Optional[datetime] = Field(default=None)
     stock_out_date: Optional[datetime] = Field(default=None)
     request_type: Optional[RequestType] = Field(default=None)
     log_type: LogType = Field(default=LogType.stock_in)
-    product: Optional["Product"] = Relationship(back_populates="stock_logs")
+    stock_type: StockType = Field(default=StockType.regular)
+    warehouse: Optional[Warehouse] = Relationship(back_populates="stock_logs")
+    product: Optional["Product"] = Relationship(back_populates="stock_log")
 
 class Vehicle(SQLModel, table=True):
     __tablename__ = "vehicle"
@@ -104,11 +109,13 @@ class WarehouseStop(SQLModel, table=True):
     __tablename__ = "warehouse_stop"
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    requester_id: int = Field(foreign_key="designation.id")
+    stock_id: str = Field(index=True)
+    requester_id: int = Field(foreign_key="users.id")
     request_type: RequestType = Field(default=RequestType.stock_out)
     request_status: RequestStatus = Field(default=RequestStatus.pending)
     request_date: Optional[datetime] = Field(default=None)
-    approver_id: Optional[int] = Field(foreign_key="designation.id", default=None)
+    warehouse_id: int = Field(foreign_key="warehouse.id")
+    approver_id: Optional[int] = Field(foreign_key="users.id", default=None)
     approve_date: Optional[datetime] = Field(default=None)
     confirmed: Optional[bool] = Field(default=False)
     confirm_date: Optional[datetime] = Field(default=None)
@@ -117,15 +124,11 @@ class WarehouseStop(SQLModel, table=True):
     stock_type: StockType = Field(default=StockType.regular)
     quantity: int = Field(default=1)
     vehicle: Optional["Vehicle"] = Relationship(back_populates="warehouse_stops")
-    requester: Optional["Designation"] = Relationship(
-        sa_relationship_kwargs={"foreign_keys": "[WarehouseStop.requester_id]"},
-        back_populates="requester_warehouse_stops"
-    )
-    approver: Optional["Designation"] = Relationship(
-        sa_relationship_kwargs={"foreign_keys": "[WarehouseStop.approver_id]"},
-        back_populates="approver_warehouse_stops"
-    )
-    product: Optional["Product"] = Relationship(back_populates="warehouse_stops")
+    warehouse: Optional[Warehouse] = Relationship(back_populates="warehouse_stops")
+    # requester: Optional["User"] = Relationship(
+    #     sa_relationship_kwargs={"foreign_keys": "[WarehouseStop.requester_id]"},
+    #     back_populates="requester_warehouse_stops"
+    # )
 
 
 

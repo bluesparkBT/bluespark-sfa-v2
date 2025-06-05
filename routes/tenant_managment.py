@@ -2,6 +2,7 @@ import copy
 from typing import Annotated, List, Dict, Any
 from datetime import timedelta, date, datetime
 from fastapi import APIRouter, HTTPException, Body, status, Depends, Path
+from models.Warehouse import WarehouseGroup
 from sqlmodel import select, Session
 from db import get_session
 import traceback
@@ -12,6 +13,7 @@ from utils.model_converter_util import get_html_types
 from utils.form_db_fetch import get_organization_ids_by_scope_group, fetch_organization_id_and_name, fetch_inheritance_group_id_and_name, fetch_address_id_and_name
 from utils.domain_util import getPath
 from utils.auth_util import check_permission_and_scope
+
 from models.Account import (
     User, ScopeGroup,
     ScopeGroupLink,
@@ -22,11 +24,13 @@ from models.Account import (
     Role,
     AccessPolicy,
     ActiveStatus,
-    ModuleName as modules
+    ModuleName as modules,
+    WarehouseStoreAdminLink
     )
 
 from models.Address import Address, Geolocation
 from models.viewModel.AccountsView import TenantView as TemplateView, UpdateTenantView as UpdateTemplateView
+
 
 # frontend domain
 Domain= getPath()
@@ -372,6 +376,7 @@ def create_template(
             modules.territory.value,
             modules.route.value,
             modules.address.value,
+            modules.inventory_management.value
             
         ]
         for module in modules_to_grant: 
@@ -399,6 +404,27 @@ def create_template(
         session.add(tenant_admin)
         session.commit()
         session.refresh(tenant_admin)
+
+        
+        warehouse_group = WarehouseGroup(
+            id = None,
+            name = f"{valid.name} Admin Warehouse Group",
+            access_policy= AccessPolicy.manage,
+            organization_id=tenant.id
+        )
+
+        session.add(warehouse_group)
+        session.commit()
+        session.refresh(warehouse_group)
+
+        link = WarehouseStoreAdminLink(
+                id=None,
+                user_id = tenant_admin.id,
+                warehouse_group_id = warehouse_group.id,
+            )
+        session.add(link)
+        session.commit()
+        session.refresh(link)
         
         return {
             "message": "Tenant and system admin created successfully",
