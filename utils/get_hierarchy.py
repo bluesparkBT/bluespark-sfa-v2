@@ -65,7 +65,7 @@ def get_child_organization(session: SessionDep, organization = None , max_depth 
         
     return {
             'id': organization,
-            'name': "All" if org.parent_organization is None else org.name, 
+            'name': "All" if org is None or org.parent_organization is None else org.name, 
             "owner": org.owner_name,
             "description": org.description,
             "organization_type": org.organization_type,
