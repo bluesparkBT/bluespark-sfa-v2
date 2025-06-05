@@ -63,6 +63,7 @@ def get_child_organization(session: SessionDep, organization = None , max_depth 
     else:
         parent_org = None
         
+    print(children)
     return {
             'id': organization,
             'name': "All" if org.parent_organization is None else org.name, 
