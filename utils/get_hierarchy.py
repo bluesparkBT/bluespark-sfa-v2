@@ -58,14 +58,14 @@ def get_child_organization(session: SessionDep, organization = None , max_depth 
 
     org = session.exec(select(Organization).where(Organization.id == organization)).first()  
     
-    if org and org.parent_organization:
+    if org.parent_organization:
         parent_org = session.exec(select(Organization).where(Organization.id == org.parent_organization)).first()  
     else:
         parent_org = None
         
     return {
             'id': organization,
-            'name': "All" if org is None or org.parent_organization is None else org.name, 
+            'name': "All" if org.parent_organization is None else org.name, 
             "owner": org.owner_name,
             "description": org.description,
             "organization_type": org.organization_type,
@@ -87,16 +87,11 @@ def get_heirarchy(session: SessionDep, organization: int , max_depth, current_us
             status_code=404, detail="ScopeGroup not found for the current user"
         )
     # Get organization IDs associated with this scope group
-    print(organization)
     scope_organizations = session.exec(select(Organization.id).where(Organization.parent_organization == organization)).all()
-    
-    print(scope_organizations)
     
     scope_organizations.append(organization)
     
     [[scope_organizations.append(org.id), scope_organizations.extend(get_parent_organizations(session, org.id))] for org in user_scope_group.organizations]
-    
-    print(scope_organizations)
         
     heirarchy = get_child_organization(session, organization, max_depth, children_key, set(scope_organizations))
     
