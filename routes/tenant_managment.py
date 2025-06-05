@@ -2,6 +2,7 @@ import copy
 from typing import Annotated, List, Dict, Any
 from datetime import timedelta, date, datetime
 from fastapi import APIRouter, HTTPException, Body, status, Depends, Path
+from models.Warehouse import WarehouseGroup
 from sqlmodel import select, Session
 from db import get_session
 import traceback
@@ -13,7 +14,7 @@ from utils.form_db_fetch import get_organization_ids_by_scope_group, fetch_organ
 from utils.domain_util import getPath
 from utils.auth_util import check_permission_and_scope
 
-from models.Account import User, ScopeGroup, ScopeGroupLink, Organization, OrganizationType, RoleModulePermission, Scope, Role, AccessPolicy
+from models.Account import User, ScopeGroup, ScopeGroupLink, Organization, OrganizationType, RoleModulePermission, Scope, Role, AccessPolicy, WarehouseStoreAdminLink
 from models.Account import ModuleName as modules
 from models.viewModel.AccountsView import TenantView as TemplateView
 
@@ -315,6 +316,7 @@ def create_template(
             modules.territory.value,
             modules.route.value,
             modules.address.value,
+            modules.inventory_management.value
             
         ]
         for module in modules_to_grant: 
@@ -342,6 +344,27 @@ def create_template(
         session.add(tenant_admin)
         session.commit()
         session.refresh(tenant_admin)
+
+        
+        warehouse_group = WarehouseGroup(
+            id = None,
+            name = f"{valid.name} Admin Warehouse Group",
+            access_policy= AccessPolicy.manage,
+            organization_id=tenant.id
+        )
+
+        session.add(warehouse_group)
+        session.commit()
+        session.refresh(warehouse_group)
+
+        link = WarehouseStoreAdminLink(
+                id=None,
+                user_id = tenant_admin.id,
+                warehouse_group_id = warehouse_group.id,
+            )
+        session.add(link)
+        session.commit()
+        session.refresh(link)
         
         return {
             "message": "Tenant and system admin created successfully",
