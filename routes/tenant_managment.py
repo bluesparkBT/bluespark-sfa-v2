@@ -239,7 +239,7 @@ def create_template(
         existing_entry = session.exec(
             select(Organization).where(
                 Organization.name == valid.name,
-                Organization.parent_organization == valid.parent_organization
+                Organization.parent_organization == None
             )
         ).first()
         if existing_entry:
@@ -256,7 +256,7 @@ def create_template(
             logo_image=valid.logo_image,
             organization_type=OrganizationType.company.value,
             tenant_domain = f"{Domain}/{hashed_tenant_name}",
-            parent_organization = service_provider
+            parent_organization = None
         )
         session.add(tenant)
         session.commit()
@@ -397,7 +397,7 @@ def update_template(
         selected_org.description= valid.description
         selected_org.logo_image=valid.logo_image
         selected_org.organization_type=OrganizationType.company.value
-        selected_org.parent_organization = valid.parent_organization
+        selected_org.parent_organization = None
         # selected_org.address = valid.address
     
         session.add(selected_org)
