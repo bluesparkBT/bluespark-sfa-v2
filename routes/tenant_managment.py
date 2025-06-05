@@ -14,9 +14,23 @@ from utils.form_db_fetch import get_organization_ids_by_scope_group, fetch_organ
 from utils.domain_util import getPath
 from utils.auth_util import check_permission_and_scope
 
-from models.Account import User, ScopeGroup, ScopeGroupLink, Organization, OrganizationType, RoleModulePermission, Scope, Role, AccessPolicy, WarehouseStoreAdminLink
-from models.Account import ModuleName as modules
-from models.viewModel.AccountsView import TenantView as TemplateView
+from models.Account import (
+    User, ScopeGroup,
+    ScopeGroupLink,
+    Organization,
+    OrganizationType,
+    RoleModulePermission,
+    Scope,
+    Role,
+    AccessPolicy,
+    ActiveStatus,
+    ModuleName as modules,
+    WarehouseStoreAdminLink
+    )
+
+from models.Address import Address, Geolocation
+from models.viewModel.AccountsView import TenantView as TemplateView, UpdateTenantView as UpdateTemplateView
+
 
 # frontend domain
 Domain= getPath()
@@ -34,7 +48,7 @@ endpoint = {
     "get_form": f"/{endpoint_name}-form/",
     "create": f"/create-{endpoint_name}",
     "update": f"/update-{endpoint_name}",
-    "archive": f"/archive-{endpoint_name}",
+    "activate": f"/activate-{endpoint_name}",
     "delete": f"/delete-{endpoint_name}",
 }
 
@@ -43,7 +57,7 @@ role_modules = {
     "get_form": ["Service Provider", "Tenant Management"],
     "create": ["Service Provider", "Tenant Management"],
     "update": ["Service Provider", "Tenant Management"],
-    "archive": "Service Provider",
+    "activate": "Service Provider",
     "delete": "Service Provider",
 }
 
@@ -118,7 +132,9 @@ def get(
                 "owner": tenant.owner_name,
                 "description": tenant.description,
                 "logo": tenant.logo_image,
-                "domain": f"{Domain}/{tenant.tenant_hashed}"                }
+                "domain": f"{Domain}/{tenant.tenant_hashed}",
+                "Status": tenant.active                
+                }
             )
 
         return tenant_list
@@ -149,19 +165,21 @@ def get_by_Id_template(
 
         if not entry:
             raise HTTPException(status_code=404, detail= f"{endpoint_name} not found")
-            
+        tenant_address = session.exec(select(Address).where(Address.id == entry.address)).first()
+        tenant_location = session.exec(select(Geolocation).where(Geolocation.id == entry.geolocation)).first()
         entry_data = {
             "id": entry.id,
             "name": entry.name,
             "owner_name": entry.owner_name,
-            "description": entry.description,
             "logo_image": entry.logo_image,
-            "organization_type": entry.organization_type,
-            "inheritance_group": entry.inheritance_group,
-            "address": entry.address,
+            "description": entry.description,
+            "country": tenant_address.country if tenant_address else "",
+            "city" : tenant_address.city if tenant_address else "",
+            "subcity": tenant_address.sub_city if tenant_address else "",
+            "woreda": tenant_address.woreda if tenant_address else "",
             "landmark": entry.landmark,
-            "latitude": entry.geolocation.latitude if entry.geolocation else "",
-            "longitude": entry.geolocation.longitude if entry.geolocation else ""
+            "latitude": tenant_location.latitude if tenant_location else "",
+            "longitude": tenant_location.longitude if tenant_location else ""
             }
         
         return entry_data
@@ -185,32 +203,35 @@ async def get_tenant_form_fields(
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-        parent_org =  session.exec(select(Organization.id))
         tenant_data = {
             "id": "",
             "name": "",
             "owner_name": "",
-            "description": "",
             "logo_image": "",
-            "inheritance_group": fetch_inheritance_group_id_and_name(session,current_user),
-            "address": fetch_address_id_and_name(session,current_user),
+            "description": "",
+            "country": "",
+            "city": "",
+            "sub_city": "",
+            "woreda": "",
             "landmark": "",
             "latitude": "",
             "longitude": "",
             }
         
-        html_types = copy.deepcopy(get_html_types('organization'))
-        del html_types['parent_organization']
-        del html_types['parent_id']
-        del html_types['organization_type']
+        html_types = copy.deepcopy(get_html_types('tenant'))
+        # del html_types['parent_organization']
+        # del html_types['parent_id']
+        # del html_types['organization_type']
+        # del html_types['inheritance_group']
 
-        return {"data": tenant_data, "html_types": html_types}
+        return {"tabs": {"tenant_info": ["name","owner_name", "description", "logo_image" ],
+                         "address": ["country", "city", "sub_city", "woreda", "landmark", "lattitude", "longitude"]},
+                "data": tenant_data, "html_types": html_types}
     except HTTPException as http_exc:
         raise http_exc
     except Exception:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Something went wrong")  
-
 
 @tr.post(endpoint['create'])
 def create_template(
@@ -229,7 +250,7 @@ def create_template(
         existing_entry = session.exec(
             select(Organization).where(
                 Organization.name == valid.name,
-                Organization.parent_organization == valid.parent_organization
+                Organization.parent_organization == None
             )
         ).first()
         if existing_entry:
@@ -237,6 +258,42 @@ def create_template(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="A Tenant with this name already exists under the same service provider.",
             )
+        def parse_float(val):
+            if val == "":
+                return None
+            if isinstance(val, float):
+                return val
+            try:
+                return float(val)
+            except (TypeError, ValueError):
+                raise HTTPException(status_code=400, detail="Latitude/Longitude must be a float or null.")
+        
+        org_geolocation = None
+        tenant_address = None
+        if valid.country is not None and valid.city is not None:
+            tenant_address = Address(
+                country = valid.country,
+                city = valid.city,
+                sub_city = valid.sub_city,
+                woreda = valid.woreda
+            )
+            session.add(tenant_address)
+            session.commit()
+            session.refresh(tenant_address)
+
+        latitude = parse_float(valid.latitude)
+        longitude = parse_float(valid.longitude)
+        if latitude is not None and longitude is not None:
+            org_geolocation = Geolocation(
+                name=f"{valid.name} location",
+                address_id=tenant_address.id,
+                latitude = latitude,
+                longitude =  longitude,
+            )
+            session.add(org_geolocation)
+            session.commit()
+            session.refresh(org_geolocation)
+
         hashed_tenant_name = get_tenant_hash(valid.name) 
         tenant = Organization(
             name = valid.name,
@@ -246,7 +303,10 @@ def create_template(
             logo_image=valid.logo_image,
             organization_type=OrganizationType.company.value,
             tenant_domain = f"{Domain}/{hashed_tenant_name}",
-            parent_organization = service_provider
+            parent_organization = None,
+            landmark = valid.landmark,
+            address = tenant_address.id if tenant_address else None,
+            geolocation = org_geolocation.id if org_geolocation else None
         )
         session.add(tenant)
         session.commit()
@@ -384,8 +444,7 @@ def create_template(
 def update_template(
     session: SessionDep, 
     current_user: UserDep,
-    tenant: str,
-    valid: TemplateView,
+    valid: UpdateTemplateView,
 ):
     try:
         if not check_permission(
@@ -395,46 +454,142 @@ def update_template(
                 status_code=403, detail="You Do not have the required privilege"
             )
         organization_ids = get_organization_ids_by_scope_group(session, current_user)
-        selected_entry = session.exec(
+        selected_tenant = session.exec(
             select(db_model).where(db_model.id.in_(organization_ids), db_model.id == valid.id)
         ).first()
-        print("fetched selected entry", selected_entry)
-        if not selected_entry:
+        print("the selected tenant is ", selected_tenant)
+        if not selected_tenant:
             raise HTTPException(status_code=404, detail=f"{endpoint_name} not found")
-        
-        selected_org = session.exec(select(Organization).where(Organization.id == selected_entry.id)).first() 
 
-        selected_org.name = valid.name
-        selected_org.owner_name = valid.owner_name
-        selected_org.description= valid.description
-        selected_org.logo_image=valid.logo_image
-        selected_org.organization_type=OrganizationType.company.value
-        selected_org.parent_organization = valid.parent_organization
-        # selected_org.address = valid.address
+        def parse_float(val):
+            if val == "":
+                return None
+            if isinstance(val, float):
+                return val
+            try:
+                return float(val)
+            except (TypeError, ValueError):
+                raise HTTPException(status_code=400, detail="Latitude/Longitude must be a float or null.")
+
+        latitude = parse_float(valid.latitude)
+        longitude = parse_float(valid.longitude)
+        new_tenant_geolocation = None
+        new_tenant_address = None
+        if valid.country is not None and valid.city is not None:
+            exisitng_tenant_address = session.exec(select(Address).where(Address.id == selected_tenant.address)).first()  
+            if exisitng_tenant_address:
+                if valid.country:
+                    exisitng_tenant_address.country = valid.country
+                if valid.city:
+                    exisitng_tenant_address.city = valid.city,
+                if valid.sub_city:
+                    exisitng_tenant_address.sub_city = valid.sub_city,
+                if valid.woreda:
+                    exisitng_tenant_address.woreda = valid.woreda
+            else:
+                new_tenant_address = Address(
+                    country = valid.country,
+                    city = valid.city,
+                    sub_city = valid.sub_city,
+                    woreda = valid.woreda
+                )
+                session.add(new_tenant_address)
+                session.commit()
+                session.refresh(new_tenant_address)
+            
+        if latitude is not None and longitude is not None:  
+            exisitng_tenant_geolocation = session.exec(select(Geolocation).where(Geolocation.id == selected_tenant.geolocation)).first()  
+            if exisitng_tenant_geolocation:
+                if valid.latitude:
+                    exisitng_tenant_geolocation.latitude = latitude,
+                if valid.longitude:
+                    exisitng_tenant_geolocation.longitude = longitude
+                    
+                session.add(exisitng_tenant_geolocation)
+                session.commit()            
+            else:
+                new_tenant_geolocation = Geolocation(
+                    name = f"{valid.name} location",
+                    latitude = latitude,
+                    longitude = longitude,
+                    address = new_tenant_address.id if new_tenant_address else exisitng_tenant_address.id,
+
+                )
+                session.add(new_tenant_geolocation)
+                session.commit()
+                session.refresh(new_tenant_geolocation)
+                selected_tenant.geolocation = new_tenant_geolocation.id
+
+        selected_tenant.name = valid.name
+        selected_tenant.owner_name = valid.owner_name
+        selected_tenant.description= valid.description
+        selected_tenant.logo_image=valid.logo_image
+        # selected_tenant.organization_type=OrganizationType.company.value
+        # selected_tenant.parent_organization = None
+        selected_tenant.address = new_tenant_address.id if new_tenant_address else exisitng_tenant_address.id
+        selected_tenant.geolocation = new_tenant_geolocation.id if new_tenant_geolocation else exisitng_tenant_geolocation.id
+        if valid.landmark:
+            selected_tenant.landmark = valid.landmark
     
-        session.add(selected_org)
+        session.add(selected_tenant)
         session.commit()
-        session.refresh(selected_org)
+        session.refresh(selected_tenant)
         return {"message": f"{endpoint_name} Updated successfully"}
-    
+
     except HTTPException as http_exc:
         raise http_exc
     except Exception:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Something went wrong")
 
-@tr.put(endpoint['archive']+ "/{id}")
-def archive_template(
+# @tr.put(endpoint['archive']+ "/{id}")
+# def archive_template(
+#     session: SessionDep, 
+#     current_user: UserDep,
+#     id: int
+# ) :
+#     """
+#     Soft delete/ archive (inactive) a tenant organization and all its related records.
+#     """
+#     try:
+#         if not check_permission(
+#             session, "Update", role_modules['archive'], current_user
+#             ):
+#             raise HTTPException(
+#                 status_code=403, detail="You Do not have the required privilege"
+#             )
+#         organization_ids = get_organization_ids_by_scope_group(session, current_user)
+#         selected_entry = session.exec(
+#             select(db_model).where(db_model.id.in_(organization_ids), db_model.id == id)
+#         ).first()
+#         print("tennat is found and have the status of:::::::", selected_entry.active)
+
+#         if not selected_entry:
+#             raise HTTPException(status_code=404, detail=f"{endpoint_name} not found")
+        
+#         if selected_entry.active == "active":
+#             selected_entry.active = ActiveStatus.inactive
+#             session.commit()
+
+#         return {"message": f"{endpoint_name} archived successfully"}
+#     except HTTPException as http_exc:
+#         raise http_exc
+#     except Exception:
+#         traceback.print_exc()
+#         raise HTTPException(status_code=500, detail="Something went wrong")
+
+@tr.put(endpoint['activate']+ "/{id}")
+def active_template(
     session: SessionDep, 
     current_user: UserDep,
     id: int
 ) :
     """
-    Soft delete/ archive (inactive) a tenant organization and all its related records.
+    Active/ inactive a tenant organization and all its related records.
     """
     try:
         if not check_permission(
-            session, "Update", role_modules['archive'], current_user
+            session, "Update", role_modules['activate'], current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
@@ -446,17 +601,25 @@ def archive_template(
 
         if not selected_entry:
             raise HTTPException(status_code=404, detail=f"{endpoint_name} not found")
-        
-        selected_entry.active = False
-        session.commit()
+        if selected_entry.active == "active":
+            selected_entry.active = ActiveStatus.inactive
+            session.commit()
+            session.refresh(selected_entry)
+            print("Tenant has been Deactivated")
+        else:
+            selected_entry.active = ActiveStatus.active
+            session.commit()
+            session.refresh(selected_entry)
+            print("Tenant has been Activated")
 
-        return {"message": f"{endpoint_name} archived successfully"}
+    
+        return {"message": f"{endpoint_name} Status changed successfully"}
     except HTTPException as http_exc:
         raise http_exc
     except Exception:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Something went wrong")
-    
+
 @tr.delete(endpoint['delete']+ "/{id}")
 async def delete_tenant(
     session: SessionDep,

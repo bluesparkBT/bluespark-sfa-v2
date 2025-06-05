@@ -223,10 +223,22 @@ def get_template(
         if not entry:
             raise HTTPException(status_code=404, detail="User not found")
               
+        if not tenant or tenant.lower() == "provider":
+            service_provider = session.exec(select(Organization).where(Organization.organization_type == "Service Provider")).first()
+            tenant_name = service_provider.name
+        else:
+            current_tenant = session.exec(
+                select(Organization).where(Organization.tenant_hashed == tenant)
+            ).first()
+            if not current_tenant:
+                raise HTTPException(status_code=404, detail="Tenant not found")
+
+            tenant_name = current_tenant.name
+            
         data =  {
             "id": entry.id,
             "full_name": entry.full_name,
-            "username": entry.username,
+            "username": extract_username(entry.username, tenant_name),
             "email": entry.email,
             "phone_number": entry.phone_number,
             "organization": entry.organization,
@@ -274,6 +286,7 @@ def get_template_form(
             "phone_number": "",
             "role": fetch_role_id_and_name(session, current_user),
             "scope_group": fetch_scope_group_id_and_name(session, current_user),
+            "organization": fetch_organization_id_and_name(session, current_user),
             "gender": {i.value: i.value for i in Gender},
             # "salary": 0,
             # "position": "",            
@@ -292,6 +305,7 @@ def get_template_form(
             del html_types['organization']
             del html_types['scope']
             del html_types['manager']
+            del form_structure['organization']
 
         return {"data": form_structure, "html_types": html_types}
 

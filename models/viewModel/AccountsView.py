@@ -103,10 +103,30 @@ class TenantView(BaseModel):
     owner_name: Annotated [ str, AfterValidator( validate_name) ]
     logo_image: Optional[str]
     description: Annotated [ str, AfterValidator( validate_name) ]    
-    parent_organization: Optional[int] = None
-    address: Optional[int] = None
-    # geolocation_id: Optional[int] = None
+    # parent_organization: Optional[int] = None
+    country: Optional[str] = None
+    city: Optional[str] = None
+    sub_city: Optional[str] = None
+    woreda: Optional[str] = None
+    landmark:Optional[str] = None
+    latitude: Optional[int | str] = None
+    longitude: Optional[int | str] = None
 
+class UpdateTenantView(BaseModel):
+    id: Optional[int]
+    name: Annotated [ str, AfterValidator( validate_name) ]
+    owner_name: Annotated [ str, AfterValidator( validate_name) ]
+    logo_image: Optional[str]
+    description: Annotated [ str, AfterValidator( validate_name) ]    
+    # parent_organization: Optional[int] = None
+    country: Optional[str] = None
+    city: Optional[str] = None
+    sub_city: Optional[str] = None
+    woreda: Optional[str] = None
+    landmark:Optional[str] = None
+    latitude: Optional[int | str] = None
+    longitude: Optional[int | str] = None
+    
 class ScopeGroupView(BaseModel):
     name: Annotated [ str, AfterValidator( validate_name) ]
     hidden: List[int]
