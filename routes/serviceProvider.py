@@ -241,7 +241,7 @@ def create_template(
             )
             session.add(role_module_permission)
         session.commit()
-        
+                
         stored_username = add_organization_path(valid.username, service_provider.name)
         new_user = User(
             full_name=valid.full_name,
@@ -256,6 +256,28 @@ def create_template(
         session.add(new_user)
         session.commit()
         session.refresh(new_user)
+        
+        role = Role(
+            name="Limited Super Admin",
+            organization = service_provider.id
+        )
+        session.add(role)
+        session.commit()
+        session.refresh(role)
+
+        # List of modules the Super Admin should have access to
+        modules_to_grant = [
+            modules.tenant_management.value,
+        ]
+        for module in modules_to_grant: 
+            role_module_permission= RoleModulePermission(
+                role=role.id,
+                module=module,
+                access_policy=AccessPolicy.manage
+            )
+            session.add(role_module_permission)
+        session.commit()
+        session.refresh()
 
         return {"message": "Superadmin created successfully"}
     except Exception as e:
