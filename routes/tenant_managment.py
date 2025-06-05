@@ -168,7 +168,6 @@ def get_by_Id_template(
             "description": entry.description,
             "logo_image": entry.logo_image,
             "organization_type": entry.organization_type,
-            "inheritance_group": entry.inheritance_group,
             "address": entry.address,
             "landmark": entry.landmark,
             "latitude": entry.geolocation.latitude if entry.geolocation else "",
@@ -202,7 +201,6 @@ async def get_tenant_form_fields(
             "owner_name": "",
             "description": "",
             "logo_image": "",
-            "inheritance_group": fetch_inheritance_group_id_and_name(session,current_user),
             "address": fetch_address_id_and_name(session,current_user),
             "landmark": "",
             "latitude": "",
@@ -213,6 +211,7 @@ async def get_tenant_form_fields(
         del html_types['parent_organization']
         del html_types['parent_id']
         del html_types['organization_type']
+        del html_types['inheritance_group']
 
         return {"data": tenant_data, "html_types": html_types}
     except HTTPException as http_exc:
@@ -239,7 +238,7 @@ def create_template(
         existing_entry = session.exec(
             select(Organization).where(
                 Organization.name == valid.name,
-                Organization.parent_organization == valid.parent_organization
+                Organization.parent_organization == None
             )
         ).first()
         if existing_entry:
@@ -256,7 +255,7 @@ def create_template(
             logo_image=valid.logo_image,
             organization_type=OrganizationType.company.value,
             tenant_domain = f"{Domain}/{hashed_tenant_name}",
-            parent_organization = service_provider
+            parent_organization = None
         )
         session.add(tenant)
         session.commit()
@@ -397,7 +396,7 @@ def update_template(
         selected_org.description= valid.description
         selected_org.logo_image=valid.logo_image
         selected_org.organization_type=OrganizationType.company.value
-        selected_org.parent_organization = valid.parent_organization
+        selected_org.parent_organization = None
         # selected_org.address = valid.address
     
         session.add(selected_org)

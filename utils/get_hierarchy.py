@@ -48,7 +48,7 @@ def get_organization_ids_by_scope_group(session, current_user) -> List[int]:
     return organization_ids
 
 
-def get_child_organization(session: SessionDep, organization: int , max_depth = None, children_key="children", scope_organizations=[]):
+def get_child_organization(session: SessionDep, organization = None , max_depth = None, children_key="children", scope_organizations=[]):
     """
     Fetch all child organizations (descendants) from the database.
     """

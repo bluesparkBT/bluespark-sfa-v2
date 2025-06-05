@@ -182,6 +182,7 @@ class User(SQLModel, table=True):
     id_number: Optional[str] = Field(default=None)    
     address: Optional[int] = Field(default=None, foreign_key="address.id", index=True)
     hashedPassword: str
+    otp: Optional[str] = Field(default=None)
 
 class ActionType(str, Enum):
     approve = "Approve"
