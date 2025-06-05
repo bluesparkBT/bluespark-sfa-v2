@@ -68,7 +68,7 @@ def get_child_organization(session: SessionDep, organization: int , max_depth = 
         parent_org = session.exec(select(Organization).where(Organization.id == org.parent_organization)).first()  
     else:
         parent_org = None
-    print(organization, children)
+    print(organization, [child.id for child in children])
     return {
             'id': organization,
             'name': org.name, 
