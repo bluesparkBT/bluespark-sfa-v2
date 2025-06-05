@@ -1,7 +1,7 @@
 from pydantic import BaseModel, AfterValidator
 from typing import Optional, Annotated
 from enum import Enum
-from utils.util_functions import validate_name, validate_email
+from utils.util_functions import validate_name, validate_email,validate_phone_number
 
 class POSStatus(str, Enum):
     ACTIVE = "Active"
@@ -16,7 +16,7 @@ class PointOfSaleView(BaseModel):
     
     status: Annotated[POSStatus, AfterValidator(validate_status)]
     registered_on: str
-    organization: int
+    # organization: int
     outlet_id: Optional[int]
     walk_in_customer_id: Optional[int]
 
@@ -24,7 +24,7 @@ class UpdatePointOfSaleView(BaseModel):
     id: Optional[int]
     status: Annotated[POSStatus, AfterValidator(validate_status)]
     registered_on: str
-    organization: int
+    # organization: int
     outlet_id: Optional[int]
     walk_in_customer_id: Optional[int]
 
@@ -37,20 +37,28 @@ class OutletView(BaseModel):
     phone: str
     email: str
     location_id: int
+    organization: int
+
 
 class UpdateOutletView(BaseModel):
     id: Optional[int]
     name: Annotated[str, AfterValidator(validate_name)]
     channel: str
     tin: str
-    phone: str
+    phone: Annotated[str, AfterValidator(validate_phone_number)]
     email: str
+    organization: int
+
     location_id: int   
+    organization: int
+
 
 class WalkInCustomerView(BaseModel):
     name: Annotated[str, AfterValidator(validate_name)]
     email: Annotated[Optional[str], AfterValidator(validate_email)]
+
     location_id: Optional[int]
+    organization: int
     route_id: Optional[int]
     territoy_id: Optional[int]
 
@@ -59,6 +67,7 @@ class UpdateWalkInCustomerView(BaseModel):
     name: Annotated[str, AfterValidator(validate_name)]
     email: Annotated[Optional[str], AfterValidator(validate_email)]
     location_id: Optional[int]
+    organization: int
     route_id: Optional[int]
     territoy_id: Optional[int]
 

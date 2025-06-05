@@ -9,7 +9,7 @@ from models.PointOfSale import WalkInCustomer
 from models.viewModel.pointOfSaleView import WalkInCustomerView as TemplateView ,  UpdateWalkInCustomerView as TemplateViews 
 from utils.auth_util import get_current_user, check_permission, check_permission_and_scope
 from utils.get_hierarchy import get_organization_ids_by_scope_group
-from utils.form_db_fetch import fetch_category_id_and_name, fetch_organization_id_and_name, fetch_id_and_name
+from utils.form_db_fetch import fetch_organization_id_and_name, fetch_address_id_and_name, fetch_route_id_and_name,fetch_territory_id_and_name
 from sqlmodel import SQLModel, Field, Session, select
 from datetime import date
 import traceback
@@ -85,6 +85,37 @@ def get_walk_in_customer_by_id(
             raise HTTPException(status_code=404, detail=f"{endpoint_name} not found")
 
         return entry
+
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Something went wrong")
+
+
+@c.get (endpoint['get_form'])
+def walk_in_customer_form(
+     tenant: str,
+    session: SessionDep,
+    current_user: UserDep,   
+):
+    try:
+        if not check_permission(
+            session, "Create",role_modules['get'], current_user
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
+        form_structure = {
+            "id": "",
+            "name": "",
+            "email": "",
+            "location": fetch_address_id_and_name(session,current_user),
+            "route":fetch_route_id_and_name(session,current_user) ,
+            "territory":fetch_territory_id_and_name(session,current_user),
+            "organization": fetch_organization_id_and_name(session,current_user)
+        }
+        return {"data": form_structure, "html_types": get_html_types("walk_in")}
 
     except HTTPException as http_exc:
         raise http_exc

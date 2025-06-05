@@ -8,8 +8,8 @@ class ClassificationView(BaseModel):
     name: Annotated[str, AfterValidator(validate_name)]
     organization: int
     point_of_sale_id: Optional[int] = None
-    territory_id: Optional[str] = None
-    route_id: Optional[str] = None
+    territory_id: Optional[int] = None
+    route_id: Optional[int] = None
     customer_discounts: Optional[int] = None
     description: Optional[Annotated[str, AfterValidator(validate_name)]]
 
@@ -18,8 +18,8 @@ class updateClassificationView(BaseModel):
     name: Annotated[str, AfterValidator(validate_name)]
     organization: int
     point_of_sale: Optional[int] = None
-    territory: Optional[str] = None
-    route: Optional[str] = None
+    territory: Optional[int] = None
+    route: Optional[int] = None
     customer_discount: Optional[int] = None
     description: Optional[Annotated[str, AfterValidator(validate_name)]]
 

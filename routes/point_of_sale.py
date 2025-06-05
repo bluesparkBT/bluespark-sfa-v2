@@ -12,7 +12,10 @@ from models.viewModel.pointOfSaleView import PointOfSaleView as TemplateView , U
 
 from utils.model_converter_util import get_html_types
 from utils.auth_util import check_permission, check_permission_and_scope
-from utils.form_db_fetch import get_organization_ids_by_scope_group
+from utils.form_db_fetch import( get_organization_ids_by_scope_group,
+                                fetch_wakl_in_customer_id_and_name,
+                                fetch_outlet_id_and_name
+                                ) 
 
 # Update router name
 PointOfSaleRouter = c = APIRouter()
@@ -91,6 +94,37 @@ def get_point_of_sale_by_id(
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Something went wrong")
 
+
+
+@c.get (endpoint['get_form'])
+def point_of_sale_form(
+    tenant: str,
+    session: SessionDep,
+    current_user: UserDep,   
+):
+    try:
+        if not check_permission(
+            session, "Create",role_modules['get'], current_user
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )
+        form_structure = {
+            "id": "",
+            "status": "",
+            "organization": "",
+            "outlet": fetch_outlet_id_and_name(session, current_user),
+            "walk_in_customer": fetch_wakl_in_customer_id_and_name(session, current_user),
+   
+      } 
+
+        return {"data": form_structure, "html_types": get_html_types("inheritance")}
+
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Something went wrong")
 
 @c.post(endpoint['create'])
 def create_point_of_sale(

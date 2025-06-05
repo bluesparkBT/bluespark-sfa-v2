@@ -2,7 +2,8 @@ from typing import Optional, List
 from sqlmodel import SQLModel, Field, Relationship
 from datetime import date
 from models.Account import Organization
-from models.Product_Category import ClassificationLink
+from models.Product_Category import ClassificationLink,InheritanceGroup
+
 
 class ClassificationGroup(SQLModel, table=True):
     __tablename__ = "classification_group"
@@ -26,6 +27,7 @@ class CustomerDiscount(SQLModel, table=True):
     # Defines the validity period for the discount
     start_date: date = Field()
     end_date: date = Field()
+
     # The discount amount or percentage applied to customers of the classification.
     discount: float = Field(description="Discount amount or percentage applicable.")
 

@@ -126,13 +126,54 @@ MODEL_HTML_TYPES = {
     },
     "classification":{
         "id": "hidden",
-        "name": "",
+        "name": "text",
         "organization": "select",
         "point_of_sale": "select",
         "route":"select",
         "territory":"select",
         "description": "textarea",
         "customer_discount": "select",
+    },
+    "outlet":{
+            "id": "hidden",
+            "name": "text",
+            "channe":"Select" ,
+            "tin":"text",
+            "phone": "text",
+            "email": "txt",
+            "location": "Select",
+            "organization": "select"
+   } ,
+
+    "territory": {
+
+            "id": "hidden",
+            "country": "text",
+            "name": "text",
+            "description": "textarea",
+            "organization": "select",          
+    },
+    "customer_discount":{
+            "id": "",
+            "start_date": "",
+            "end_date": "",
+            "discount": "",            
+    },
+    "walk_in":{
+            "id": "hidden",
+            "name": "text",
+            "email": "text",
+            "location":"select",
+            "route":"select",
+            "territory":"select",
+            "organization":"select" ,
+    },
+    "route": {
+            "id": "hidden",
+            "name": "text",
+            "territory": "select",
+            "description": "textarea",
+            "organization": "select"      
     }
 
 }

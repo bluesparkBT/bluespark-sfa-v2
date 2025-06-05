@@ -97,7 +97,7 @@ def get_route_by_id(
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Something went wrong")
 
-@c.get("/route-form")
+@c.get(endpoint["get_form"])
 async def get_form_fields_for_route(
     session: SessionDep, current_user: UserDep
 ):

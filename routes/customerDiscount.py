@@ -93,6 +93,29 @@ def get_customer_discount_by_id(
         raise HTTPException(status_code=500, detail="Something went wrong")
 
 
+@c.get("/customer-discount-form")
+async def get_form_customer_discount(
+    session: SessionDep, current_user: UserDep
+):
+    try:
+        if not check_permission(
+            session, "Create",role_modules['get_form'], current_user
+            ):
+            raise HTTPException(
+                status_code=403, detail="You Do not have the required privilege"
+            )   
+
+        classification_data = {
+            "id": "",
+            "start_date": "",
+            "end_date": "",
+            "discount": "",
+    }
+        return {"data": classification_data, "html_types": get_html_types("customer_discount")}
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=400, detail=str(e))
+
 @c.post(endpoint['create'])
 def create_customer_discount(
     session: SessionDep,

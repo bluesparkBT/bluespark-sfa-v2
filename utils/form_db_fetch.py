@@ -6,7 +6,7 @@ from models.Account import (Organization, User, Role, ScopeGroup, ScopeGroupLink
 from models.Address import Address, Geolocation
 from models.Product_Category import Category, Product, InheritanceGroup, ProductLink, CategoryLink
 from models.Marketing import ClassificationGroup, CustomerDiscount
-
+from models.PointOfSale import PointOfSale, Outlet, WalkInCustomer
 from models.RoutesAndVisits import Route, Territory
 #from models.Warehouse import Stock, StockType, Warehouse, Vehicle
 from utils.get_hierarchy import get_organization_ids_by_scope_group
@@ -65,18 +65,66 @@ def fetch_territory_id_and_name(session: SessionDep, current_user: UserDep):
     ).all()
 
     territorys = {row[0]: row[1] for row in territory_rows}
-    return territorys    
+    return territorys 
+   
 def fetch_discount_id_and_name(session: SessionDep, current_user: UserDep):
     organization_ids = get_organization_ids_by_scope_group(session, current_user)
 
     discount_rows = session.exec(
-        select(CustomerDiscount.id, CustomerDiscount.name)
-        .where(CustomerDiscount.id.in_(organization_ids))
+        select(CustomerDiscount.id)
+        # .where(CustomerDiscount.organization.in_(organization_ids))
     ).all()
 
-    discounts = {row[0]: row[1] for row in discount_rows}
-    return discounts  
+    # Ensure the function returns only a list of IDs
+    discount_ids = [row for row in discount_rows if row is not None]
 
+    return discount_ids
+
+
+
+
+# def fetch_discount_id_and_name(session: SessionDep, current_user: UserDep):
+#     organization_ids = get_organization_ids_by_scope_group(session, current_user)
+
+#     discount_rows = session.exec(
+#         select(CustomerDiscount.id, CustomerDiscount.name)
+#         .where(CustomerDiscount.id.in_(organization_ids))
+#     ).all()
+
+#     discounts = {row[0]: row[1] for row in discount_rows}
+#     return discounts 
+# def fetch_role_id_and_name(session: SessionDep, current_user: UserDep):
+#     organization_ids = get_organization_ids_by_scope_group(session, current_user)
+
+#     role_rows = session.exec(
+#         select(Role.id, Role.name)
+#         .where(Role.organization.in_(organization_ids))
+#     ).all()
+
+#     roles = {row[0]: row[1] for row in role_rows}
+#     return roles
+
+def fetch_outlet_id_and_name(session: SessionDep, current_user: UserDep):
+    organization_ids = get_organization_ids_by_scope_group(session, current_user)
+
+    outlet_rows = session.exec(
+        select(Outlet.id, Outlet.name)
+        .where(Outlet.organization.in_(organization_ids))
+    ).all()
+
+    outlets = {row[0]: row[1] for row in outlet_rows}
+    return outlets
+
+def fetch_wakl_in_customer_id_and_name(session: SessionDep, current_user: UserDep):
+    organization_ids = get_organization_ids_by_scope_group(session, current_user)
+
+    wakl_in_customer_rows = session.exec(
+        select(WalkInCustomer.id, WalkInCustomer.name)
+        .where(WalkInCustomer.organization.in_(organization_ids))
+    ).all()
+
+    wakl_in_customers = {row[0]: row[1] for row in wakl_in_customer_rows }
+    return wakl_in_customers
 
 def fetch_role_id_and_name(session: SessionDep, current_user: UserDep):
     organization_ids = get_organization_ids_by_scope_group(session, current_user)
@@ -201,18 +249,26 @@ def fetch_classification_id_and_name(session: SessionDep, current_user: UserDep)
 #     print(customer_discount)
 
 #     return customer_discount
-
-
-def fetch_point_of_sale_id_and_name(session: SessionDep, current_user: UserDep):
+def fetch_point_of_sale_ids(session: SessionDep, current_user: UserDep):
     organization_ids = get_organization_ids_by_scope_group(session, current_user)
+    pos_rows = session.exec(select(PointOfSale.id).where(PointOfSale.organization.in_(organization_ids))).all()
+    
+    # Ensure extracted values are clean integers
+    point_of_sale_ids = [row for row in pos_rows if row is not None]
+    
+    return point_of_sale_ids
 
-    pos_row = session.exec(
-        select(Organization.point_of_sale_id, Organization.point_of_sale_name)
-        .where(Organization.id.in_(organization_ids))
-    ).all()
 
-    pos = {row[0]: row[1] for row in pos_row if row[0] is not None}
-    return pos 
+# def fetch_point_of_sale_id_and_name(session: SessionDep, current_user: UserDep):
+#     organization_ids = get_organization_ids_by_scope_group(session, current_user)
+
+#     pos_row = session.exec(
+#         select(PointOfSale.id)
+#         .where(PointOfSale.organization.in_(organization_ids))
+#     ).all()
+
+#     pos = {row[0]: row[1] for row in pos_row if row[0] is not None}
+#     return pos 
 
 # def fetch_warehouse_id_and_name(session: SessionDep, current_user: UserDep):
 #     organization_ids = get_organization_ids_by_scope_group(session, current_user)

@@ -46,6 +46,7 @@ modules_to_grant = [
     modules.administrative.value,
     modules.address.value,
     modules.category.value,
+    modules.classification.value,
     modules.dashboard.value,
     modules.deposit.value,
     modules.finance.value,

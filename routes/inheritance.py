@@ -10,7 +10,7 @@ from models.viewModel.InheritanceView import AddInheritanceView as AddTemplateVi
 from utils.get_hierarchy import get_organization_ids_by_scope_group
 
 from utils.model_converter_util import get_html_types
-from utils.form_db_fetch import fetch_category_id_and_name, fetch_product_id_and_name, fetch_role_id_and_name, fetch_classification_id_and_name, fetch_point_of_sale_id_and_name
+from utils.form_db_fetch import fetch_category_id_and_name, fetch_product_id_and_name, fetch_role_id_and_name, fetch_classification_id_and_name, fetch_point_of_sale_ids
 import traceback
 from models import InheritanceGroup
 
@@ -85,13 +85,12 @@ def inheritance_form(
     current_user: UserDep,   
 ):
     try:
-        # Check permission
         if not check_permission(
-            session, "Create",["Administrative", "Inheritance"], current_user
+            session, "Create",role_modules['get'], current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
-            )   
+            )
 
         form_structure = {
             "id": "",

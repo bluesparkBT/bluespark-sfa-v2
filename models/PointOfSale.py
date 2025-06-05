@@ -8,14 +8,25 @@ class POSStatus(str, Enum):
     ACTIVE = "Active"
     INACTIVE = "Inactive"
 
+class ChannelType(Enum):
+    SUQ = "Suq"
+    MINI_MARKET = "MiniMarket"
+    SUPERMARKET = "Supermarket"
+    HOTEL = "Hotel"
+    WHOLESALE = "Wholesale"
+    FRUIT_HOUSE = "FruitHouse"
+    BURGER_HOUSE_PIZZERIA = "BurgerHousePizzeria"
+    CAFE_RESTAURANT = "CafeRestaurant"
+    PHARMACY = "Pharmacy"
+    
 class PointOfSale(SQLModel, table=True):
     __tablename__ = "point_of_sale"
 
     id: Optional[int] = Field(default=None, primary_key=True)
     status: POSStatus  # Enum status
     registered_on: str = Field(index=True)  # Registration date in text format
-    organization: int = Field(foreign_key="organization.id", ondelete="CASCADE")  # Reference to Organization
     # default_credit_group_id: int = Field(foreign_key="credit_group.id")  # Reference to Default Credit Group
+    organization: int = Field(foreign_key="organization.id", ondelete="CASCADE")  # Reference to Organization
 
     # Optional references
     outlet_id: Optional[int] = Field(default=None, foreign_key="outlet.id")
@@ -36,6 +47,7 @@ class Outlet(SQLModel, table=True):
     phone: str  # Phone number
     email: str = Field(index=True)  # Email address
     location_id: int = Field(foreign_key="geolocation.id")  # Reference to geolocation
+    organization: int = Field(foreign_key="organization.id", ondelete="CASCADE")  # Reference to Organization
 
     # Relationship with PointOfSale
     point_of_sale: Optional[PointOfSale] = Relationship(back_populates="outlet")
@@ -53,3 +65,4 @@ class WalkInCustomer(SQLModel, table=True):
   # Optional Reference to Location
     # Relationship with PointOfSale
     point_of_sale: Optional[PointOfSale] = Relationship(back_populates="walk_in_customer")
+    organization: int = Field(foreign_key="organization.id", ondelete="CASCADE")  # Reference to Organization
