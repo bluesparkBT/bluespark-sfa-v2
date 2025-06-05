@@ -127,10 +127,8 @@ async def form_scope_organization(
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-        if tenant == "provider":
-            heirarchy = get_heirarchy(session, None, None, current_user, children_key="children")
-        else:
-            heirarchy = get_heirarchy(session, current_user.organization, None, current_user, children_key="children")
+        
+        heirarchy = get_heirarchy(session, current_user.organization, None, current_user, children_key="children")
             
         return {"data": {'id': "", 'name': "", "hidden": [heirarchy]} , "html_types": get_html_types("scope_group")}
         
