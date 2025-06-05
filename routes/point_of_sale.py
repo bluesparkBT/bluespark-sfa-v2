@@ -1,27 +1,26 @@
-from typing import Annotated, List, Dict, Any, Optional, Union
-from db import SECRET_KEY, get_session
-from sqlmodel import Session, select
-from fastapi import APIRouter, HTTPException, Body, status, Depends
-from db import get_session
-from utils.model_converter_util import get_html_types
-from models.Account import User, ScopeGroup,ScopeGroupLink, Organization, Role
-from models.Marketing import CustomerDiscount
-from utils.util_functions import validate_name
-from models.viewModel.ClassificationView import CustomerDiscountView as TemplateView ,  UpdateCustomerDiscountView as TemplateViews 
-from utils.auth_util import get_current_user, check_permission, check_permission_and_scope
-from utils.get_hierarchy import get_organization_ids_by_scope_group
-from utils.form_db_fetch import fetch_category_id_and_name, fetch_organization_id_and_name, fetch_id_and_name
-from sqlmodel import SQLModel, Field, Session, select
-from datetime import date
 import traceback
+from fastapi import Depends, HTTPException, Body, APIRouter
+from typing import Annotated, Optional
+from fastapi.routing import APIRouter
+from sqlmodel import and_, select, Session
+from db import get_session
+from models.PointOfSale import PointOfSale
+from models.Utils import ErrorLog
+from utils.address_util import check_address
+from utils.auth_util import get_current_user
+from models.viewModel.pointOfSaleView import PointOfSaleView as TemplateView , UpdatePointOfSaleView as TemplateViews
+
+from utils.model_converter_util import get_html_types
+from utils.auth_util import check_permission, check_permission_and_scope
+from utils.form_db_fetch import get_organization_ids_by_scope_group
 
 # Update router name
-CustomerDiscountRouter = c = APIRouter()
+PointOfSaleRouter = c = APIRouter()
 SessionDep = Annotated[Session, Depends(get_session)]
 UserDep = Annotated[dict, Depends(get_current_user)]
 
-endpoint_name = "customer-discount"  # Update this
-db_model = CustomerDiscount  # Update this
+endpoint_name = "point-of-sale"  # Update this
+db_model = PointOfSale  # Update this
 
 endpoint = {
     "get": f"/get-{endpoint_name}",
@@ -33,18 +32,18 @@ endpoint = {
 }
 
 # Update role_modules
-role_modules = {   
-    "get": ["Administrative", "Classification"],
-    "get_form": ["Administrative", "Classification"],
-    "create": ["Administrative", "Classification"],
-    "update": ["Administrative", "Classification"],
-    "delete": ["Administrative", "Classification"],
+role_modules = {
+    "get": ["Administrative"],
+    "get_form": ["Administrative"],
+    "create": ["Administrative"],
+    "update": ["Administrative"],
+    "delete": ["Administrative"],
 }
 
 # CRUD Operations
 
 @c.get(endpoint['get'])
-def get_customer_discounts(
+def get_point_of_sales(
     session: SessionDep,
     current_user: UserDep,
     tenant: str
@@ -53,7 +52,7 @@ def get_customer_discounts(
         orgs_in_scope = check_permission_and_scope(session, "Read", role_modules['get'], current_user)
 
         entries_list = session.exec(
-            select(db_model)
+            select(db_model).where(db_model.organization.in_(orgs_in_scope["organization_ids"]))
         ).all()
 
         return entries_list
@@ -66,7 +65,7 @@ def get_customer_discounts(
 
 
 @c.get(endpoint['get_by_id'])
-def get_customer_discount_by_id(
+def get_point_of_sale_by_id(
     session: SessionDep,
     current_user: UserDep,
     tenant: str,
@@ -78,7 +77,7 @@ def get_customer_discount_by_id(
 
         organization_ids = get_organization_ids_by_scope_group(session, current_user)
         entry = session.exec(
-            select(db_model).where( db_model.id == id)
+            select(db_model).where(db_model.organization.in_(organization_ids), db_model.id == id)
         ).first()
 
         if not entry:
@@ -94,16 +93,15 @@ def get_customer_discount_by_id(
 
 
 @c.post(endpoint['create'])
-def create_customer_discount(
+def create_point_of_sale(
     session: SessionDep,
     tenant: str,
     current_user: UserDep,
     valid: TemplateView
 ):
     try:
-        # Ensure required fields are present
-        if valid.discount is None:
-            raise HTTPException(status_code=400, detail="Discount field is required")
+        if not check_permission(session, "Create", role_modules['create'], current_user):
+            raise HTTPException(status_code=403, detail="You do not have the required privilege")
 
         new_entry = db_model.model_validate(valid)
 
@@ -121,11 +119,11 @@ def create_customer_discount(
 
 
 @c.put(endpoint['update'])
-def update_customer_discount(
+def update_point_of_sale(
     session: SessionDep,
     tenant: str,
     current_user: UserDep,
-
+    id: int,
     valid: TemplateViews
 ):
     try:
@@ -138,9 +136,11 @@ def update_customer_discount(
             raise HTTPException(status_code=404, detail=f"{endpoint_name} not found")
 
         # Update fields
-        entry.start_date = valid.start_date
-        entry.end_date = valid.end_date
-        entry.discount = valid.discount
+        entry.status = valid.status
+        entry.registered_on = valid.registered_on
+        entry.organization = valid.organization
+        entry.outlet_id = valid.outlet_id
+        entry.walk_in_customer_id = valid.walk_in_customer_id
 
         session.add(entry)
         session.commit()
@@ -156,7 +156,7 @@ def update_customer_discount(
 
 
 @c.delete(endpoint['delete'])
-def delete_customer_discount(
+def delete_point_of_sale(
     session: SessionDep,
     tenant: str,
     current_user: UserDep,

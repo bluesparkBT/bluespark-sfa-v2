@@ -6,6 +6,8 @@ from models.Account import (Organization, User, Role, ScopeGroup, ScopeGroupLink
 from models.Address import Address, Geolocation
 from models.Product_Category import Category, Product, InheritanceGroup, ProductLink, CategoryLink
 from models.Marketing import ClassificationGroup, CustomerDiscount
+
+from models.RoutesAndVisits import Route, Territory
 #from models.Warehouse import Stock, StockType, Warehouse, Vehicle
 from utils.get_hierarchy import get_organization_ids_by_scope_group
 from utils.auth_util import get_current_user
@@ -43,6 +45,38 @@ def fetch_organization_id_and_name(session: SessionDep, current_user: UserDep):
 
     organizations = {row[0]: row[1] for row in organization_rows}
     return organizations
+
+def fetch_route_id_and_name(session: SessionDep, current_user: UserDep):
+    organization_ids = get_organization_ids_by_scope_group(session, current_user)
+
+    route_rows = session.exec(
+        select(Route.id, Route.name)
+        .where(Route.id.in_(organization_ids))
+    ).all()
+    routes = {row[0]: row[1] for row in route_rows}
+    return routes
+  
+def fetch_territory_id_and_name(session: SessionDep, current_user: UserDep):
+    organization_ids = get_organization_ids_by_scope_group(session, current_user)
+
+    territory_rows = session.exec(
+        select(Territory.id, Territory.name)
+        .where(Territory.id.in_(organization_ids))
+    ).all()
+
+    territorys = {row[0]: row[1] for row in territory_rows}
+    return territorys    
+def fetch_discount_id_and_name(session: SessionDep, current_user: UserDep):
+    organization_ids = get_organization_ids_by_scope_group(session, current_user)
+
+    discount_rows = session.exec(
+        select(CustomerDiscount.id, CustomerDiscount.name)
+        .where(CustomerDiscount.id.in_(organization_ids))
+    ).all()
+
+    discounts = {row[0]: row[1] for row in discount_rows}
+    return discounts  
+
 
 def fetch_role_id_and_name(session: SessionDep, current_user: UserDep):
     organization_ids = get_organization_ids_by_scope_group(session, current_user)
@@ -154,19 +188,19 @@ def fetch_classification_id_and_name(session: SessionDep, current_user: UserDep)
     classifications = {row[0]: row[1] for row in classification_row if row[0] is not None}
     return classifications
 
-def fetch_customer_discount_id_and_name(session: SessionDep, current_user: UserDep):
-    organization_ids = get_organization_ids_by_scope_group(session, current_user)
+# def fetch_customer_discount_id_and_name(session: SessionDep, current_user: UserDep):
+#     organization_ids = get_organization_ids_by_scope_group(session, current_user)
 
-    classification_row = session.exec(
-        select(CustomerDiscount.id, CustomerDiscount.discount)).all()
-        # .where(CustomerDiscount.organization.in_(organization_ids))
-    # ).all()
-    print(classification_row)
-    # customer_discount = {row[0]: str(row[1]) for row in classification_row if row[0] is not None}
-    customer_discount = {row[0]: row[1] for row in classification_row if row[0] is not None}
-    print(customer_discount)
+#     classification_row = session.exec(
+#         select(CustomerDiscount.id, CustomerDiscount.discount)).all()
+#         # .where(CustomerDiscount.organization.in_(organization_ids))
+#     # ).all()
+#     print(classification_row)
+#     # customer_discount = {row[0]: str(row[1]) for row in classification_row if row[0] is not None}
+#     customer_discount = {row[0]: row[1] for row in classification_row if row[0] is not None}
+#     print(customer_discount)
 
-    return customer_discount
+#     return customer_discount
 
 
 def fetch_point_of_sale_id_and_name(session: SessionDep, current_user: UserDep):

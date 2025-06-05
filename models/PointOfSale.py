@@ -1,7 +1,7 @@
 from typing import Optional, List
 from sqlmodel import SQLModel, Field, Relationship
 from enum import Enum
-from models.Product_Category import PointOfSaleLink
+from models.Product_Category import PointOfSaleLink,InheritanceGroup
 
 # Define Enum for status
 class POSStatus(str, Enum):

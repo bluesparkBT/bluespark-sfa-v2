@@ -5,9 +5,8 @@ from fastapi import APIRouter, HTTPException, Body, status, Depends
 from db import get_session
 from utils.model_converter_util import get_html_types
 from models.Account import User, ScopeGroup,ScopeGroupLink, Organization, Role
-from models.Marketing import CustomerDiscount
-from utils.util_functions import validate_name
-from models.viewModel.ClassificationView import CustomerDiscountView as TemplateView ,  UpdateCustomerDiscountView as TemplateViews 
+from models.PointOfSale import WalkInCustomer
+from models.viewModel.pointOfSaleView import WalkInCustomerView as TemplateView ,  UpdateWalkInCustomerView as TemplateViews 
 from utils.auth_util import get_current_user, check_permission, check_permission_and_scope
 from utils.get_hierarchy import get_organization_ids_by_scope_group
 from utils.form_db_fetch import fetch_category_id_and_name, fetch_organization_id_and_name, fetch_id_and_name
@@ -16,12 +15,12 @@ from datetime import date
 import traceback
 
 # Update router name
-CustomerDiscountRouter = c = APIRouter()
+WalkInCustomerRouter = c = APIRouter()
 SessionDep = Annotated[Session, Depends(get_session)]
 UserDep = Annotated[dict, Depends(get_current_user)]
 
-endpoint_name = "customer-discount"  # Update this
-db_model = CustomerDiscount  # Update this
+endpoint_name = "walk-in-customer"  # Update this
+db_model = WalkInCustomer  # Update this
 
 endpoint = {
     "get": f"/get-{endpoint_name}",
@@ -33,18 +32,18 @@ endpoint = {
 }
 
 # Update role_modules
-role_modules = {   
-    "get": ["Administrative", "Classification"],
-    "get_form": ["Administrative", "Classification"],
-    "create": ["Administrative", "Classification"],
-    "update": ["Administrative", "Classification"],
-    "delete": ["Administrative", "Classification"],
+role_modules = {
+    "get": ["Administrative"],
+    "get_form": ["Administrative"],
+    "create": ["Administrative"],
+    "update": ["Administrative"],
+    "delete": ["Administrative"],
 }
 
 # CRUD Operations
 
 @c.get(endpoint['get'])
-def get_customer_discounts(
+def get_walk_in_customers(
     session: SessionDep,
     current_user: UserDep,
     tenant: str
@@ -54,6 +53,7 @@ def get_customer_discounts(
 
         entries_list = session.exec(
             select(db_model)
+            # select(db_model).where(db_model.organization.in_(orgs_in_scope["organization_ids"]))
         ).all()
 
         return entries_list
@@ -66,7 +66,7 @@ def get_customer_discounts(
 
 
 @c.get(endpoint['get_by_id'])
-def get_customer_discount_by_id(
+def get_walk_in_customer_by_id(
     session: SessionDep,
     current_user: UserDep,
     tenant: str,
@@ -78,7 +78,7 @@ def get_customer_discount_by_id(
 
         organization_ids = get_organization_ids_by_scope_group(session, current_user)
         entry = session.exec(
-            select(db_model).where( db_model.id == id)
+            select(db_model).where(db_model.organization.in_(organization_ids), db_model.id == id)
         ).first()
 
         if not entry:
@@ -94,16 +94,15 @@ def get_customer_discount_by_id(
 
 
 @c.post(endpoint['create'])
-def create_customer_discount(
+def create_walk_in_customer(
     session: SessionDep,
     tenant: str,
     current_user: UserDep,
     valid: TemplateView
 ):
     try:
-        # Ensure required fields are present
-        if valid.discount is None:
-            raise HTTPException(status_code=400, detail="Discount field is required")
+        if not check_permission(session, "Update", role_modules['update'], current_user):
+            raise HTTPException(status_code=403, detail="You do not have the required privilege")
 
         new_entry = db_model.model_validate(valid)
 
@@ -121,26 +120,28 @@ def create_customer_discount(
 
 
 @c.put(endpoint['update'])
-def update_customer_discount(
+def update_walk_in_customer(
     session: SessionDep,
     tenant: str,
     current_user: UserDep,
-
+    id: int,
     valid: TemplateViews
 ):
     try:
         if not check_permission(session, "Update", role_modules['update'], current_user):
             raise HTTPException(status_code=403, detail="You do not have the required privilege")
 
-        entry = session.get(db_model, valid.id)
+        entry = session.get(db_model, id)
 
         if not entry:
             raise HTTPException(status_code=404, detail=f"{endpoint_name} not found")
 
         # Update fields
-        entry.start_date = valid.start_date
-        entry.end_date = valid.end_date
-        entry.discount = valid.discount
+        entry.name = valid.name
+        entry.email = valid.email
+        entry.location_id = valid.location_id
+        entry.route_id = valid.route_id
+        entry.territoy_id = valid.territoy_id
 
         session.add(entry)
         session.commit()
@@ -156,7 +157,7 @@ def update_customer_discount(
 
 
 @c.delete(endpoint['delete'])
-def delete_customer_discount(
+def delete_walk_in_customer(
     session: SessionDep,
     tenant: str,
     current_user: UserDep,

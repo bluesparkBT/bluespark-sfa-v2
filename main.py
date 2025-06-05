@@ -21,6 +21,11 @@ from routes.organizations import OrganizationRouter
 from routes.tenant_managment import TenantRouter
 from routes.classification import ClassificationRouter
 from routes.customerDiscount import CustomerDiscountRouter
+from routes.territory import TerritoryRouter
+from routes.route import RouteRouter
+from routes.point_of_sale import PointOfSaleRouter
+from routes.WalkInCustomer import WalkInCustomerRouter
+from routes.outlet import OutletRouter
 
 
 
@@ -84,6 +89,11 @@ app.include_router(OrganizationRouter, prefix="/{tenant}/organization", tags=["o
 app.include_router(ProductRouter, prefix="/{tenant}/product", tags=["product"])
 app.include_router(ClassificationRouter, prefix="/{tenant}/classification", tags=["classification"])
 app.include_router(CustomerDiscountRouter, prefix="/{tenant}/customer-discount", tags=["customer Discount"])
+app.include_router(TerritoryRouter, prefix="/{tenant}/territory", tags=["territory"])
+app.include_router(RouteRouter, prefix="/{tenant}/route", tags=["route"])
+app.include_router(PointOfSaleRouter, prefix="/{tenant}/point-of-sale", tags=["point of sale"])
+app.include_router(WalkInCustomerRouter, prefix="/{tenant}/walk-in-customer", tags=["walk in customer"])
+app.include_router(OutletRouter, prefix="/{tenant}/outlet", tags=["outlet"])
 
 app.include_router(RoleRouter, prefix="/{tenant}/role", tags=["role"])
 app.include_router(ScopeGroupRouter, prefix="/{tenant}", tags=["Scope Group"])

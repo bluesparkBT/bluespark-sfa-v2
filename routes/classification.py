@@ -255,7 +255,11 @@ from models.viewModel.ClassificationView import ClassificationView as TemplateVi
 from models.viewModel.ClassificationView import updateClassificationView as TemplateViews
 from utils.auth_util import get_current_user, check_permission, check_permission_and_scope
 from utils.get_hierarchy import get_organization_ids_by_scope_group
-from utils.form_db_fetch import fetch_category_id_and_name, fetch_organization_id_and_name, fetch_customer_discount_id_and_name
+from utils.form_db_fetch import (fetch_point_of_sale_id_and_name, 
+                                 fetch_organization_id_and_name, 
+                                 fetch_discount_id_and_name,
+                                 fetch_territory_id_and_name,
+                                 fetch_route_id_and_name)
 import traceback
 
 #Update router name
@@ -296,7 +300,8 @@ def get_template(
         orgs_in_scope = check_permission_and_scope(session, "Read", role_modules['get'], current_user)
         
         entries_list = session.exec(
-            select(ClassificationGroup)).all()
+            select(db_model).where(db_model.organization.in_(orgs_in_scope["organization_ids"]))
+            ).all()
         if not entries_list:
              raise HTTPException(status_code=404, detail=" classification not found")
 
@@ -370,12 +375,10 @@ async def get_form_fields_for_classification(
             "name": "",
             "description": "",
             "organization": fetch_organization_id_and_name(session, current_user),
-            # "point_of_sale": fetch_point_of_sale_id_and_name(session, current_user),
-            # "territory": fetch_territory_id_and_name(session, current_user),
-            "point_of_sale": "",
-            "territory":"",
-            "route":"",
-            "customer_discount": fetch_customer_discount_id_and_name(session, current_user)
+            "point_of_sale": fetch_point_of_sale_id_and_name(session, current_user),
+            "territory": fetch_territory_id_and_name(session, current_user),
+            "route":fetch_route_id_and_name(session, current_user),
+            "customer_discount": fetch_discount_id_and_name(session, current_user)
         }
 
         return {"data": classification_data, "html_types": get_html_types("classification")}
