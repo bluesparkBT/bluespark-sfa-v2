@@ -58,7 +58,7 @@ def get_child_organization(session: SessionDep, organization = None , max_depth 
 
     org = session.exec(select(Organization).where(Organization.id == organization)).first()  
     
-    if org.parent_organization:
+    if org and org.parent_organization:
         parent_org = session.exec(select(Organization).where(Organization.id == org.parent_organization)).first()  
     else:
         parent_org = None
