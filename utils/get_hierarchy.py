@@ -68,7 +68,7 @@ def get_child_organization(session: SessionDep, organization: int , max_depth = 
         parent_org = session.exec(select(Organization).where(Organization.id == org.parent_organization)).first()  
     else:
         parent_org = None
-    print(organization, [child.id for child in children])
+
     return {
             'id': organization,
             'name': org.name, 
@@ -96,8 +96,6 @@ def get_heirarchy(session: SessionDep, organization: int , max_depth, current_us
     scope_organizations = session.exec(select(Organization.id).where(Organization.parent_organization == organization)).all()
     
     [[scope_organizations.append(org.id), scope_organizations.extend(get_parent_organizations(session, org.id))] for org in user_scope_group.organizations]
-    
-    print(scope_organizations)
         
     heirarchy = get_child_organization(session, organization, max_depth, children_key, set(scope_organizations))
     
