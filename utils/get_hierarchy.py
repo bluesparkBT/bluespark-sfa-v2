@@ -63,6 +63,7 @@ def get_child_organization(session: SessionDep, organization: int , max_depth = 
         children = session.exec(
             select(Organization).where(Organization.parent_organization == None).where(Organization.organization_type != OrganizationType.service_provider)
         ).all()
+        print(children)
     
     if org.parent_organization:
         parent_org = session.exec(select(Organization).where(Organization.id == org.parent_organization)).first()  
