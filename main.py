@@ -13,6 +13,7 @@ from routes.serviceProvider import ServiceProvider
 from routes.accounts import AccountRouter
 from routes.address import AddressRouter
 from routes.category import CategoryRouter
+from routes.deposit import DepositRouter
 from routes.inheritance import InheritanceRouter
 from routes.product import ProductRouter
 from routes.role import RoleRouter
@@ -83,6 +84,7 @@ def on_startup():
 app.include_router(AccountRouter, prefix="/{tenant}/account", tags=["account"])
 app.include_router(AddressRouter, prefix="/{tenant}/address", tags=["address"])
 app.include_router(CategoryRouter, prefix="/{tenant}/category", tags=["category"])
+app.include_router(DepositRouter, prefix="/{tenant}/finance", tags=["finance"])
 app.include_router(InheritanceRouter, prefix="/{tenant}/inheritance", tags = ["inheritance"])
 app.include_router(OrganizationRouter, prefix="/{tenant}/organization", tags=["organization"])
 app.include_router(ProductRouter, prefix="/{tenant}/product", tags=["product"])

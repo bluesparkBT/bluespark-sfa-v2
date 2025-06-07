@@ -160,10 +160,16 @@ MODEL_HTML_TYPES = {
         "amount": "number",
         "remark": "text",
         "date": "date",
-        "approval_status": "select",
         "organization": "select",
         "transaction_number":"text",
         "deposit_slip": "file"
+    },
+    "bank": {
+        "id": "hidden",
+        "bank_name": "select",
+        "account": "text",
+        "account_holder": "text",
+        "organization": "select"
     }
 
 }

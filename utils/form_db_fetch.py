@@ -6,6 +6,7 @@ from db import  get_session
 from models.Account import (Organization, User, Role, ScopeGroup, ScopeGroupLink, WarehouseStoreAdminLink)
 from models.Address import Address, Geolocation
 from models.Product_Category import Category, Product, InheritanceGroup, ProductLink, CategoryLink
+from models.FinanceModule import BankAccount
 from models.Marketing import ClassificationGroup
 from models.PointOfSale import PointOfSale, Outlet, WalkInCustomer
 #from models.Warehouse import Stock, StockType, Warehouse, Vehicle
@@ -133,6 +134,40 @@ def fetch_inheritance_group_id_and_name(session: SessionDep, current_user: UserD
 #     ).all()
 
 #     return {row[0]: row[1] for row in inheritance_groups}
+
+
+def fetch_bank_account_id_and_account(session:SessionDep, current_user: UserDep):
+    
+    organization_ids = get_organization_ids_by_scope_group(session, current_user)
+    bank_row = session.exec(
+        select(BankAccount.id, BankAccount.account)
+        .where(BankAccount.organization.in_(organization_ids))
+        ).all()
+    account = {row[0]: row[1] for row in bank_row}
+    return account 
+
+def group_bank_accounts_by_bank_name(bank_accounts):
+    """
+    Groups bank accounts by their bank_name.
+
+    Args:
+        bank_accounts (List[BankAccount]): List of BankAccount objects or dicts.
+
+    Returns:
+        dict: {bank_name: {id: account, ...}, ...}
+    """
+    grouped = {}
+    for acc in bank_accounts:
+        # If acc is a SQLModel object, use acc.bank_name, acc.id, acc.account
+        # If acc is a dict, use acc['bank_name'], acc['id'], acc['account']
+        bank_name = acc.bank_name if hasattr(acc, "bank_name") else acc["bank_name"]
+        acc_id = acc.id if hasattr(acc, "id") else acc["id"]
+        account = acc.account if hasattr(acc, "account") else acc["account"]
+
+        if bank_name not in grouped:
+            grouped[bank_name] = {}
+        grouped[bank_name][acc_id] = account
+    return grouped
 
 def fetch_address_id_and_name(session: SessionDep, current_user: UserDep):
     organization_ids = get_organization_ids_by_scope_group(session, current_user)

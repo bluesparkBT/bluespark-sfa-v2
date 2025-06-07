@@ -208,7 +208,7 @@ def create_product(
             ).first()
         if selected_product:
             raise HTTPException(status_code=400, 
-                                detail= f"{endpoint_name}  already exists")
+                                detail= f"No {endpoint_name} created")
         
         # Create a new product entry from validated input
         new_entry = db_model(
