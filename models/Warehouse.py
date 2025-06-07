@@ -55,8 +55,8 @@ class WarehouseGroup(SQLModel, table=True):
     name: str = Field(index=True)
     access_policy: "AccessPolicy" 
     organization_id: int = Field(foreign_key="organization.id", ondelete="CASCADE")
-    warehouses: List["Warehouse"] = Relationship(back_populates="warehouse_groups", link_model=WarehouseGroupLink)
-    store_admins: List["User"] = Relationship(back_populates="warehouse_groups", link_model=WarehouseStoreAdminLink)
+    warehouses: Optional[List["Warehouse"]] = Relationship(back_populates="warehouse_groups", link_model=WarehouseGroupLink)
+    store_admins: Optional[List["User"]] = Relationship(back_populates="warehouse_groups", link_model=WarehouseStoreAdminLink)
 
 class Warehouse(SQLModel, table=True):
     __tablename__ = "warehouse"
