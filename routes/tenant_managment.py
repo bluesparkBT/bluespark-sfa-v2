@@ -175,7 +175,7 @@ def get_by_Id_template(
             "description": entry.description,
             "country": tenant_address.country if tenant_address else "",
             "city" : tenant_address.city if tenant_address else "",
-            "subcity": tenant_address.sub_city if tenant_address else "",
+            "sub_city": tenant_address.sub_city if tenant_address else "",
             "woreda": tenant_address.woreda if tenant_address else "",
             "landmark": entry.landmark,
             "latitude": tenant_location.latitude if tenant_location else "",

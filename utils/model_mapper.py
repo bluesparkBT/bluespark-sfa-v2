@@ -134,7 +134,7 @@ MODEL_HTML_TYPES = {
         "name": "text",
         "sku": "text",
         "organization": "select",
-        "category_id": "select",        
+        "category": "select",        
         "description": "textarea",
         "image": "file",
         "brand": "text",
@@ -151,6 +151,25 @@ MODEL_HTML_TYPES = {
         "role": "select",
         "classification": "select",
         "point_of_sale": "select"
+    },
+    "deposit": {
+        "id": "hidden",
+        "bank": "select",
+        "account": "select",
+        "branch": "text",
+        "amount": "number",
+        "remark": "text",
+        "date": "date",
+        "organization": "select",
+        "transaction_number":"text",
+        "deposit_slip": "file"
+    },
+    "bank": {
+        "id": "hidden",
+        "bank_name": "select",
+        "account": "text",
+        "account_holder": "text",
+        "organization": "select"
     }
 
 }

@@ -13,6 +13,14 @@ class BankAccountView(BaseModel):
     account_holder: Optional[str]
     organization: Optional[int]
 
+
+class UpdateBankAccountView(BaseModel):
+    id: Optional[int]
+    bank_name: str
+    account: str
+    account_holder: Optional[str]
+    organization: Optional[int]
+
 class ChequeView(BaseModel):
     cheque_number: str
     check_owner: str
@@ -20,16 +28,30 @@ class ChequeView(BaseModel):
     amount: float
 
 class DepositView(BaseModel):
-    sales_representative: int
-    approver: Optional[int]
-    date: datetime
-    bank: int
+    # sales_representative: int
+    bank: str
+    account: Optional[int | str]
     branch: Optional[str]
     amount: float
     remark: Optional[str]
-    approval_status: DepositStatus
+    date: datetime
+    organization: Optional[int]   
+    transaction_number: Optional[str] 
     deposit_slip: Optional[bytes]
-    organization: Optional[int]
+
+    
+class UpdateDepositView(BaseModel):
+    id:Optional[int]
+    # sales_representative: int
+    bank: str  #string should be removed on improved update endpoint
+    account: int | str
+    branch: Optional[str]
+    amount: float
+    remark: Optional[str]
+    date: datetime
+    organization: Optional[int] 
+    transaction_number: Optional[str]   
+    deposit_slip: Optional[bytes]
 
 class InvoiceView(BaseModel):
     number: int

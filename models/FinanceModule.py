@@ -4,7 +4,12 @@ from pydantic import Base64Bytes, model_validator
 from sqlmodel import Relationship, SQLModel, Field
 from typing import List, Optional, Self
 
-
+class BankName(str, Enum):
+    CBE = "Commericial Bank Of Ethiopia"
+    DashinBank = "Dashin Bank"
+    BOA = "Bank Of Abbisinya"
+    AwashBank = "Awash Bank"
+    
 class BankAccount(SQLModel, table=True):
     __tablename__ = "bank_account"
 
@@ -34,12 +39,12 @@ class BankAccount(SQLModel, table=True):
     """
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    bank_name: str = Field(index=True)
+    bank_name: BankName = Field(index=True)
     account: str = Field(index=True)
     account_holder: Optional[str] = Field(default=None)
     organization: Optional[int] = Field(foreign_key="organization.id", ondelete="CASCADE", index=True)
 
-
+    
 class Cheque(SQLModel, table=True):
     __tablename__ = "cheque"
     
@@ -111,7 +116,7 @@ class Deposit(SQLModel, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     sales_representative: int = Field(foreign_key="users.id", index=True)
-    approver: Optional[int] = Field(foreign_key="users.id", index=True, default=None)
+    finance_manager: Optional[int] = Field(foreign_key="users.id", index=True, default=None)
     date: datetime = Field(default=datetime.now(), index=True)
     bank: int = Field(foreign_key="bank_account.id", index=True)
     branch: Optional[str] = Field(default=None)
@@ -121,3 +126,4 @@ class Deposit(SQLModel, table=True):
     deposit_slip: Optional[Base64Bytes] = Field(default=None)
     transaction_number: Optional[str] = Field(default=None)
     organization: Optional[int] = Field(foreign_key="organization.id", ondelete="CASCADE", index=True)
+    comment: Optional[int] =  Field(default=None)
