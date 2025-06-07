@@ -7,7 +7,7 @@ class ProductView(BaseModel):
     name: Annotated[str, AfterValidator(validate_name)]
     sku: Annotated[str, AfterValidator(validate_name)]
     organization: int
-    category_id: Optional[int] = None
+    category: Optional[int] = None
     image: Optional[str] = None
     brand: Optional[str] = None
     price: float
@@ -19,7 +19,7 @@ class UpdateProductView(BaseModel):
     name: Annotated[str, AfterValidator(validate_name)]
     sku: Annotated[str, AfterValidator(validate_name)]
     organization: int
-    category_id: Optional[int] = None
+    category: Optional[int] = None
     image: Optional[str] = None
     brand: Optional[str] = None
     price: float

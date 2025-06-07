@@ -160,7 +160,7 @@ def get_template_form(
             "name": "",
             "sku": "",
             "organization": fetch_organization_id_and_name(session, current_user),
-            "category_id": fetch_category_id_and_name(session, current_user),
+            "category": fetch_category_id_and_name(session, current_user),
             "description": "",
             "image": "",
             "brand": "",
@@ -211,7 +211,18 @@ def create_product(
                                 detail= f"{endpoint_name}  already exists")
         
         # Create a new product entry from validated input
-        new_entry = db_model.model_validate(valid)
+        new_entry = db_model(
+            sku = valid.sku,
+            name = valid.name,
+            description = valid.description,
+            image = valid.image,
+            brand = valid.brand,
+            price = valid.price,
+            unit = valid.unit,
+            category_id = valid.category,
+            organization = valid.organization,
+
+            )
         session.add(new_entry)
         session.commit()
         session.refresh(new_entry)
@@ -255,7 +266,7 @@ def update_template(
         selected_product.brand = valid.brand
         selected_product.price = valid.price
         selected_product.unit = valid.unit
-        selected_product.category_id = valid.category_id
+        selected_product.category_id = valid.category
         selected_product.organization = valid.organization
 
         
