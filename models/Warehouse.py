@@ -53,7 +53,7 @@ class WarehouseGroup(SQLModel, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True)
-    access_policy: "AccessPolicy" 
+    access_policy: AccessPolicy
     organization_id: int = Field(foreign_key="organization.id", ondelete="CASCADE")
     warehouses: Optional[List["Warehouse"]] = Relationship(back_populates="warehouse_groups", link_model=WarehouseGroupLink)
     store_admins: Optional[List["User"]] = Relationship(back_populates="warehouse_groups", link_model=WarehouseStoreAdminLink)
