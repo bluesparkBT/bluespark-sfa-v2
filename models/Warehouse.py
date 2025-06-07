@@ -37,16 +37,15 @@ class WarehouseGroupLink(SQLModel, table=True):
     __tablename__ = "warehouse_group_link"
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    warehouse_id: int = Field(foreign_key="warehouse.id", index=True)
-    warehouse_group_id: int = Field(foreign_key="warehouse_group.id", index=True)
-
-
+    warehouse_id: int | None = Field(foreign_key="warehouse.id", index=True)
+    warehouse_group_id: int | None = Field(foreign_key="warehouse_group.id", index=True)
+    
 
 class WarehouseStoreAdminLink(SQLModel, table=True):
     __tablename__ = "warehouse_store_admin_link"
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="users.id", index=True)
-    warehouse_group_id: int = Field(foreign_key="warehouse_group.id", index=True), 
+    user_id: int = Field(foreign_key="users.id", index=True, primary_key=True)
+    warehouse_group_id: int = Field(foreign_key="warehouse_group.id", index=True, primary_key=True)
     
 class WarehouseGroup(SQLModel, table=True):
     __tablename__ = "warehouse_group"
@@ -57,7 +56,8 @@ class WarehouseGroup(SQLModel, table=True):
     organization_id: int = Field(foreign_key="organization.id", ondelete="CASCADE")
     warehouses: Optional[List["Warehouse"]] = Relationship(back_populates="warehouse_groups", link_model=WarehouseGroupLink)
     store_admins: Optional[List["User"]] = Relationship(back_populates="warehouse_groups", link_model=WarehouseStoreAdminLink)
-
+    
+    
 class Warehouse(SQLModel, table=True):
     __tablename__ = "warehouse"
 
