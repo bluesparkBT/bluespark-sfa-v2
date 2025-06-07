@@ -126,4 +126,5 @@ class Deposit(SQLModel, table=True):
     deposit_slip: Optional[Base64Bytes] = Field(default=None)
     transaction_number: Optional[str] = Field(default=None)
     organization: Optional[int] = Field(foreign_key="organization.id", ondelete="CASCADE", index=True)
-    comment: Optional[int] =  Field(default=None)
+    comment: Optional[str] =  Field(default=None)
+    

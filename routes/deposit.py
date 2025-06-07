@@ -74,7 +74,8 @@ def get_template(
                 "date": entry.date.strftime("%Y-%m-%d") if entry.date else None,
                 "remark": entry.remark,
                 "approval_status": entry.approval_status,
-                "organization": org_name
+                "organization": org_name,
+                "deposit_slip": entry.deposit_slip
             }
             if temp not in deposit_list:
                 deposit_list.append(temp)
@@ -182,7 +183,6 @@ def get_template_form(
 
         
         html_types = copy.deepcopy(get_html_types('deposit'))
-        del html_types['deposit_slip']
         return {"data": form_structure, "html_types": html_types}
     except HTTPException as http_exc:
         raise http_exc
