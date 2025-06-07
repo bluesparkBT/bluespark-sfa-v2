@@ -36,8 +36,8 @@ class RequestStatus(str, Enum):
 class WarehouseGroupLink(SQLModel, table=True):
     __tablename__ = "warehouse_group_link"
 
-    warehouse_id: int | None = Field(foreign_key="warehouse.id", index=True)
-    warehouse_group_id: int | None = Field(foreign_key="warehouse_group.id", index=True)
+    warehouse_id: int | None = Field(foreign_key="warehouse.id", index=True, primary_key=True)
+    warehouse_group_id: int | None = Field(foreign_key="warehouse_group.id", index=True, primary_key=True)
     
 
 class WarehouseStoreAdminLink(SQLModel, table=True):
