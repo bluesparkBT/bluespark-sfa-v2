@@ -1,5 +1,5 @@
 from sqlmodel import SQLModel, Field, Relationship
-from Account import AccessPolicy
+from models.Account import AccessPolicy
 from enum import Enum   
 from typing import Optional, List
 from datetime import  datetime
