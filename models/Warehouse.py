@@ -38,7 +38,7 @@ class WarehouseGroupLink(SQLModel, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     warehouse_id: int = Field(foreign_key="warehouse.id", index=True)
-    warehouse_group_id: int = Field(foreign_key="warehouse_group.id", index=True, ondelete="CASCADE")
+    warehouse_group_id: int = Field(foreign_key="warehouse_group.id", index=True)
 
 
 
