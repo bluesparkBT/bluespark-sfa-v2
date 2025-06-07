@@ -5,12 +5,6 @@ from typing import List, Optional, Self
 from models.Address import Address, Geolocation
 from models.Product_Category import RoleLink
 from models.Warehouse import *
-class AccessPolicy(str, Enum):
-    deny = "deny"
-    view = "view"
-    edit = "edit"
-    contribute = "contribute"
-    manage = "manage"
 
 class SuperAdminModuleName(str, Enum):
     #Service Provider

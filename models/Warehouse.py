@@ -1,8 +1,14 @@
 from sqlmodel import SQLModel, Field, Relationship
-from models.Account import AccessPolicy
 from enum import Enum   
 from typing import Optional, List
 from datetime import  datetime
+
+class AccessPolicy(str, Enum):
+    deny = "deny"
+    view = "view"
+    edit = "edit"
+    contribute = "contribute"
+    manage = "manage"
 
 
 class RequestType(str, Enum):
