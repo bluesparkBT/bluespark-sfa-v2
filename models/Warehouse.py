@@ -133,3 +133,8 @@ class WarehouseStop(SQLModel, table=True):
 
 
 
+class WarehouseStoreAdminLink(SQLModel, table=True):
+    __tablename__ = "warehouse_store_admin_link"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="users.id", index=True)
+    warehouse_group_id: int = Field(foreign_key="warehouse_group.id", index=True)
