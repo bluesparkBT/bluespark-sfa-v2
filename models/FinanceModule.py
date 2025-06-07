@@ -127,3 +127,4 @@ class Deposit(SQLModel, table=True):
     transaction_number: Optional[str] = Field(default=None)
     organization: Optional[int] = Field(foreign_key="organization.id", ondelete="CASCADE", index=True)
     comment: Optional[str] =  Field(default=None)
+    
