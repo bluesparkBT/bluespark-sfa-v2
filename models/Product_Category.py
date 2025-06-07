@@ -70,6 +70,8 @@ class Product(SQLModel, table=True):
     unit: Product_units = Field(default=None)
     category: Optional["Category"] = Relationship(back_populates="products")
     inheritance_groups: List["InheritanceGroup"] = Relationship(back_populates="products", link_model=ProductLink)
+    stock: Optional["Stock"] = Relationship(back_populates="product")
+    stock_log: Optional["StockLog"] = Relationship(back_populates="product")
 
 
 class Category(SQLModel, table=True):

@@ -1,5 +1,5 @@
 
-from typing import Optional
+from typing import List, Optional
 from typing import Annotated
 from pydantic import Field
 from sqlmodel import SQLModel
@@ -7,12 +7,13 @@ from utils.util_functions import validate_name, validate_phone_number, validate_
 from pydantic import AfterValidator, BaseModel, ValidationError
 
 class WarehouseGroup(BaseModel):
-    id: Optional[int] = None
+    id: Optional[int | str] = None
     name: str 
     access_policy: str
+    warehouses: List[int]
 
 class Warehouse(BaseModel):
-    id: Optional[int] = None
+    id: Optional[int | str ] = None
     warehouse_name: str 
     organization: int 
     address: Optional[int] = None
@@ -20,15 +21,18 @@ class Warehouse(BaseModel):
     latitude: float
     longitude: float
 
+class WarehouseStoreAdmin(BaseModel):
+    warehouse_group: int
+    store_admins: List[int]
+
 class Stock(BaseModel):
-    id: Optional[int] = None
-    warehouse: int 
+    id: Optional[int |str] = None
     product: int 
     quantity: int 
     stock_type: str
 
 class Vehicle(BaseModel):
-    id: Optional[int] = None
+    id: Optional[int |str] = None
     name: str
     make: Optional[str] = None
     model: Optional[str] = None
@@ -40,10 +44,11 @@ class Vehicle(BaseModel):
     organization: int 
 
 class WarehouseStop(BaseModel):
-    id: Optional[int] = None
+    id: Optional[int | str] = None
     request_type: str
     vehicle: Optional[int]= None
     product: int
     stock_type: str
     quantity: int 
+    warehouse: int
 

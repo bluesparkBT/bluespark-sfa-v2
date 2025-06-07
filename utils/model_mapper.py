@@ -88,18 +88,27 @@ MODEL_HTML_TYPES = {
         "id":"hidden",
         "warehouse_name":"text",
         "organization":"select",
-        "location":"text"
+        "address": "select",
+        "landmark": "text",
+        "latitude":"text",
+        "longitude": "text",
     },
-     "warehouse_storeadmin":{
-        "warehouse_id":"hidden",
-        "store_admin": "checkbox"
+      "warehouse-storeadmin-add":{
+        "warehouse_group":"select",
+        "store_admins": "select multiple"
+    },
+     "warehouse-storeadmin-update":{
+        "warehouse_group":"hidden",
+        "store_admins": "select multiple"
+    },
+    "warehouse-group":{
+        "name": "text",
+        "access_policy": "select",
+        "warehouses": "select multiple"
     },
     "stock":{
         "id":"hidden",
-        "warehouse":"select",
         "product":"select",
-        "category":"select",
-        "sub_category": "select",
         "quantity": "number",
         "stock_type": "select"
     },
@@ -107,7 +116,8 @@ MODEL_HTML_TYPES = {
         "id":"hidden",
         "request_type":"select",
         "vehicle":"select",
-        "stock": "select",
+        "product": "select",
+        "warehouse": "select",
         "quantity": "number",
         "stock_type": "select"
     },
