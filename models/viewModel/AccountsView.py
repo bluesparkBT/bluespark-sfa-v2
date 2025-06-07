@@ -46,7 +46,6 @@ class UserAccountView(BaseModel):
     # image: Optional[str] = None
     # id_type: Optional[IdType] = None
     # id_number: Optional[str] = None
-    address: Optional[int]
 
 class UpdateUserAccountView(BaseModel):
     id: Optional[int] = None
