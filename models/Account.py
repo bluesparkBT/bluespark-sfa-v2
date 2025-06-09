@@ -4,13 +4,7 @@ from datetime import  datetime
 from typing import List, Optional, Self
 from models.Address import Address, Geolocation
 from models.Product_Category import RoleLink
-
-class AccessPolicy(str, Enum):
-    deny = "deny"
-    view = "view"
-    edit = "edit"
-    contribute = "contribute"
-    manage = "manage"
+from models.Warehouse import *
 
 class SuperAdminModuleName(str, Enum):
     #Service Provider
@@ -87,12 +81,6 @@ class IdType(str, Enum):
     passport = "Passport"
     driving_license = "Driving License"
     school_id = "School ID"
-
-class WarehouseStoreAdminLink(SQLModel, table=True):
-    __tablename__ = "warehouse_store_admin_link"
-    id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="users.id", index=True)
-    warehouse_group_id: int = Field(foreign_key="warehouse_group.id", index=True)
 
 class Scope(str, Enum):
     managerial_scope = "managerial_scope"

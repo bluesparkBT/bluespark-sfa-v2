@@ -1,8 +1,14 @@
-from models.Account import AccessPolicy, WarehouseStoreAdminLink
 from sqlmodel import SQLModel, Field, Relationship
 from enum import Enum   
 from typing import Optional, List
 from datetime import  datetime
+
+class AccessPolicy(str, Enum):
+    deny = "deny"
+    view = "view"
+    edit = "edit"
+    contribute = "contribute"
+    manage = "manage"
 
 
 class RequestType(str, Enum):
@@ -30,28 +36,32 @@ class RequestStatus(str, Enum):
 class WarehouseGroupLink(SQLModel, table=True):
     __tablename__ = "warehouse_group_link"
 
-    id: Optional[int] = Field(default=None, primary_key=True)
-    warehouse_id: int = Field(foreign_key="warehouse.id", index=True)
-    warehouse_group_id: int = Field(foreign_key="warehouse_group.id", index=True)
+    warehouse_id: int | None = Field(foreign_key="warehouse.id", index=True, primary_key=True, ondelete="CASCADE")
+    warehouse_group_id: int | None = Field(foreign_key="warehouse_group.id", index=True, primary_key=True, ondelete="CASCADE")
+    
 
+class WarehouseStoreAdminLink(SQLModel, table=True):
+    __tablename__ = "warehouse_store_admin_link"
+    user_id: int = Field(foreign_key="users.id", index=True, primary_key=True, ondelete="CASCADE")
+    warehouse_group_id: int = Field(foreign_key="warehouse_group.id", index=True, primary_key=True, ondelete="CASCADE")
+    
 class WarehouseGroup(SQLModel, table=True):
     __tablename__ = "warehouse_group"
 
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True)
-    access_policy: AccessPolicy 
-    organization_id: int = Field(foreign_key="organization.id")
-    warehouses: List["Warehouse"] = Relationship(back_populates="warehouse_groups", link_model=WarehouseGroupLink)
-    store_admins: List["User"] = Relationship(back_populates="warehouse_groups", link_model=WarehouseStoreAdminLink)
-
-
-
+    access_policy: AccessPolicy
+    organization_id: int = Field(foreign_key="organization.id", ondelete="CASCADE")
+    warehouses: Optional[List["Warehouse"]] = Relationship(back_populates="warehouse_groups", link_model=WarehouseGroupLink)
+    store_admins: Optional[List["User"]] = Relationship(back_populates="warehouse_groups", link_model=WarehouseStoreAdminLink)
+    
+    
 class Warehouse(SQLModel, table=True):
     __tablename__ = "warehouse"
 
     id: Optional[int] = Field(default=None, primary_key=True)
     warehouse_name: str = Field(index=True)
-    organization_id: int = Field(foreign_key="organization.id")
+    organization_id: int = Field(foreign_key="organization.id", ondelete="CASCADE")
     address_id: Optional[int] = Field(foreign_key="address.id", default=None)
     landmark: Optional[str] = Field(default=None) 
     location_id: int = Field(foreign_key="geolocation.id")
@@ -102,7 +112,7 @@ class Vehicle(SQLModel, table=True):
     vin: Optional[str] = Field(default=None)
     description: Optional[str] = Field(default=None)
     plate_number: str = Field(index=True)
-    organization_id: int = Field(foreign_key="organization.id", index=True)
+    organization_id: int = Field(foreign_key="organization.id", index=True, ondelete="CASCADE")
     warehouse_stops: Optional[List["WarehouseStop"]] = Relationship(back_populates="vehicle")
 
 class WarehouseStop(SQLModel, table=True):
@@ -129,7 +139,4 @@ class WarehouseStop(SQLModel, table=True):
     #     sa_relationship_kwargs={"foreign_keys": "[WarehouseStop.requester_id]"},
     #     back_populates="requester_warehouse_stops"
     # )
-
-
-
 
