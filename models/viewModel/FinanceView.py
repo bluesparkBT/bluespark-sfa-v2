@@ -43,7 +43,7 @@ class DepositView(BaseModel):
 class UpdateDepositView(BaseModel):
     id:Optional[int]
     # sales_representative: int
-    bank: int | str  #string should be removed on improved update
+    bank: str
     account: int | str
     branch: Optional[str]
     amount: float

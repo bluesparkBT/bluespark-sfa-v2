@@ -55,9 +55,16 @@ def get_template(
                 status_code=403, detail="You Do not have the required privilege"
             )
         organization_ids = get_organization_ids_by_scope_group(session, current_user)
-        entries_list = session.exec(
-            select(db_model).where(db_model.organization.in_(organization_ids))
-        ).all()
+        # scope group and scop check
+        entries_list = None
+        if current_user.scope == "managerial_scope":
+            entries_list = session.exec(
+                select(db_model).where(db_model.organization.in_(organization_ids))
+            ).all()
+        elif current_user.scope == "personal_scope":
+            entries_list = session.exec(
+                select(db_model).where(db_model.organization.in_(organization_ids), db_model.sales_representative == current_user.id )
+            ).all()  
         if not entries_list:
             raise HTTPException(status_code=404, detail= f" No {endpoint_name} Created")  
           
@@ -73,8 +80,8 @@ def get_template(
                 "amount": entry.amount,
                 "date": entry.date.strftime("%Y-%m-%d") if entry.date else None,
                 "remark": entry.remark,
-                "approval_status": entry.approval_status,
                 "organization": org_name,
+                "status": entry.approval_status,
                 "deposit_slip": entry.deposit_slip
             }
             if temp not in deposit_list:
@@ -119,15 +126,16 @@ def get_template(
         
         if not entry:
             raise HTTPException(status_code=404, detail="Deposit not found")
-        entry_account_number = session.exec(select(BankAccount).where(BankAccount.bank_name == str(entry.bank))).first()
+        entry_bank_name = session.exec(select(BankAccount.bank_name).where(BankAccount.id == entry.bank)).first()
+        entry_account_number = session.exec(select(BankAccount.account).where(BankAccount.id == entry.bank)).first()
         if not entry_account_number:
             entry_account_number = None
             print("Account number not found for the selected deposit")
         return {
                 "id":entry.id,
                 # "sales_representative": entry.sales_representative,
-                "bank": entry.bank,
-                "account": entry_account_number.id,
+                "bank": entry_bank_name,
+                "account": entry_account_number,
                 "branch": entry.branch,
                 "amount": entry.amount,
                 "remark": entry.remark,
@@ -278,7 +286,6 @@ def update_template(
         current_deposit.amount = valid.amount
         current_deposit.branch = valid.branch
         current_deposit.remark = valid.remark
-        current_deposit.approval_status = valid.approval_status
 
         session.add(current_deposit)
         session.commit()
