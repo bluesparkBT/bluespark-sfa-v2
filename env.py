@@ -1,3 +1,4 @@
+
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config
@@ -81,3 +82,4 @@ if context.is_offline_mode():
 else:
     run_migrations_online()
     
+

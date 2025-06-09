@@ -5,8 +5,8 @@ from sqlmodel import Session, select
 from fastapi import APIRouter, HTTPException, Body, status, Depends
 from db import get_session
 from utils.model_converter_util import get_html_types
-from models.Marketing import ClassificationGroup
-from utils.util_functions import validate_name
+from models.Marketing import ClassificationGroup, CustomerDiscount
+from utils.util_functions import validate_name,parse_datetime_field,format_date_for_input
 from models.viewModel.ClassificationView import ClassificationView as TemplateView #Update this
 from models.viewModel.ClassificationView import updateClassificationView as TemplateViews
 from utils.auth_util import get_current_user, check_permission, check_permission_and_scope
@@ -92,15 +92,25 @@ def get_template(
 
         if not entry:
             raise HTTPException(status_code=404, detail= f"{endpoint_name} not found")
+        
+        coustomer_discount=  session.exec(
+            select(CustomerDiscount).where( CustomerDiscount.id == entry.customer_discounts)
+
+        ).first()
+
         classification= {
         "id": entry.id,
         "name": entry.name,
-        "description": entry.description,
         "organization": entry.organization,
         "point_of_sale": entry.point_of_sale_id,
-        "territory":entry.territory_id,
         "route":entry.route_id,
-        "customer_discount": entry.customer_discounts,
+        "territory":entry.territory_id,
+        "description": entry.description,
+
+        "customer_id": coustomer_discount.id,
+        "start_date":format_date_for_input(coustomer_discount.start_date) ,
+        "end_date": format_date_for_input(coustomer_discount.end_date),
+        "discount": coustomer_discount.discount       
         }
         #Business Logic
         return classification
@@ -134,10 +144,18 @@ async def get_form_fields_for_classification(
             "route":fetch_route_id_and_name(session, current_user),
             "territory": fetch_territory_id_and_name(session, current_user),
             "description": "",
-            "customer_discount": fetch_discount_id_and_name(session, current_user)
-        }
 
-        return {"data": classification_data, "html_types": get_html_types("classification")}
+            "customer_id": "",
+            "start_date": "",
+            "end_date": "",
+            "discount": ""            
+        }
+        # html_type = copy.deepcopy(get_html)
+        return {"tabs": {"classification":["id","name","organization","point_of_sale","route","territory","discription"],
+                        "customer_discount":["customer_id", "start_date","end_date","discount"]
+        },
+            "data": classification_data, "html_types": get_html_types("classification")}
+    
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
@@ -162,15 +180,34 @@ def create_template(
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
-            )
-        new_entry = db_model.model_validate(valid)  
-        print(valid.customer_discounts)      
+             )
+        # new_entry = db_model.model_validate(valid)  
+        # print(valid.customer_discounts)      
         
-        session.add(new_entry)
-        session.commit()
-        session.refresh(new_entry)
+        customer_discount = CustomerDiscount( 
+            start_date = valid.start_date, 
+            end_date = valid.end_date , 
+            discount = valid.discount
+        ) 
+ 
+        session.add(customer_discount) 
+        session.commit() 
+        session.refresh(customer_discount)
 
-        return new_entry
+        classification = ClassificationGroup(
+                name=valid.name,
+                organization=valid.organization,
+                customer_discounts=customer_discount.id,
+                point_of_sale_id= valid.point_of_sale,
+                territory_id = valid.territory,
+                route_id = valid.route,
+                   
+        )
+        session.add(classification)
+        session.commit()
+        session.refresh(classification)
+
+        return classification
 
     except HTTPException as http_exc:
         raise http_exc
@@ -198,7 +235,22 @@ def update_template(
         selected_entry = session.exec(
             select(db_model).where(db_model.organization.in_(organization_ids), db_model.id == valid.id)
         ).first()
+         
+        coustomer_discount=  session.exec(
+            select(CustomerDiscount).where( CustomerDiscount.id == valid.customer_id)
 
+        ).first()
+         
+        if not coustomer_discount:
+            raise HTTPException(status_code=404, detail=f"customer discount not found")
+
+        coustomer_discount.start_date = valid.start_date
+        coustomer_discount.end_date = valid.end_date
+        coustomer_discount.discount = valid.discount
+
+        session.add(coustomer_discount)
+        session.commit()
+        session.refresh(coustomer_discount)
         if not selected_entry:
             raise HTTPException(status_code=404, detail=f"{endpoint_name} not found")
         
@@ -208,7 +260,7 @@ def update_template(
         selected_entry.point_of_sale_id = valid.point_of_sale
         selected_entry.territory_id = valid.territory
         selected_entry.route_id = valid.route
-        selected_entry.customer_discounts = valid.customer_discount
+      
         selected_entry.description = valid.description
 
 

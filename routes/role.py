@@ -9,8 +9,9 @@ from models.Account import (
     RoleModulePermission,
     User,
     ScopeGroup)
-from models.viewModel.AccountsView import RoleView as TemplateView, UpdateRoleView as UpdateTemplateView
+from models.viewModel.AccountsView import RoleView as TemplateView
 from models.Account import ModuleName as modules
+from models.Account import SuperAdminModuleName as superAdminModules
 from utils.auth_util import get_tenant, get_current_user, check_permission
 from utils.model_converter_util import get_html_types
 from utils.util_functions import validate_name, parse_enum
@@ -82,12 +83,7 @@ async def get_my_role(
     current_user: UserDep,
 ):
     try:
-        if not check_permission(
-            session, "Read", ["Administrative", "Role", "Service Provider"], current_user
-            ):
-            raise HTTPException(
-                status_code=403, detail="You Do not have the required privilege"
-            )
+        
         user = session.exec(select(User).where(User.id ==current_user.id)).first()
         if not user or not user.role:
             raise HTTPException(status_code=404, detail="User or assigned role not found")
@@ -211,15 +207,17 @@ def get_template_form(
         user_scope_group = session.exec(select(ScopeGroup).where(ScopeGroup.id == current_user.scope_group)).first()
          
         if user_scope_group.name == "Super Admin Scope":
-            modules_dict = {i.value: i.value for i in modules}
+            modules_dict = {i.value: i.value for i in superAdminModules}
         else:
             modules_dict = {
                 i.value: i.value for i in modules if i.value != "Service Provider"
             }
         role = {
+            "id": None,
             "name":"",
             "module":modules_dict,
             "policy":policy_type,
+            "permisssion": ""
         }
         
         return {"data": role, "html_types": get_html_types("role")}
@@ -230,24 +228,22 @@ def get_template_form(
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Something went wrong")
 
-@rr.post("/create-role")
-async def create_role(
+@rr.post(endpoint['create'])
+def create_template(
     session: SessionDep,
     tenant: str,
-    current_user: UserDep,    
-    id: Optional[int] = Body(None),
-    name: str = Body(...),
-    module: str = Body(...),
-    policy: str = Body(...),
-): 
+    current_user: UserDep,
+    valid: TemplateView,
+):
     try:
+        
         if not check_permission(
-            session, "Create", "Administrative", current_user
+            session, "Create", role_modules['create'], current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-        if(parse_enum(AccessPolicy,policy,"Policy") == None or parse_enum(mod,module,"Module") == None):
+        if(parse_enum(AccessPolicy, valid.policy,"Policy") == None or parse_enum(mod, valid.module,"Module") == None):
              raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
                         detail="Required field missing",
@@ -257,9 +253,9 @@ async def create_role(
         role_id: int
         if id:
             print("role is not None")
-            role = session.query(Role).where(Role.id==id).first()
+            role = session.query(Role).where(Role.id== valid.id).first()
             if not role:
-                if validate_name(name) == False:
+                if validate_name(valid.name) == False:
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
                         detail="Role name is not valid",
@@ -267,10 +263,9 @@ async def create_role(
                 
                 #create role
                 role = Role(
-                    name=name,
+                    name= valid.name,
                     organization = current_user.organization
                 )
-
                 session.add(role)
                 session.commit()
                 session.refresh(role)
@@ -279,35 +274,33 @@ async def create_role(
                 role_id = role.id
         else:
             #create role
-            if validate_name(name) == False:
+            if validate_name(valid.name) == False:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Role name is not valid",
             )
             role = Role(
-                name=name,
+                name=valid.name,
                 organization = current_user.organization
             )
-
             session.add(role)
             session.commit()
             session.refresh(role)
             role_id = role.id
 
         # grant module permissions from list of modules defined as modules_togrant
-       
         role_module_permission = session.exec(select(RoleModulePermission)
                                     .where((RoleModulePermission.role == role_id)&
-                                          (RoleModulePermission.module == module))).first()
+                                          (RoleModulePermission.module == valid.module))).first()
         if(role_module_permission):
-            role_module_permission.module = module
-            role_module_permission.access_policy = policy
+            role_module_permission.module = valid.module
+            role_module_permission.access_policy = valid.policy
         else:
             role_module_permission= RoleModulePermission(
                     id=None,
                     role=role_id,
-                    module=module,
-                    access_policy=policy
+                    module= valid.module,
+                    access_policy= valid.policy
                 )
 
         session.add(role_module_permission)
@@ -315,25 +308,27 @@ async def create_role(
         session.refresh(role_module_permission)
         return {"id":role.id,"name": role.name}
 
+    except HTTPException as http_exc:
+        raise http_exc
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-       
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Something went wrong")
+    
 @rr.put(endpoint['update'])
 def update_template(
     session: SessionDep, 
     current_user: UserDep,
     tenant: str,
-    valid: UpdateTemplateView,
+    valid: TemplateView,
 ):
     try:
-        # Check permission
         if not check_permission(
             session, "Update",role_modules['update'], current_user
             ):
             raise HTTPException(
                 status_code=403, detail="You Do not have the required privilege"
             )
-        role = session.exec(select(Role).where(Role.id== id)).first()
+        role = session.exec(select(Role).where(Role.id== valid.id)).first()
         if not role:
             raise HTTPException(status_code=404, detail="Role not found")
       
@@ -351,7 +346,7 @@ def update_template(
         if (parse_enum(AccessPolicy,valid.policy, "policy") != None and parse_enum(mod,valid.module,"Module") != None):
             print("in here")
             role_module_permission = session.exec(select(RoleModulePermission)
-                                    .where((RoleModulePermission.role == id)&
+                                    .where((RoleModulePermission.role == valid.id)&
                                           (RoleModulePermission.module == valid.module))).first()
             if(role_module_permission):
                 role_module_permission.module = valid.module
@@ -359,7 +354,7 @@ def update_template(
             else:
                 role_module_permission= RoleModulePermission(
                         id=None,
-                        role=id,
+                        role= valid.id,
                         module=valid.module,
                         access_policy=valid.policy
                     )

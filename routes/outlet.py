@@ -31,7 +31,6 @@ endpoint = {
     "update": f"/update-{endpoint_name}",
     "delete": f"/delete-{endpoint_name}",
 }
-
 # Update role_modules
 role_modules = {
     "get": ["Administrative"],
@@ -109,12 +108,13 @@ def outlet_form(
             )
         form_structure = {
             "id": "",
-            "name": "",
-            "channe":"" ,
-            "tin":"",
+            "outlet_name": "",
+            "channel": "",
+            "tin": "",
             "phone": "",
-            "email": "",
-            "location": fetch_address_id_and_name(session,current_user),
+            "outlet_email": "",
+            # "latitude": "",
+            # "longitude": "",
             }
 
         return {"data": form_structure, "html_types": get_html_types("outlet")}

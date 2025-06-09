@@ -45,6 +45,17 @@ def fetch_organization_id_and_name(session: SessionDep, current_user: UserDep):
 
     organizations = {row[0]: row[1] for row in organization_rows}
     return organizations
+def fetch_organization_ids(session: SessionDep, current_user: UserDep):
+    organization_ids = get_organization_ids_by_scope_group(session, current_user)
+
+    organization_rows = session.exec(
+        select(Organization.id)
+        .where(Organization.id.in_(organization_ids))
+    ).all()
+
+    # Extract only the IDs from the result rows (each row is a one-item tuple)
+    organization_ids_list = [row[0] for row in organization_rows]
+    return organization_ids_list
 
 def fetch_route_id_and_name(session: SessionDep, current_user: UserDep):
     organization_ids = get_organization_ids_by_scope_group(session, current_user)
@@ -167,7 +178,7 @@ def fetch_product_id_and_name(session: SessionDep, current_user: UserDep):
 
     product_row = session.exec(
         select(Product.id, Product.name)
-        .where(Role.organization.in_(organization_ids))
+        .where(Product.organization.in_(organization_ids))
         ).all()
     products = {row[0]: row[1] for row in product_row}
     return products
@@ -183,47 +194,55 @@ def fetch_category_id_and_name(session: SessionDep, current_user: UserDep):
     return categories
 
 def fetch_inheritance_group_id_and_name(session: SessionDep, current_user: UserDep):
-    # Step 1: Get the list of organization IDs the current user has access to
     organization_ids = get_organization_ids_by_scope_group(session, current_user)
 
-    # Step 2: Get distinct inheritance_group IDs from those organizations
-    inheritance_group_ids = session.exec(
-        select(Organization.inheritance_group)
-        .where(Organization.id.in_(organization_ids))
-        .where(Organization.inheritance_group.is_not(None))
-    ).all()
-
-    # Step 3: Use those IDs to get inheritance group names
-    if not inheritance_group_ids:
-        return {}
-
-    inheritance_groups = session.exec(
+    inheritance_row = session.exec(
         select(InheritanceGroup.id, InheritanceGroup.name)
-        .where(InheritanceGroup.id.in_(inheritance_group_ids))
-    ).all()
+        .where(InheritanceGroup.organization.in_(organization_ids))
+        ).all()
+    inheritance_groups = {row[0]: row[1] for row in inheritance_row}
+    return inheritance_groups
 
-    return {row[0]: row[1] for row in inheritance_groups}
+# def fetch_inheritance_group_id_and_name(session: SessionDep, current_user: UserDep):
+#     organization_ids = get_organization_ids_by_scope_group(session, current_user)
+
+#     # Step 2: Get distinct inheritance_group IDs from those organizations
+#     inheritance_group_ids = session.exec(
+#         select(Organization.inheritance_group)
+#         .where(Organization.id.in_(organization_ids))
+#         .where(Organization.inheritance_group.is_not(None))
+#     ).all()
+
+#     # Step 3: Use those IDs to get inheritance group names
+#     if not inheritance_group_ids:
+#         return {}
+
+#     inheritance_groups = session.exec(
+#         select(InheritanceGroup.id, InheritanceGroup.name)
+#         .where(InheritanceGroup.id.in_(inheritance_group_ids))
+#     ).all()
+
+#     return {row[0]: row[1] for row in inheritance_groups}
 
 def fetch_address_id_and_name(session: SessionDep, current_user: UserDep):
     organization_ids = get_organization_ids_by_scope_group(session, current_user)
 
-    address_ids = session.exec(
-        select(Organization.address)
-        .where(Organization.id.in_(organization_ids))
-    ).all()
-    
-    address_ids = [
-        aid[0] for aid in address_ids if aid is not None and aid[0] is not None
-    ] 
-    if not address_ids:
-        return {}
+    address_row = session.exec(
+        select(Address.id, Address.sub_city)
+        .where(Address.organization.in_(organization_ids))
+        ).all()
+    products = {row[0]: row[1] for row in address_row}
+    return products
+
+def fetch_geolocation_id_and_name(session: SessionDep, current_user: UserDep):
+    organization_ids = get_organization_ids_by_scope_group(session, current_user)
 
     address_row = session.exec(
-        select(Address.id, Address.name)
-        .where(Address.id.in_(address_ids))
-    ).all()
-
-    return {row[0]: row[1] for row in address_row}
+        select(Geolocation.id, Geolocation.name)
+        .where(Geolocation.organization.in_(organization_ids))
+        ).all()
+    products = {row[0]: row[1] for row in address_row}
+    return products
 
 def fetch_classification_id_and_name(session: SessionDep, current_user: UserDep):
     organization_ids = get_organization_ids_by_scope_group(session, current_user)
@@ -269,6 +288,15 @@ def fetch_point_of_sale_ids(session: SessionDep, current_user: UserDep):
 
 #     pos = {row[0]: row[1] for row in pos_row if row[0] is not None}
 #     return pos 
+
+def fetch_outlet_id_and_name(session: SessionDep, current_user: UserDep):
+    organization_ids = get_organization_ids_by_scope_group(session, current_user)
+    outlet_row = session.exec(
+        select(Outlet.id, Outlet.name)
+        .where(PointOfSale.organization.in_(organization_ids))
+        ).all()
+    outlet = {row[0]: row[1] for row in outlet_row}
+    return outlet 
 
 # def fetch_warehouse_id_and_name(session: SessionDep, current_user: UserDep):
 #     organization_ids = get_organization_ids_by_scope_group(session, current_user)

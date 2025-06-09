@@ -12,15 +12,28 @@ MODEL_HTML_TYPES = {
         "inheritance_group": "select",
         "address": "select",
         "landmark": "text",
-        "latitude": "text",
-        "longitude": "text",
-        "hidden": "text"
+        "hidden": "text",
+    },
+    "tenant": {
+        "id": "hidden",
+        "name": "text",
+        "owner_name": "text",
+        "logo_image": "file",
+        "description": "textarea",
+        "parent_organization": "select",
+        "country": "text",
+        "city": "text",
+        "sub_city": "text",
+        "woreda": "text",
+        "landmark": "text",
+        "hidden": "text",
     },
     "role":{
         "id":"hidden",
         "name":"text",
         "module":"select",
-        "policy":"radio"
+        "policy":"radio",
+        "permissions": "hidden"
     },
     "policy":{
         "role":"hidden",
@@ -62,6 +75,7 @@ MODEL_HTML_TYPES = {
         "city": "text",
         "sub_city": "text",
         "woreda": "text",
+        "organization": "select"
     },
     "location": {
         "id": "hidden",
@@ -107,19 +121,21 @@ MODEL_HTML_TYPES = {
     },
     "product": {
         "id": "hidden",
-        "sku": "text",
         "name": "text",
+        "sku": "text",
+        "organization": "select",
+        "category_id": "select",        
         "description": "textarea",
         "image": "file",
         "brand": "text",
         "price": "number",
         "unit": "select",
-        "category": "select",
-        "organization": "select"
+
     },
     "inheritance": {
         "id": "hidden",
         "name": "text",
+        "organization": "select",
         "category": "select",
         "product": "select"
         # "classification":"select"
@@ -132,18 +148,12 @@ MODEL_HTML_TYPES = {
         "route":"select",
         "territory":"select",
         "description": "textarea",
-        "customer_discount": "select",
+
+        "customer_id": "hidden",
+        "start_date": "date",
+        "end_date": "date",
+        "discount": "number"
     },
-    "outlet":{
-            "id": "hidden",
-            "name": "text",
-            "channe":"Select" ,
-            "tin":"text",
-            "phone": "text",
-            "email": "txt",
-            "location": "Select",
-            "organization": "select"
-   } ,
 
     "territory": {
 
@@ -159,6 +169,16 @@ MODEL_HTML_TYPES = {
             "end_date": "",
             "discount": "",            
     },
+    "outlet":{
+            "id": "hidden",
+            "outlet_name": "text",
+            "channel": "select",
+            "tin": "text",
+            "phone": "text",
+            "outlet_email": "text",
+            "latitude": "text",
+            "longitude": "text",
+   } ,
     "walk_in":{
             "id": "hidden",
             "name": "text",
@@ -174,6 +194,23 @@ MODEL_HTML_TYPES = {
             "territory": "select",
             "description": "textarea",
             "organization": "select"      
-    }
+    },
+    "point_of_sale": {
 
+            "id": "hidden",
+            "outlet_name": "text",
+            "channel": "select",
+            "tin": "text",
+            "phone": "text",
+            "outlet_email": "text",
+            "latitude": "hidden",
+            "longitude": "hidden",
+
+            "customer_id": "hidden",
+            "customer_name": "text",
+            "customer_email": "text",
+            "route": "select",
+            "territoy": "select",
+            },
 }
+  

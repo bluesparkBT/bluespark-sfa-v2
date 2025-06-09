@@ -35,6 +35,9 @@ from pydantic import EmailStr, BaseModel
 # frontend domain
 Domain= getPath()
 
+#Backend Domain path
+Domain_path = "172.10.10.202/8000"
+
 service_provider_company = "Bluespark"
 ACCESS_TOKEN_EXPIRE_DAYS = 2
 
@@ -238,7 +241,7 @@ def create_template(
             )
             session.add(role_module_permission)
         session.commit()
-        
+                
         stored_username = add_organization_path(valid.username, service_provider.name)
         new_user = User(
             full_name=valid.full_name,
@@ -253,6 +256,28 @@ def create_template(
         session.add(new_user)
         session.commit()
         session.refresh(new_user)
+        
+        role = Role(
+            name="Limited Super Admin",
+            organization = service_provider.id
+        )
+        session.add(role)
+        session.commit()
+        session.refresh(role)
+
+        # List of modules the Super Admin should have access to
+        modules_to_grant = [
+            modules.tenant_management.value,
+        ]
+        for module in modules_to_grant: 
+            role_module_permission= RoleModulePermission(
+                role=role.id,
+                module=module,
+                access_policy=AccessPolicy.manage
+            )
+            session.add(role_module_permission)
+        session.commit()
+        session.refresh()
 
         return {"message": "Superadmin created successfully"}
     except Exception as e:
@@ -343,32 +368,34 @@ conf = ConnectionConfig(
     VALIDATE_CERTS=True
 )
 
-@sr.post("/forgot-Password")
-async def send_mail(data: EmailSchema, 
-                    db: Session = Depends(get_session),                        
+@sr.get("/forgot-Password")
+async def forget_email(
+    username: str, 
+    otp: str,
+    session: Session = Depends(get_session),                        
 ):
-    username = data.username
 
-    service_provider = db.exec(select(Organization).where(Organization.organization_type == "Service Provider")).first()
-
+    service_provider = session.exec(select(Organization).where(Organization.organization_type == "Service Provider")).first()
     db_username = add_organization_path(username, service_provider.name)
-
     # Check if the user exists
-    user = db.exec(select(db_model).where(db_model.username == db_username)).first()
-
+    user = session.exec(select(db_model).where(db_model.username == db_username)).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     stored_username = add_organization_path(username, service_provider.name)
     #Generate a new random password and hash it
     new_password = generate_random_password()
-    hashed_password = get_password_hash(new_password + stored_username)
+    pass_hash = get_password_hash(new_password + stored_username)
 
     #Update user's password in the database
-    user.hashedPassword = hashed_password
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-
+    if user.otp == otp:
+        user.hashedPassword = pass_hash
+        user.otp = ""
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+    else:
+        raise HTTPException(status_code=404, detail="Invalid request")
+        
     # Build the email template with the generated password included
     template = f"""
 <html>
@@ -414,7 +441,7 @@ async def send_mail(data: EmailSchema,
     # Prepare the email message. The recipient is now static.
     message = MessageSchema(
         subject="Your New Password",
-        recipients=["yalew.tenna@bluespark.et"],
+        recipients=[user.email],
         body=template,
         subtype="html"
     )
@@ -427,3 +454,89 @@ async def send_mail(data: EmailSchema,
     print(f"New password generated for user : {new_password}")
 
     return JSONResponse(status_code=200, content={"message": "Email with new password has been sent"})
+
+@sr.post("/send-otp")
+async def send_otp(
+    username: str, 
+    session: Session = Depends(get_session),     
+):
+    try:
+
+        service_provider = session.exec(select(Organization).where(Organization.organization_type == "Service Provider")).first()
+        db_username = add_organization_path(username, service_provider.name)
+        # Check if the user exists
+        user = session.exec(select(db_model).where(db_model.username == db_username)).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        stored_username = add_organization_path(username, service_provider.name)
+        #Generate a new random password and hash it
+        new_password = generate_random_password()
+        otp = get_password_hash(new_password + stored_username)
+
+        #Update user's password in the database
+        user.otp = otp
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+        
+        template = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
+            <div style="max-width: 600px; margin: auto; background-color: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);">
+            
+            <div style="text-align: center;">
+                <h2 style="color: #0047AB;">Sales Force Automation (SFA)</h2>
+                <h4 style="color: #008CBA;">Powered by BlueSpark Business Technology Solutions</h4>
+            </div>
+            
+            <hr style="border: none; height: 1px; background-color: #ddd; margin: 20px 0;">
+            
+            <p style="font-size: 16px; color: #333;">Hello,</p>
+            
+            <p style="font-size: 16px; color: #333;">
+                Thank you for using <strong>Sales for Automation (SFA)</strong>. We value your trust and are committed to delivering smart solutions for your business efficiency.
+            </p>
+            
+            <p style="font-size: 16px; color: #333;">
+                To reset your password, please click the link below:<br>
+                <a href="{Domain}/forgot-Password?username={username}&otp={otp}" style="font-weight: bold; color: #d9534f; font-size: 18px;">Click Here to Reset Password</a>
+            </p>
+            
+            <p style="font-size: 16px; color: #333;">
+                Please use this link to reset your password. For security reasons, update your password immediately after logging in.
+            </p>
+            
+            <hr style="border: none; height: 1px; background-color: #ddd; margin: 20px 0;">
+            
+            <div style="text-align: center;">
+                <p style="font-size: 14px; color: #888;">
+                If you have any questions or need assistance, please contact 
+                <strong>BlueSpark Business Technology Solutions Support</strong>.
+                </p>
+            </div>
+            
+            </div>
+        </body>
+        </html>
+        """
+            # Prepare the email message. The recipient is now static.
+        message = MessageSchema(
+            subject="Your New Password",
+            recipients=[user.email],
+            body=template,
+            subtype="html"
+        )
+        # Send the email
+        fm = FastMail(conf)
+        try:
+            await fm.send_message(message)
+        except Exception as e:
+            traceback.print_exc()
+            raise HTTPException(status_code=500, detail="Failed to send email")
+    
+        return JSONResponse(status_code=200, content={"message": "Confirmation requested by email"})
+
+    
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Something went wrong")
