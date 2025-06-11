@@ -26,6 +26,13 @@ from routes.warehouseStoreAdmin import WarehouseStoreAdminRouter
 from routes.stock import StockRouter
 from routes.stockLog import StockLogRouter
 from routes.itemRequest import WarehouseItemRequestRouter
+from routes.classification import ClassificationRouter
+from routes.customerDiscount import CustomerDiscountRouter
+from routes.territory import TerritoryRouter
+from routes.route import RouteRouter
+from routes.pointofsale import PointOfSaleRouter
+from routes.WalkInCustomer import WalkInCustomerRouter
+from routes.outlet import OutletRouter
 
 
 
@@ -88,6 +95,14 @@ app.include_router(DepositRouter, prefix="/{tenant}/finance", tags=["finance"])
 app.include_router(InheritanceRouter, prefix="/{tenant}/inheritance", tags = ["inheritance"])
 app.include_router(OrganizationRouter, prefix="/{tenant}/organization", tags=["organization"])
 app.include_router(ProductRouter, prefix="/{tenant}/product", tags=["product"])
+app.include_router(ClassificationRouter, prefix="/{tenant}/classification", tags=["classification"])
+app.include_router(CustomerDiscountRouter, prefix="/{tenant}/customer-discount", tags=["customer Discount"])
+app.include_router(TerritoryRouter, prefix="/{tenant}/territory", tags=["territory"])
+app.include_router(RouteRouter, prefix="/{tenant}/route", tags=["route"])
+app.include_router(PointOfSaleRouter, prefix="/{tenant}/pointofsale", tags=["point of sale"])
+app.include_router(WalkInCustomerRouter, prefix="/{tenant}/walk-in-customer", tags=["walk in customer"])
+app.include_router(OutletRouter, prefix="/{tenant}/outlet", tags=["outlet"])
+
 app.include_router(RoleRouter, prefix="/{tenant}/role", tags=["role"])
 app.include_router(ScopeGroupRouter, prefix="/{tenant}", tags=["Scope Group"])
 app.include_router(UtilRouter, prefix="/{tenant}/utility", tags=["utility"])

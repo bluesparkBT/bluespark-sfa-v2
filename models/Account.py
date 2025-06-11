@@ -29,6 +29,7 @@ class ModuleName(str, Enum):
     #Tenant
     address = "Address"
     category = "Category"
+    classification = "Classification"
     dashboard = "Dashboard"
     deposit = "Deposit"
     finance = "Finance"

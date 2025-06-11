@@ -1,22 +1,23 @@
 from typing import Optional, List
 from sqlmodel import SQLModel, Field, Relationship
-from datetime import date
+from datetime import datetime
 from models.Account import Organization
-from models.Product_Category import ClassificationLink
+from models.Product_Category import ClassificationLink,InheritanceGroup
+
 
 class ClassificationGroup(SQLModel, table=True):
     __tablename__ = "classification_group"
 
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True)
-    description: Optional[str] = Field(default=None)
     organization: int = Field(foreign_key="organization.id", ondelete="CASCADE")  # Reference to Organization
-    point_of_sale_id: Optional[int] = Field(default=None, foreign_key="point_of_sale.id")
-    territory_id: Optional[int] = Field(default=None, foreign_key="territory.id")
-    route_id: Optional[int] = Field(default=None, foreign_key="route.id")
+    point_of_sale_id: Optional[int] = Field(default=None, foreign_key="point_of_sale.id",ondelete="CASCADE")
+    territory_id: Optional[int] = Field(default=None, foreign_key="territory.id",ondelete="CASCADE")
+    route_id: Optional[int] = Field(default=None, foreign_key="route.id",ondelete="CASCADE")
     # A classification group can have many discount entries.
-    customer_discounts: int = Field(foreign_key="customer_discount.id")  # Reference to Organization
+    customer_discounts: int = Field(foreign_key="customer_discount.id",ondelete="CASCADE")  # Reference to Organization
     inheritance_groups: List["InheritanceGroup"] = Relationship(back_populates="classifications", link_model=ClassificationLink)
+    description: Optional[str] = Field(default=None)
 
 
 class CustomerDiscount(SQLModel, table=True):
@@ -24,8 +25,9 @@ class CustomerDiscount(SQLModel, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     # Defines the validity period for the discount
-    start_date: date = Field()
-    end_date: date = Field()
+    start_date: datetime = Field()
+    end_date: datetime = Field()
+
     # The discount amount or percentage applied to customers of the classification.
     discount: float = Field(description="Discount amount or percentage applicable.")
 
@@ -49,19 +51,19 @@ class PromotionalItem(SQLModel, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     promotionImage: Optional[str] = Field(default=None)
-    product: int = Field(foreign_key="product.id", index=True)
+    product: int = Field(foreign_key="product.id", index=True,ondelete="CASCADE")
     quantity: float = Field(default=0)
-    promotion: Optional[int] = Field(foreign_key="promotion.id", default=None, index=True)
-    employee_id: int = Field(foreign_key="users.id", index=True)
-    promotion_id:int = Field(foreign_key="promotion.id", index=True)
+    promotion: Optional[int] = Field(foreign_key="promotion.id", default=None, index=True,ondelete="CASCADE")
+    employee_id: int = Field(foreign_key="users.id", index=True,ondelete="CASCADE")
+    promotion_id:int = Field(foreign_key="promotion.id", index=True,ondelete="CASCADE")
     promotion: Optional["Promotion"] = Relationship(back_populates="promotional_items")
     
 class Promotion(SQLModel, table=True):
     __tablename__ = "promotion"
     id: Optional[int] = Field(default=None, primary_key=True)
-    territory: int = Field(foreign_key="territory.id", index=True)
-    route: Optional[int] = Field(default=None, foreign_key="route.id", index=True)
-    point_of_sale: Optional[int] = Field(default=None, foreign_key="point_of_sale.id", index=True)
+    territory: int = Field(foreign_key="territory.id", index=True,ondelete="CASCADE")
+    route: Optional[int] = Field(default=None, foreign_key="route.id", index=True,ondelete="CASCADE")
+    point_of_sale: Optional[int] = Field(default=None, foreign_key="point_of_sale.id", index=True,ondelete="CASCADE")
     promotional_items: Optional[List[PromotionalItem]]= Relationship(back_populates= "promotion")
 
 class ShelfShare(SQLModel, table=True):
@@ -83,7 +85,7 @@ class ShelfShare(SQLModel, table=True):
 
     shelfShareImage: Optional[str]= Field(default=None)
     competitor: str = Field(default=None)
-    point_of_sale_id: int = Field(foreign_key="point_of_sale.id", index=True)
+    point_of_sale_id: int = Field(foreign_key="point_of_sale.id", index=True,ondelete="CASCADE")
     estimated_own_products: int = Field(default=0)
     estimated_competitors_products: int = Field(default=0)
 
@@ -106,7 +108,7 @@ class SalesActivation(SQLModel, table=True):
     """
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    sale: Optional[int] = Field(default=None, foreign_key="sale.id", index=True)
+    sale: Optional[int] = Field(default=None, foreign_key="sale.id", index=True,ondelete="CASCADE")
     quantity: float = Field(default=0)
-    promotion: int = Field(foreign_key="promotion.id", index=True)
-    distance: int = Field(foreign_key="geolocation.id")
+    promotion: int = Field(foreign_key="promotion.id", index=True,ondelete="CASCADE")
+    distance: int = Field(foreign_key="geolocation.id", ondelete="CASCADE")

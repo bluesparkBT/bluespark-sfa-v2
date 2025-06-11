@@ -187,6 +187,7 @@ async def create_inheritance_group(
             select(db_model).where(db_model.name == valid.name, db_model.organization.in_(organization_ids))
         ).first()
 
+        print(db_model.id)
         if check_inheritance_exist:
             raise HTTPException(status_code=400, detail=f"{endpoint_name} already exist")
         

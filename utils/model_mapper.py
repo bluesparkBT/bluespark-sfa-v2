@@ -170,6 +170,81 @@ MODEL_HTML_TYPES = {
         "account": "text",
         "account_holder": "text",
         "organization": "select"
-    }
+    },
 
+    "product": {"select"},
+        # "classification":"select"
+    "classification":{
+        "id": "hidden",
+        "name": "text",
+        "organization": "select",
+        "point_of_sale": "select",
+        "route":"select",
+        "territory":"select",
+        "description": "textarea",
+
+        "customer_id": "hidden",
+        "start_date": "date",
+        "end_date": "date",
+        "discount": "number"
+    },
+
+    "territory": {
+
+            "id": "hidden",
+            "country": "text",
+            "name": "text",
+            "description": "textarea",
+            "organization": "select",          
+    },
+    "customer_discount":{
+            "id": "",
+            "start_date": "",
+            "discount": "",            
+            "end_date": "",
+    },
+    "outlet":{
+            "id": "hidden",
+            "outlet_name": "text",
+            "channel": "select",
+            "tin": "text",
+            "phone": "text",
+            "outlet_email": "text",
+            "latitude": "text",
+            "longitude": "text",
+   } ,
+    "walk_in":{
+            "id": "hidden",
+            "name": "text",
+            "email": "text",
+            "location":"select",
+            "route":"select",
+            "territory":"select",
+            "organization":"select" ,
+    },
+    "route": {
+            "id": "hidden",
+            "name": "text",
+            "territory": "select",
+            "description": "textarea",
+            "organization": "select"      
+    },
+    "point_of_sale": {
+
+            "id": "hidden",
+            "outlet_name": "text",
+            "channel": "select",
+            "tin": "text",
+            "phone": "text",
+            "outlet_email": "text",
+            "latitude": "hidden",
+            "longitude": "hidden",
+
+            "customer_id": "hidden",
+            "customer_name": "text",
+            "customer_email": "text",
+            "route": "select",
+            "territoy": "select",
+            },
 }
+  
