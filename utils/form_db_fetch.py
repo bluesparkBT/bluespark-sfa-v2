@@ -1,10 +1,12 @@
+from models.Warehouse import Stock, StockType, Vehicle, Warehouse, WarehouseGroup, WarehouseGroupLink
 from sqlmodel import select
 from fastapi import Request, HTTPException, status, Depends
 from typing import Annotated
 from db import  get_session
-from models.Account import (Organization, User, Role, ScopeGroup, ScopeGroupLink)
+from models.Account import (Organization, User, Role, ScopeGroup, ScopeGroupLink, WarehouseStoreAdminLink)
 from models.Address import Address, Geolocation
 from models.Product_Category import Category, Product, InheritanceGroup, ProductLink, CategoryLink
+from models.FinanceModule import BankAccount
 from models.Marketing import ClassificationGroup, CustomerDiscount
 from models.PointOfSale import PointOfSale, Outlet, WalkInCustomer
 from models.RoutesAndVisits import Route, Territory
@@ -33,6 +35,7 @@ def fetch_user_id_and_name(session: SessionDep, current_user: UserDep):
     ).all()
     
     users = {row[0]: row[1] for row in users_row}
+    print("users: ", users)
     return users
 
 def fetch_organization_id_and_name(session: SessionDep, current_user: UserDep):
@@ -224,6 +227,40 @@ def fetch_inheritance_group_id_and_name(session: SessionDep, current_user: UserD
 
 #     return {row[0]: row[1] for row in inheritance_groups}
 
+
+def fetch_bank_account_id_and_account(session:SessionDep, current_user: UserDep):
+    
+    organization_ids = get_organization_ids_by_scope_group(session, current_user)
+    bank_row = session.exec(
+        select(BankAccount.id, BankAccount.account)
+        .where(BankAccount.organization.in_(organization_ids))
+        ).all()
+    account = {row[0]: row[1] for row in bank_row}
+    return account 
+
+def group_bank_accounts_by_bank_name(bank_accounts):
+    """
+    Groups bank accounts by their bank_name.
+
+    Args:
+        bank_accounts (List[BankAccount]): List of BankAccount objects or dicts.
+
+    Returns:
+        dict: {bank_name: {id: account, ...}, ...}
+    """
+    grouped = {}
+    for acc in bank_accounts:
+        # If acc is a SQLModel object, use acc.bank_name, acc.id, acc.account
+        # If acc is a dict, use acc['bank_name'], acc['id'], acc['account']
+        bank_name = acc.bank_name if hasattr(acc, "bank_name") else acc["bank_name"]
+        acc_id = acc.id if hasattr(acc, "id") else acc["id"]
+        account = acc.account if hasattr(acc, "account") else acc["account"]
+
+        if bank_name not in grouped:
+            grouped[bank_name] = {}
+        grouped[bank_name][acc_id] = account
+    return grouped
+
 def fetch_address_id_and_name(session: SessionDep, current_user: UserDep):
     organization_ids = get_organization_ids_by_scope_group(session, current_user)
 
@@ -298,42 +335,61 @@ def fetch_outlet_id_and_name(session: SessionDep, current_user: UserDep):
     outlet = {row[0]: row[1] for row in outlet_row}
     return outlet 
 
-# def fetch_warehouse_id_and_name(session: SessionDep, current_user: UserDep):
-#     organization_ids = get_organization_ids_by_scope_group(session, current_user)
+def fetch_admin_warehouse_id_and_name(session: SessionDep, current_user: UserDep):
+    organization_ids = get_organization_ids_by_scope_group(session, current_user)
 
-#     warehouse_row = session.exec(
-#         select(Warehouse.id, Warehouse.warehouse_name)
-#         .where(Warehouse.organization.in_(organization_ids))
-#         ).all()
-#     warehouses = {row[0]: row[1] for row in warehouse_row}
-#     return warehouses
+    warehouse_row = session.exec(
+        select(Warehouse.id, Warehouse.warehouse_name)
+        .where(Warehouse.organization_id.in_(organization_ids))
+        .distinct()
+    ).all()
+    warehouses = {row[0]: row[1] for row in warehouse_row}
+    print("warehouses: ", warehouses)
+    return warehouses
 
-# def fetch_stocks_id_and_name(session: SessionDep, current_user: UserDep):
-#     organization_ids = get_organization_ids_by_scope_group(session, current_user)
-#     stock_row = session.exec(
-#         select(Stock.id, Stock.stock_type, Product.name)
-#         .join(Warehouse, Warehouse.id == Stock.warehouse_id)
-#         .join(Product, Product.id == Stock.product_id)
-#         .where(Warehouse.organization.in_(organization_ids))
-#     ).all()
+def fetch_warehouse_id_and_name(session: SessionDep, current_user: UserDep):
+    organization_ids = get_organization_ids_by_scope_group(session, current_user)
 
-#     print(stock_row)
+    warehouse_row = session.exec(
+        select(Warehouse.id, Warehouse.warehouse_name)
+        .join(WarehouseGroupLink, WarehouseGroupLink.warehouse_id == Warehouse.id)
+        .join(WarehouseStoreAdminLink, WarehouseStoreAdminLink.warehouse_group_id == WarehouseGroupLink.warehouse_group_id)
+        .where(WarehouseStoreAdminLink.user_id == current_user.id)  
+        .where(Warehouse.organization_id.in_(organization_ids))
+        .distinct()
+    ).all()
+    warehouses = {row[0]: row[1] for row in warehouse_row}
+    return warehouses
 
-#     stocks = {
-#         row[0] :row[2] + convert_promotional(row[1])
-#         for row in stock_row
-#     }
-#     return stocks
+def fetch_stocks_id_and_name(session: SessionDep, current_user: UserDep):
+    organization_ids = get_organization_ids_by_scope_group(session, current_user)
+    stock_row = session.exec(
+        select(Stock.id, Stock.stock_type, Product.name)
+        .join(Warehouse, Warehouse.id == Stock.warehouse_id)
+        .join(Product, Product.id == Stock.product_id)
+        .join(WarehouseGroupLink, WarehouseGroupLink.warehouse_id == Warehouse.id)
+        .join(WarehouseStoreAdminLink, WarehouseStoreAdminLink.warehouse_group_id == WarehouseGroupLink.warehouse_group_id)
+        .where(WarehouseStoreAdminLink.user_id == current_user.id) 
+        .where(Warehouse.organization_id.in_(organization_ids)).distinct()
+    ).all()
 
-# def fetch_vehicle_id_and_name(session: SessionDep, current_user: UserDep):
-#     organization_ids = get_organization_ids_by_scope_group(session, current_user)
+    print(stock_row)
 
-#     vehicle_row = session.exec(
-#         select(Vehicle.id, Vehicle.name)
-#         .where(Vehicle.organization.in_(organization_ids))
-#         ).all()
-#     vehicles = {row[0]: row[1] for row in vehicle_row}
-#     return vehicles
+    stocks = {
+        row[0] :row[2] + convert_promotional(row[1])
+        for row in stock_row
+    }
+    return stocks
+
+def fetch_vehicle_id_and_name(session: SessionDep, current_user: UserDep):
+    organization_ids = get_organization_ids_by_scope_group(session, current_user)
+
+    vehicle_row = session.exec(
+        select(Vehicle.id, Vehicle.name)
+        .where(Vehicle.organization_id.in_(organization_ids))
+        ).all()
+    vehicles = {row[0]: row[1] for row in vehicle_row}
+    return vehicles
 
 
 def add_category_link(session: SessionDep, inheritance_group_id: int, category_id: int):
@@ -414,3 +470,23 @@ def get_user_inheritance_group(session, current_user):
     if inherited_group:
         return inherited_group, inherited_group.product
     return None, []
+
+def fetch_warehouse_group_id_and_name(session: SessionDep, current_user: UserDep):
+    organization_ids = get_organization_ids_by_scope_group(session, current_user)
+    group_row = session.exec(
+        select(WarehouseGroup.id, WarehouseGroup.name).where(WarehouseGroup.organization_id.in_(organization_ids))
+    ).all()
+
+    print(group_row)
+
+    groups = {
+        row[0] :row[1]
+        for row in group_row
+    }
+    return groups
+
+def convert_promotional(stock_type: StockType):
+    if stock_type == StockType.promotional:
+        return "(Promotional)"
+    else:
+        return ""

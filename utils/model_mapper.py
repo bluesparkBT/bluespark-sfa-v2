@@ -88,18 +88,27 @@ MODEL_HTML_TYPES = {
         "id":"hidden",
         "warehouse_name":"text",
         "organization":"select",
-        "location":"text"
+        "address": "select",
+        "landmark": "text",
+        "latitude":"text",
+        "longitude": "text",
     },
-     "warehouse_storeadmin":{
-        "warehouse_id":"hidden",
-        "store_admin": "checkbox"
+      "warehouse-storeadmin-add":{
+        "warehouse_group":"select",
+        "store_admins": "select multiple"
+    },
+     "warehouse-storeadmin-update":{
+        "warehouse_group":"hidden",
+        "store_admins": "select multiple"
+    },
+    "warehouse-group":{
+        "name": "text",
+        "access_policy": "select",
+        "warehouses": "select multiple"
     },
     "stock":{
         "id":"hidden",
-        "warehouse":"select",
         "product":"select",
-        "category":"select",
-        "sub_category": "select",
         "quantity": "number",
         "stock_type": "select"
     },
@@ -107,7 +116,8 @@ MODEL_HTML_TYPES = {
         "id":"hidden",
         "request_type":"select",
         "vehicle":"select",
-        "stock": "select",
+        "product": "select",
+        "warehouse": "select",
         "quantity": "number",
         "stock_type": "select"
     },
@@ -124,7 +134,7 @@ MODEL_HTML_TYPES = {
         "name": "text",
         "sku": "text",
         "organization": "select",
-        "category_id": "select",        
+        "category": "select",        
         "description": "textarea",
         "image": "file",
         "brand": "text",
@@ -137,7 +147,32 @@ MODEL_HTML_TYPES = {
         "name": "text",
         "organization": "select",
         "category": "select",
-        "product": "select"
+        "product": "select",
+        "role": "select",
+        "classification": "select",
+        "point_of_sale": "select"
+    },
+    "deposit": {
+        "id": "hidden",
+        "bank": "select",
+        "account": "select",
+        "branch": "text",
+        "amount": "number",
+        "remark": "text",
+        "date": "date",
+        "organization": "select",
+        "transaction_number":"text",
+        "deposit_slip": "file"
+    },
+    "bank": {
+        "id": "hidden",
+        "bank_name": "select",
+        "account": "text",
+        "account_holder": "text",
+        "organization": "select"
+    },
+
+    "product": "select"
         # "classification":"select"
     },
     "classification":{

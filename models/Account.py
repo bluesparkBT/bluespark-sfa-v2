@@ -4,13 +4,7 @@ from datetime import  datetime
 from typing import List, Optional, Self
 from models.Address import Address, Geolocation
 from models.Product_Category import RoleLink
-
-class AccessPolicy(str, Enum):
-    deny = "deny"
-    view = "view"
-    edit = "edit"
-    contribute = "contribute"
-    manage = "manage"
+from models.Warehouse import *
 
 class SuperAdminModuleName(str, Enum):
     #Service Provider
@@ -183,7 +177,9 @@ class User(SQLModel, table=True):
     id_number: Optional[str] = Field(default=None)    
     address: Optional[int] = Field(default=None, foreign_key="address.id", index=True)
     hashedPassword: str
+    warehouse_groups: Optional[List["WarehouseGroup"]] = Relationship(back_populates="store_admins", link_model=WarehouseStoreAdminLink)
     otp: Optional[str] = Field(default=None)
+
 
 class ActionType(str, Enum):
     approve = "Approve"

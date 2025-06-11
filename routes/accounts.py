@@ -241,19 +241,20 @@ def get_template(
             "username": extract_username(entry.username, tenant_name),
             "email": entry.email,
             "phone_number": entry.phone_number,
-            "organization": entry.organization,
             "role": entry.role,
             "scope": entry.scope,
             "scope_group": entry.scope_group,
+            "organization": entry.organization,
             "gender": entry.gender,
-            "manager_id": entry.manager,
-            "address": entry.address
+            "address": entry.address,
+            "manager": entry.manager,
+
         }
         
         if tenant == "provider":
             del data['organization']
             del data['scope']
-            del data['manager_id']
+            del data['manager']
         
         return data
     except HTTPException as http_exc:
@@ -285,6 +286,7 @@ def get_template_form(
             "email": "",
             "phone_number": "",
             "role": fetch_role_id_and_name(session, current_user),
+            "scope": {i.value: i.value for i in Scope},
             "scope_group": fetch_scope_group_id_and_name(session, current_user),
             "organization": fetch_organization_id_and_name(session, current_user),
             "gender": {i.value: i.value for i in Gender},

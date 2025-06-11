@@ -57,7 +57,7 @@ async def get_inheritance_groups(
 
         if not db_entries:
             raise HTTPException(status_code=404, 
-                detail=f"{endpoint_name} Group not found")
+                detail=f"No {endpoint_name} Group created")
         inheritance_list = []
         for inheritance in db_entries:
             organization_name = session.exec(select(Organization.name).where(Organization.id == inheritance.organization)).first()

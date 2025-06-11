@@ -13,12 +13,19 @@ from routes.serviceProvider import ServiceProvider
 from routes.accounts import AccountRouter
 from routes.address import AddressRouter
 from routes.category import CategoryRouter
+from routes.deposit import DepositRouter
 from routes.inheritance import InheritanceRouter
 from routes.product import ProductRouter
 from routes.role import RoleRouter
 from routes.scopeGroup import ScopeGroupRouter
 from routes.organizations import OrganizationRouter
 from routes.tenant_managment import TenantRouter
+from routes.warehouses import WarehouseRouter
+from routes.warehouseGroup import WarehouseGroupRouter
+from routes.warehouseStoreAdmin import WarehouseStoreAdminRouter
+from routes.stock import StockRouter
+from routes.stockLog import StockLogRouter
+from routes.itemRequest import WarehouseItemRequestRouter
 from routes.classification import ClassificationRouter
 from routes.customerDiscount import CustomerDiscountRouter
 from routes.territory import TerritoryRouter
@@ -84,6 +91,7 @@ def on_startup():
 app.include_router(AccountRouter, prefix="/{tenant}/account", tags=["account"])
 app.include_router(AddressRouter, prefix="/{tenant}/address", tags=["address"])
 app.include_router(CategoryRouter, prefix="/{tenant}/category", tags=["category"])
+app.include_router(DepositRouter, prefix="/{tenant}/finance", tags=["finance"])
 app.include_router(InheritanceRouter, prefix="/{tenant}/inheritance", tags = ["inheritance"])
 app.include_router(OrganizationRouter, prefix="/{tenant}/organization", tags=["organization"])
 app.include_router(ProductRouter, prefix="/{tenant}/product", tags=["product"])
@@ -100,4 +108,9 @@ app.include_router(ScopeGroupRouter, prefix="/{tenant}", tags=["Scope Group"])
 app.include_router(UtilRouter, prefix="/{tenant}/utility", tags=["utility"])
 app.include_router(TenantRouter, tags=["tenant management"])
 app.include_router(ServiceProvider, tags=["service provider"])
-#app.include_router(WarehouseRouter, prefix="/{tenant}/warehouse", tags=["warehouse"])
+app.include_router(WarehouseRouter, prefix="/{tenant}/warehouse", tags=["warehouse"])
+app.include_router(WarehouseGroupRouter, prefix="/{tenant}/warehouse", tags=["warehouse-group"])
+app.include_router(WarehouseStoreAdminRouter, prefix="/{tenant}/warehouse", tags=["warehouse-store-admin"])
+app.include_router(StockRouter, prefix="/{tenant}/warehouse", tags=["warehouse-stock"])
+app.include_router(StockLogRouter, prefix="/{tenant}/warehouse", tags=["warehouse-stock-log"])
+app.include_router(WarehouseItemRequestRouter, prefix="/{tenant}/warehouse", tags=["warehouse-item-request"])
