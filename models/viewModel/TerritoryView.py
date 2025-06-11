@@ -27,7 +27,7 @@ class RouteView(BaseModel):
     organization: int
 
 class updateRouteView(BaseModel):
-    id: int | str
+    id: Optional[int]
     name: Annotated[str, AfterValidator(validate_name)]
     territory: int
     description: Optional[str]

@@ -30,7 +30,7 @@ class PointOfSale(SQLModel, table=True):
     organization: int = Field(foreign_key="organization.id", ondelete="CASCADE")  # Reference to Organization
 
     # Optional references
-    outlet_id: Optional[int] = Field(default=None, foreign_key="outlet.id")
+    outlet_id: Optional[int] = Field(default=None, foreign_key="outlet.id", ondelete = "CASCADE")  # Reference to Outlet
     walk_in_customer_id: Optional[int] = Field(default=None, foreign_key="walk_in_customer.id" ,ondelete="CASCADE")
 
     # Relationships
@@ -59,7 +59,6 @@ class WalkInCustomer(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True)  # Walk-in customer name
     email: Optional[str] = Field(default=None)  # Optional email (Alphanumeric type assumed as text)
-    location_id: Optional[int] = Field(default=None, foreign_key="geolocation.id",ondelete="CASCADE")  # Optional Reference to Location
     route_id: Optional[int] = Field(default=None, foreign_key="route.id", ondelete="CASCADE")
     territoy_id: Optional[int] = Field(default=None, foreign_key="territory.id" , ondelete="CASCADE")  # Optional Reference to Location
   # Optional Reference to Location

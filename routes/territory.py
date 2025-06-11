@@ -100,9 +100,11 @@ def get_territory_by_id(
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Something went wrong")
 
-@c.get("/territory-form")
-async def get_form_fields_for_territory(
-    session: SessionDep, current_user: UserDep
+@c.get(endpoint['get_form'])
+def territory_form(
+    tenant: str,
+    session: SessionDep, 
+    current_user: UserDep,
 ):
     try:
         if not check_permission(
@@ -129,11 +131,14 @@ async def get_form_fields_for_territory(
 @c.post(endpoint['create'])
 def create_territory(
     session: SessionDep,
-    tenant: str,
     current_user: UserDep,
+    tenant: str,
     valid: TemplateView
 ):
     try:
+        if not check_permission(session, "Create", role_modules['create'], current_user):
+            raise HTTPException(status_code=403, detail="You do not have the required privilege")
+
         new_entry = db_model.model_validate(valid)
 
         session.add(new_entry)
@@ -185,7 +190,7 @@ def update_territory(
         raise HTTPException(status_code=500, detail="Something went wrong")
 
 
-@c.delete(endpoint['delete'])
+@c.delete(endpoint['delete'] + "/{id}")
 def delete_territory(
     session: SessionDep,
     tenant: str,
@@ -200,7 +205,7 @@ def delete_territory(
 
         if not entry:
             raise HTTPException(status_code=404, detail=f"{endpoint_name} not found")
-
+    
         session.delete(entry)
         session.commit()
 

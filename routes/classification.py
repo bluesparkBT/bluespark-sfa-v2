@@ -124,7 +124,7 @@ def get_template(
 
 
 
-@c.get("/classification-form")
+@c.get (endpoint['get_form'])
 async def get_form_fields_for_classification(
     session: SessionDep, current_user: UserDep
 ):

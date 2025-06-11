@@ -172,9 +172,8 @@ MODEL_HTML_TYPES = {
         "organization": "select"
     },
 
-    "product": "select"
+    "product": {"select"},
         # "classification":"select"
-    },
     "classification":{
         "id": "hidden",
         "name": "text",
@@ -201,8 +200,8 @@ MODEL_HTML_TYPES = {
     "customer_discount":{
             "id": "",
             "start_date": "",
-            "end_date": "",
             "discount": "",            
+            "end_date": "",
     },
     "outlet":{
             "id": "hidden",

@@ -19,8 +19,8 @@ class Territory(SQLModel, table=True):
     """
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    country: str = Field(default="Ethiopia", index=True)
     name: str = Field(index=True)
+    country: str = Field(default="Ethiopia", index=True)
     description: Optional[str] = Field(default=None)
     organization: Optional[int] = Field(default=None, foreign_key="organization.id", ondelete="CASCADE")
 
@@ -46,8 +46,8 @@ class Route(SQLModel, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True)
+    territory: int = Field(foreign_key="territory.id", index=True, ondelete = "CASCADE")
     description: Optional[str] = Field(default=None)
-    territory: int = Field(foreign_key="territory.id", index=True)
     organization: Optional[int] = Field(default=None, foreign_key="organization.id", ondelete="CASCADE")
 
 

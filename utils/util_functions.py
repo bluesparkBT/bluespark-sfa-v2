@@ -40,6 +40,19 @@ def validate_email(email: str) -> bool:
     else:
         return False
 
+def parse_float(val):
+    """
+    Attempts to parse a float from the given input value.
+    Returns None if the input is an empty string or not convertible.
+    """
+    if val == "":
+        return None
+    if isinstance(val, float):
+        return val
+    try:
+        return float(val)
+    except (TypeError, ValueError):
+        return None
 
 def validate_phone_number(phone_number) -> bool:
     """Validates Ethiopian phone numbers starting with +2517/9 or 07/09."""

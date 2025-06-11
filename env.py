@@ -3,13 +3,10 @@ from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
-from sqlmodel import SQLModel
 from alembic import context
+from models import *
 
 
-
-# from models.Core import Category
-# from models.Core import Stock
 
 
 # this is the Alembic Config object, which provides

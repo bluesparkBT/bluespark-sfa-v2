@@ -1,7 +1,7 @@
 from models.Warehouse import Stock, StockType, Vehicle, Warehouse, WarehouseGroup, WarehouseGroupLink
 from sqlmodel import select
 from fastapi import Request, HTTPException, status, Depends
-from typing import Annotated
+from typing import Annotated, Any
 from db import  get_session
 from models.Account import (Organization, User, Role, ScopeGroup, ScopeGroupLink, WarehouseStoreAdminLink)
 from models.Address import Address, Geolocation
@@ -51,14 +51,12 @@ def fetch_organization_id_and_name(session: SessionDep, current_user: UserDep):
 def fetch_organization_ids(session: SessionDep, current_user: UserDep):
     organization_ids = get_organization_ids_by_scope_group(session, current_user)
 
-    organization_rows = session.exec(
-        select(Organization.id)
-        .where(Organization.id.in_(organization_ids))
-    ).all()
+    # Fetch IDs directly without expecting tuples
+    organization_ids_list = session.exec(
+        select(Organization.id).where(Organization.id.in_(organization_ids))
+    ).all()  # This already returns a list of integers
 
-    # Extract only the IDs from the result rows (each row is a one-item tuple)
-    organization_ids_list = [row[0] for row in organization_rows]
-    return organization_ids_list
+    return organization_ids_list  # No need to unpack tuplesrn organization_ids_list
 
 def fetch_route_id_and_name(session: SessionDep, current_user: UserDep):
     organization_ids = get_organization_ids_by_scope_group(session, current_user)
@@ -70,17 +68,33 @@ def fetch_route_id_and_name(session: SessionDep, current_user: UserDep):
     routes = {row[0]: row[1] for row in route_rows}
     return routes
   
-def fetch_territory_id_and_name(session: SessionDep, current_user: UserDep):
-    organization_ids = get_organization_ids_by_scope_group(session, current_user)
+# def fetch_territory_id_and_name(session: SessionDep, current_user: UserDep):
+#     organization_ids = get_organization_ids_by_scope_group(session, current_user)
 
+#     territory_rows = session.exec(
+#         select(Territory.id, Territory.name)
+#         .where(Territory.id.in_(organization_ids))
+#     ).all()
+
+#     territorys = {row[0]: row[1] for row in territory_rows}
+#     return territorys 
+
+def fetch_territory_id_and_name(
+    session: SessionDep,
+    current_user: UserDep
+) -> list[dict[str, Any]]:
+    # 1. Grab all the org IDs this user can see
+    organization_ids = get_organization_ids_by_scope_group(session, current_user)
+    # 2. Fetch (id, name) for every Territory whose organization_id is in that list
     territory_rows = session.exec(
         select(Territory.id, Territory.name)
-        .where(Territory.id.in_(organization_ids))
+        .where(Territory.organization.in_(organization_ids))
     ).all()
 
-    territorys = {row[0]: row[1] for row in territory_rows}
-    return territorys 
-   
+    # 3. Return a list of dicts so the front-end can loop through them easily
+    territories = {row[0]: row[1] for row in territory_rows}
+
+    return territories
 def fetch_discount_id_and_name(session: SessionDep, current_user: UserDep):
     organization_ids = get_organization_ids_by_scope_group(session, current_user)
 
